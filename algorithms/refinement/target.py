@@ -21,6 +21,7 @@ from scitbx import sparse
 
 # PHIL
 from libtbx.phil import parse
+from future.utils import with_metaclass
 
 phil_str = """
     rmsd_cutoff = *fraction_of_bin_size absolute
@@ -121,7 +122,7 @@ class TargetFactory(object):
         )
 
 
-class Target(object):
+class Target(with_metaclass(abc.ABCMeta, object)):
     """Abstract interface for a target function class
 
     A Target object will be used by a Refinery. It will refer to a Reflection
@@ -140,8 +141,6 @@ class Target(object):
     is used for a detector space & phi residual, or a reciprocal space residual.
     This should all be set by a derived class.
     """
-
-    __metaclass__ = abc.ABCMeta
     _grad_names = ["dX_dp", "dY_dp", "dphi_dp"]
     rmsd_names = ["RMSD_X", "RMSD_Y", "RMSD_Phi"]
     rmsd_units = ["mm", "mm", "rad"]

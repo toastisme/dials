@@ -15,6 +15,7 @@ from dials.algorithms.indexing.compare_orientation_matrices import (
 )
 from dials.algorithms.refinement import RefinerFactory
 from dials.util.log import LoggingContext
+from future.utils import with_metaclass
 
 
 logger = logging.getLogger(__name__)
@@ -66,9 +67,7 @@ def filter_doubled_cell(solutions):
     return accepted_solutions
 
 
-class ModelRank(object):
-
-    __metaclass__ = abc.ABCMeta
+class ModelRank(with_metaclass(abc.ABCMeta, object)):
 
     def __init__(self):
         self.all_solutions = []
@@ -302,9 +301,7 @@ class ModelRankWeighted(ModelRank):
         return table_utils.format(rows=rows, has_header=True)
 
 
-class Strategy(object):
-
-    __metaclass__ = abc.ABCMeta
+class Strategy(with_metaclass(abc.ABCMeta, object)):
 
     @abc.abstractmethod
     def evaluate(self, experiments, reflections):

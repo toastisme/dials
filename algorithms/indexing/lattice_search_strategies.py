@@ -15,6 +15,7 @@ from scitbx import matrix
 from scitbx.math import superpose, least_squares_plane
 from dxtbx.model import Crystal
 from libtbx import phil
+from future.utils import with_metaclass
 
 TWO_PI = 2.0 * math.pi
 FIVE_DEG = TWO_PI * 5.0 / 360.0
@@ -22,10 +23,8 @@ FIVE_DEG = TWO_PI * 5.0 / 360.0
 logger = logging.getLogger(__name__)
 
 
-class Strategy(object):
+class Strategy(with_metaclass(abc.ABCMeta, object)):
     """A base class for lattice search strategies."""
-
-    __metaclass__ = abc.ABCMeta
 
     phil_scope = None
 
