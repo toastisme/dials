@@ -9,7 +9,7 @@ class ReciprocalLatticeJson(object):
     def __init__(self, experiments, reflections):
         self.experiments = experiments
         self.reflections = Indexer.map_centroids_to_reciprocal_space(
-            experiments, reflections
+            experiments, reflections, convert_px_to_mm=True
         )
 
     def as_dict(self, n_digits=None):

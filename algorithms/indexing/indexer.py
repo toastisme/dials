@@ -513,11 +513,15 @@ class Indexer(object):
         self.reflections["id"] = flex.int(len(self.reflections), -1)
 
     @staticmethod
-    def map_centroids_to_reciprocal_space(experiments, reflections):
+    def map_centroids_to_reciprocal_space(
+        experiments, reflections, convert_px_to_mm=False
+    ):
         spots_mm = reflections
         reflections = flex.reflection_table()
         for i, expt in enumerate(experiments):
             spots_sel = spots_mm.select(spots_mm["imageset_id"] == i)
+            if convert_px_to_mm:
+                spots_sel.centroid_px_to_mm(expt.detector, expt.scan)
             spots_sel.map_centroids_to_reciprocal_space(
                 expt.detector, expt.beam, expt.goniometer
             )
