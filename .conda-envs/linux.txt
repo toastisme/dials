@@ -40,7 +40,7 @@ conda-forge::requests
 conda-forge::scikit-learn
 conda-forge::scipy
 conda-forge::scons
-conda-forge::setuptools
+conda-forge::setuptools<50.0
 conda-forge::six
 conda-forge::sphinx<3.2
 conda-forge::sqlite
