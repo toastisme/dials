@@ -64,6 +64,10 @@ phil_scope = parse(
     log = 'dials.find_spots.log'
       .type = str
       .help = "The log filename"
+
+    tof_sequence_to_stills = False
+      .type = bool
+      .help = "Outputs a ToF Experiment as an ExperimentList with one Experiment for each reflection."
   }
 
   maximum_trusted_value = None
@@ -161,6 +165,12 @@ class Script:
 
         # Loop through all the imagesets and find the strong spots
         reflections = flex.reflection_table.from_observations(experiments, params)
+        if params.output.tof_sequence_to_stills:
+            assert(len(experiments) == 1), "ExperimentList has more than one experiment"
+            reflections.calculate_tof_wavelengths(experiments)
+            experiments = reflections.tof_sequence_to_stills(experiments[0])
+            reflections.map_centroids_to_reciprocal_space(experiments)
+            experiments.as_file("tof_imported.expt")
 
         # Add n_signal column - before deleting shoeboxes
         good = MaskCode.Foreground | MaskCode.Valid
