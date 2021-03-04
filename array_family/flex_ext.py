@@ -1220,7 +1220,12 @@ Found %s"""
                 self["xyzobs.mm.variance"].set_selected(sel, centroid_variance)
 
 
-    def calculate_tof_wavelengths(self, experiments, L0_in_m=8.3):
+    def add_tof_data(self, experiments, L0_in_m=8.3):
+
+        """
+        Adds tof_wavelength, tof_s0, and tof_unit_s0 columns to self
+        """
+
         import numpy as np
         from scipy import interpolate
 
@@ -1228,6 +1233,9 @@ Found %s"""
             h = 6.626E-34
             m_n = 1.675E-27
             return ((h * tof_in_s)/(m_n * (L0_in_m + L_in_m)))*10**10
+
+        def get_tof_s0(s0_direction, tof_wavelength):
+            return s0_direction * 1.0/tof_wavelength
 
         def get_tof_curve_coefficients(tof_vals):
             x = [i+1 for i in range(len(tof_vals))]
@@ -1242,7 +1250,9 @@ Found %s"""
 
         self.centroid_px_to_mm(experiments)
         panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
-        self["tof_wavelength"] = cctbx.array_family.flex.double(self.nrows(), -1)
+        self["tof_wavelength"] = cctbx.array_family.flex.double(self.nrows())
+        self["tof_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
+        self["tof_unit_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
 
         for i, expt in enumerate(experiments):
             if "imageset_id" in self:
@@ -1264,11 +1274,18 @@ Found %s"""
                 ) 
                 frame_tof_vals = get_frame_tof_vals(frame, tof_vals, tof_curve_coeffs)
 
-                wavelengths = cctbx.array_family.flex.double(len(s1), -1)
+                wavelengths = cctbx.array_family.flex.double(len(s1))
+                tof_s0 = cctbx.array_family.flex.vec3_double(self.nrows())
+                tof_unit_s0 = cctbx.array_family.flex.vec3_double(self.nrows())
                 for j in range(len(s1)):
                     s1n = np.linalg.norm(s1[j]) * 10**-3
                     wavelengths[j]=get_tof_wavelength_in_ang(L0_in_m, s1n, frame_tof_vals[j])
+                    unit_s0 = -np.array(expt.beam.get_unit_s0())
+                    tof_s0[j] = get_tof_s0(unit_s0, wavelengths[j])
+                    tof_unit_s0[j] = unit_s0
                 self["tof_wavelength"].set_selected(sel, wavelengths)
+                self["tof_s0"].set_selected(sel, tof_s0)
+                self["tof_unit_s0"].set_selected(sel, tof_unit_s0)
 
     def tof_sequence_to_stills(self, experiment):
         
