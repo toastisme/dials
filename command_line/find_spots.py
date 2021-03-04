@@ -64,6 +64,10 @@ phil_scope = parse(
     log = 'dials.find_spots.log'
       .type = str
       .help = "The log filename"
+
+    add_tof_data = False
+      .type = bool
+      .help = Adds tof_wavelength, tof_s0, and tof_unit_s0 to the reflection table
   }
 
   maximum_trusted_value = None
@@ -161,6 +165,8 @@ class Script:
 
         # Loop through all the imagesets and find the strong spots
         reflections = flex.reflection_table.from_observations(experiments, params)
+        if params.output.add_tof_data:
+            reflections.add_tof_data(experiments)
 
         # Add n_signal column - before deleting shoeboxes
         good = MaskCode.Foreground | MaskCode.Valid
