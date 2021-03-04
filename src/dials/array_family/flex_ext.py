@@ -29,6 +29,7 @@ import dials.extensions.glm_background_ext
 import dials.extensions.simple_centroid_ext
 import dials.util.ext
 import dials_array_family_flex_ext
+from dxtbx.model import ExperimentList, Experiment
 from dials.algorithms.centroid import centroid_px_to_mm_panel
 
 __all__ = ["real", "reflection_table_selector"]
@@ -895,9 +896,8 @@ class _:
             self, image_volume=image_volume
         )
 
-    def compute_summed_intensity(
-        self, image_volume: dials.model.data.MultiPanelImageVolume = None
-    ) -> None:
+    def compute_summed_intensity(self, image_volume=None):
+        # type: (dials.model.data.MultiPanelImageVolume) -> None
         """
         Compute intensity via summation integration.
         """
@@ -1273,6 +1273,91 @@ Found %s"""
                 )
                 self["xyzobs.mm.value"].set_selected(sel, centroid_position)
                 self["xyzobs.mm.variance"].set_selected(sel, centroid_variance)
+
+
+    def calculate_tof_wavelengths(self, experiments, L0_in_m=8.3):
+        import numpy as np
+        from scipy import interpolate
+
+        def get_tof_wavelength_in_ang(L0_in_m, L_in_m, tof_in_s):
+            h = 6.626E-34
+            m_n = 1.675E-27
+            return ((h * tof_in_s)/(m_n * (L0_in_m + L_in_m)))*10**10
+
+        def get_tof_curve_coefficients(tof_vals):
+            x = [i+1 for i in range(len(tof_vals))]
+            return interpolate.splrep(x, tof_vals)
+
+        def get_frame_tof_vals(frames, tof_vals, tof_curve_coeffs):
+            frame_tof_vals = []
+            for i in range(len(frames)):
+                frame_tof_vals.append(interpolate.splev(frames[i], tof_curve_coeffs))
+            return frame_tof_vals
+            
+
+        self.centroid_px_to_mm(experiments)
+        panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
+        self["tof_wavelength"] = cctbx.array_family.flex.double(self.nrows(), -1)
+
+        for i, expt in enumerate(experiments):
+            if "imageset_id" in self:
+                sel_expt = self["imageset_id"] == i
+            else:
+                sel_expt = self["id"] == i
+
+            fmt_cls = expt.imageset.get_format_class()
+            fmt_cls_inst = fmt_cls(expt.imageset.get_template())
+            tof_vals = fmt_cls_inst._get_time_channels_in_seconds()
+            tof_curve_coeffs = get_tof_curve_coefficients(tof_vals)
+
+            for i_panel in range(len(expt.detector)):
+                sel = sel_expt & (panel_numbers == i_panel)
+                x, y, rot_angle = self["xyzobs.mm.value"].select(sel).parts()
+                px, py, frame = self["xyzobs.px.value"].select(sel).parts()
+                s1 = expt.detector[i_panel].get_lab_coord(
+                    cctbx.array_family.flex.vec2_double(x, y)
+                ) 
+                frame_tof_vals = get_frame_tof_vals(frame, tof_vals, tof_curve_coeffs)
+
+                wavelengths = cctbx.array_family.flex.double(len(s1), -1)
+                for j in range(len(s1)):
+                    s1n = np.linalg.norm(s1[j]) * 10**-3
+                    wavelengths[j]=get_tof_wavelength_in_ang(L0_in_m, s1n, frame_tof_vals[j])
+                self["tof_wavelength"].set_selected(sel, wavelengths)
+
+    def tof_sequence_to_stills(self, experiment):
+        
+        """
+        Returns an ExperimentList consisting of separate Experiment instances
+        for each reflection, with Beam instances set to the wavelength of each
+        reflection.
+        """
+
+        assert("tof_wavelength" in self), "Reflection table does not contain ToF wavelengths."
+        from dxtbx_imageset_ext import ImageSet
+        from scitbx.array_family import flex
+        beams = [copy.copy(experiment.beam) for i in range(len(self))] 
+        experiment_list = ExperimentList()
+        for i in range(len(self)):
+            beam = copy.copy(experiment.beam)
+            beam.set_wavelength(self["tof_wavelength"][i])
+            px, py, frame = self["xyzobs.px.value"][i]
+            single_file_indices = [int(frame)]
+            single_file_indices = flex.size_t(single_file_indices)
+            imageset = ImageSet(experiment.imageset.data(), single_file_indices)
+            imageset.set_scan(None)
+            imageset.set_goniometer(None)
+            imageset.set_beam(beam)
+            new_experiment = Experiment(beam=beam,
+                                        detector=experiment.imageset.get_detector(),
+                                        goniometer=None,
+                                        scan=None,
+                                        crystal=None,
+                                        identifier=str(i),
+                                        imageset=imageset)
+            experiment_list.append(new_experiment)
+           
+        return experiment_list
 
     def map_centroids_to_reciprocal_space(
         self, experiments, calculated=False, crystal_frame=False
