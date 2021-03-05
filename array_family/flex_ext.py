@@ -1338,10 +1338,23 @@ Found %s"""
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
-                s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
-                self["s1"].set_selected(sel, s1)
-                S = s1 - expt.beam.get_s0()
-                if expt.goniometer is not None:
+
+                if "tof_wavelength" in self:
+                    import numpy as np
+                    assert("tof_s0" in self and "tof_unit_s0" in self), "ToF columns incomplete."
+                    tof_wavelengths = self["tof_wavelength"].select(sel)
+                    tof_s0 = self["tof_s0"].select(sel)
+                    S = s1
+                    for s1_idx in range(len(s1)):
+                        s1[s1_idx] = s1[s1_idx]/np.linalg.norm(s1[s1_idx]) 
+                        s1[s1_idx] = np.array(s1[s1_idx]) * 1.0/tof_wavelengths[s1_idx]
+                        S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])
+                else:
+                    s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
+                    S = s1 - expt.beam.get_s0()
+                    self["s1"].set_selected(sel, s1)
+
+                if expt.goniometer is not None and "tof_wavelength" not in self:
                     setting_rotation = matrix.sqr(
                         expt.goniometer.get_setting_rotation()
                     )
