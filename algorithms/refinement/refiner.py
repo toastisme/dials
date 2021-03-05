@@ -243,6 +243,9 @@ class RefinerFactory:
             "flags",
             "shoebox",
             "delpsical.weights",
+            "tof_wavelength",
+            "tof_s0",
+            "tof_unit_s0"
         ]
         # NB xyzobs.px.value & xyzcal.px required by SauterPoon outlier rejector
         # NB delpsical.weights is used by ExternalDelPsiWeightingStrategy
