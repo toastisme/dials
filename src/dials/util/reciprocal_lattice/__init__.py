@@ -63,7 +63,7 @@ class Render3d:
     def load_models(self, experiments, reflections):
         self.experiments = experiments
         self.reflections_input = reflections
-        if self.experiments[0].goniometer is not None:
+        if self.experiments[0].goniometer is not None and "tof_wavelength" not in reflections:
             self.viewer.set_rotation_axis(
                 self.experiments[0].goniometer.get_rotation_axis()
             )
