@@ -159,8 +159,12 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
     spherical_relp_model = False
 
     def _predict_one_experiment(self, experiment, reflections):
-
-        predictor = st(experiment, spherical_relp=self.spherical_relp_model)
+        dmin=None
+        if "tof_s0" in reflections and "tof_wavelength" in reflections:
+            min_wavelength, min_idx = min((val, idx) for (idx, val) in enumerate(reflections["tof_wavelength"]))
+            min_s0 = reflections["tof_s0"][min_idx]
+            dmin = experiment.detector.get_max_resolution(min_s0)
+        predictor = st(experiment, dmin=dmin, spherical_relp=self.spherical_relp_model)
         UB = experiment.crystal.get_A()
         predictor.for_reflection_table(reflections, UB)
 
