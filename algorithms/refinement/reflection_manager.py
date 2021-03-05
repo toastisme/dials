@@ -354,7 +354,10 @@ class ReflectionManager:
         self._axes = [
             matrix.col(g.get_rotation_axis()) if g else None for g in goniometers
         ]
-        self._s0vecs = [matrix.col(e.beam.get_s0()) for e in self._experiments]
+        if "tof_s0" in reflections and len(experiments) == 1:
+            self._s0vecs = [matrix.col(reflections["tof_s0"][r]) for r in range(len(reflections))]
+        else:
+            self._s0vecs = [matrix.col(e.beam.get_s0()) for e in self._experiments]
 
         # unset the refinement flags (creates flags field if needed)
         reflections.unset_flags(
