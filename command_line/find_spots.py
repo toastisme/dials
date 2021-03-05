@@ -65,7 +65,6 @@ phil_scope = parse(
       .type = str
       .help = "The log filename"
 
- one_experiment_per_reflection
     tof_sequence_to_stills = False
       .type = bool
       .help = "Outputs a ToF Experiment as an ExperimentList with one Experiment for each reflection."
@@ -73,7 +72,6 @@ phil_scope = parse(
     add_tof_data = False
       .type = bool
       .help = Adds tof_wavelength, tof_s0, and tof_unit_s0 to the reflection table
- tof_wavelength_mapping
   }
 
   maximum_trusted_value = None
