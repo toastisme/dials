@@ -1275,14 +1275,15 @@ Found %s"""
                 frame_tof_vals = get_frame_tof_vals(frame, tof_vals, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
-                tof_s0 = cctbx.array_family.flex.vec3_double(self.nrows())
-                tof_unit_s0 = cctbx.array_family.flex.vec3_double(self.nrows())
+                tof_s0 = cctbx.array_family.flex.vec3_double(len(s1))
+                tof_unit_s0 = cctbx.array_family.flex.vec3_double(len(s1))
                 for j in range(len(s1)):
                     s1n = np.linalg.norm(s1[j]) * 10**-3
                     wavelengths[j]=get_tof_wavelength_in_ang(L0_in_m, s1n, frame_tof_vals[j])
-                    unit_s0 = -np.array(expt.beam.get_unit_s0())
+                    unit_s0 = np.array(expt.beam.get_unit_s0())
                     tof_s0[j] = get_tof_s0(unit_s0, wavelengths[j])
                     tof_unit_s0[j] = unit_s0
+
                 self["tof_wavelength"].set_selected(sel, wavelengths)
                 self["tof_s0"].set_selected(sel, tof_s0)
                 self["tof_unit_s0"].set_selected(sel, tof_unit_s0)
@@ -1318,7 +1319,9 @@ Found %s"""
                                         identifier=str(i),
                                         imageset=imageset)
             experiment_list.append(new_experiment)
-           
+            self["id"][i] = i
+            if "imageset_id" in self:
+                self["imageset_id"][i] = i
         return experiment_list
 
     def map_centroids_to_reciprocal_space(
@@ -1361,15 +1364,15 @@ Found %s"""
                     assert("tof_s0" in self and "tof_unit_s0" in self), "ToF columns incomplete."
                     tof_wavelengths = self["tof_wavelength"].select(sel)
                     tof_s0 = self["tof_s0"].select(sel)
-                    S = s1
+                    S = cctbx.array_family.flex.vec3_double(len(s1))
                     for s1_idx in range(len(s1)):
                         s1[s1_idx] = s1[s1_idx]/np.linalg.norm(s1[s1_idx]) 
                         s1[s1_idx] = np.array(s1[s1_idx]) * 1.0/tof_wavelengths[s1_idx]
-                        S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])
+                        S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])     
                 else:
                     s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
                     S = s1 - expt.beam.get_s0()
-                    self["s1"].set_selected(sel, s1)
+                self["s1"].set_selected(sel, s1)
 
                 if expt.goniometer is not None and "tof_wavelength" not in self:
                     setting_rotation = matrix.sqr(
