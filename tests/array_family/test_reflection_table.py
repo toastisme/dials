@@ -1604,3 +1604,29 @@ def test_concat():
     assert list(table1["id"]) == [0, 0, 1, 1, 2, 2, 3, 3]
     assert list(ids1.keys()) == [0, 1, 2, 3]
     assert list(ids1.values()) == ["a", "b", "c", "d"]
+def test_contains_valid_tof_data():
+
+    # Test empty table
+    table = flex.reflection_table()
+    assert table.contains_valid_tof_data() is False
+
+    # Test table with only tof_wavelength with invalid values
+    tof_wavelength = flex.double(2)
+    tof_s0 = flex.vec3_double(2)
+    table["tof_wavelength"] = tof_wavelength
+    assert table.contains_valid_tof_data() is False
+
+    # TEST table with only tof_wavelength with valid values
+    table["tof_wavelength"][0] = 0.1
+    table["tof_wavelength"][1] = 0.2
+    assert table.contains_valid_tof_data() is False
+
+    # Test table with tof_wavelength and tof_s0, but tof_s0 has
+    # invalid values
+    table["tof_s0"] = tof_s0
+    assert table.contains_valid_tof_data() is False
+
+    # Test table with valid values for tof_wavelength and tof_s0
+    table["tof_s0"][0] = (0, 0, 1)
+    table["tof_s0"][1] = (0, 0, 1)
+    assert table.contains_valid_tof_data() is True

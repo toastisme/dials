@@ -23,13 +23,13 @@ import boost_adaptbx.boost.python
 import cctbx.array_family.flex
 import cctbx.miller
 import libtbx.smart_open
+from dxtbx.model import Experiment, ExperimentList
 from scitbx import matrix
 
 import dials.extensions.glm_background_ext
 import dials.extensions.simple_centroid_ext
 import dials.util.ext
 import dials_array_family_flex_ext
-from dxtbx.model import ExperimentList, Experiment
 from dials.algorithms.centroid import centroid_px_to_mm_panel
 
 __all__ = ["real", "reflection_table_selector"]
@@ -1035,6 +1035,16 @@ class _:
         self.set_flags(ninvfg > 0, self.flags.foreground_includes_bad_pixels)
         return (ntotal - nvalid) > 0
 
+    def contains_valid_tof_data(self):
+        if "tof_wavelength" not in self or "tof_s0" not in self:
+            return False
+        for i in range(len(self)):
+            if self["tof_wavelength"][i] < 1e-8:
+                return False
+            if abs(sum(self["tof_s0"][i])) < 1e-8:
+                return False
+        return True
+
     def find_overlaps(self, experiments=None, border=0):
         """
         Check for overlapping reflections.
@@ -1274,7 +1284,6 @@ Found %s"""
                 self["xyzobs.mm.value"].set_selected(sel, centroid_position)
                 self["xyzobs.mm.variance"].set_selected(sel, centroid_variance)
 
-
     def add_tof_data(self, experiments, L0_in_m=8.3):
 
         """
@@ -1285,15 +1294,15 @@ Found %s"""
         from scipy import interpolate
 
         def get_tof_wavelength_in_ang(L0_in_m, L_in_m, tof_in_s):
-            h = 6.626E-34
-            m_n = 1.675E-27
-            return ((h * tof_in_s)/(m_n * (L0_in_m + L_in_m)))*10**10
+            h = 6.626e-34
+            m_n = 1.675e-27
+            return ((h * tof_in_s) / (m_n * (L0_in_m + L_in_m))) * 10 ** 10
 
         def get_tof_s0(s0_direction, tof_wavelength):
-            return s0_direction * 1.0/tof_wavelength
+            return s0_direction * 1.0 / tof_wavelength
 
         def get_tof_curve_coefficients(tof_vals):
-            x = [i+1 for i in range(len(tof_vals))]
+            x = [i + 1 for i in range(len(tof_vals))]
             return interpolate.splrep(x, tof_vals)
 
         def get_frame_tof_vals(frames, tof_vals, tof_curve_coeffs):
@@ -1301,7 +1310,6 @@ Found %s"""
             for i in range(len(frames)):
                 frame_tof_vals.append(interpolate.splev(frames[i], tof_curve_coeffs))
             return frame_tof_vals
-            
 
         self.centroid_px_to_mm(experiments)
         panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
@@ -1326,15 +1334,17 @@ Found %s"""
                 px, py, frame = self["xyzobs.px.value"].select(sel).parts()
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
-                ) 
+                )
                 frame_tof_vals = get_frame_tof_vals(frame, tof_vals, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
                 tof_s0 = cctbx.array_family.flex.vec3_double(len(s1))
                 tof_unit_s0 = cctbx.array_family.flex.vec3_double(len(s1))
                 for j in range(len(s1)):
-                    s1n = np.linalg.norm(s1[j]) * 10**-3
-                    wavelengths[j]=get_tof_wavelength_in_ang(L0_in_m, s1n, frame_tof_vals[j])
+                    s1n = np.linalg.norm(s1[j]) * 10 ** -3
+                    wavelengths[j] = get_tof_wavelength_in_ang(
+                        L0_in_m, s1n, frame_tof_vals[j]
+                    )
                     unit_s0 = np.array(expt.beam.get_unit_s0())
                     tof_s0[j] = get_tof_s0(unit_s0, wavelengths[j])
                     tof_unit_s0[j] = unit_s0
@@ -1344,17 +1354,19 @@ Found %s"""
                 self["tof_unit_s0"].set_selected(sel, tof_unit_s0)
 
     def tof_sequence_to_stills(self, experiment):
-        
+
         """
         Returns an ExperimentList consisting of separate Experiment instances
         for each reflection, with Beam instances set to the wavelength of each
         reflection.
         """
 
-        assert("tof_wavelength" in self), "Reflection table does not contain ToF wavelengths."
+        assert (
+            "tof_wavelength" in self
+        ), "Reflection table does not contain ToF wavelengths."
         from dxtbx_imageset_ext import ImageSet
         from scitbx.array_family import flex
-        beams = [copy.copy(experiment.beam) for i in range(len(self))] 
+
         experiment_list = ExperimentList()
         for i in range(len(self)):
             beam = copy.copy(experiment.beam)
@@ -1366,13 +1378,15 @@ Found %s"""
             imageset.set_scan(None)
             imageset.set_goniometer(None)
             imageset.set_beam(beam)
-            new_experiment = Experiment(beam=beam,
-                                        detector=experiment.imageset.get_detector(),
-                                        goniometer=None,
-                                        scan=None,
-                                        crystal=None,
-                                        identifier=str(i),
-                                        imageset=imageset)
+            new_experiment = Experiment(
+                beam=beam,
+                detector=experiment.imageset.get_detector(),
+                goniometer=None,
+                scan=None,
+                crystal=None,
+                identifier=str(i),
+                imageset=imageset,
+            )
             experiment_list.append(new_experiment)
             self["id"][i] = i
             if "imageset_id" in self:
@@ -1418,16 +1432,18 @@ Found %s"""
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
 
-                if "tof_wavelength" in self:
+                if self.contains_valid_tof_data():
                     import numpy as np
-                    assert("tof_s0" in self and "tof_unit_s0" in self), "ToF columns incomplete."
+
                     tof_wavelengths = self["tof_wavelength"].select(sel)
                     tof_s0 = self["tof_s0"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
                     for s1_idx in range(len(s1)):
-                        s1[s1_idx] = s1[s1_idx]/np.linalg.norm(s1[s1_idx]) 
-                        s1[s1_idx] = np.array(s1[s1_idx]) * 1.0/tof_wavelengths[s1_idx]
-                        S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])     
+                        s1[s1_idx] = s1[s1_idx] / np.linalg.norm(s1[s1_idx])
+                        s1[s1_idx] = (
+                            np.array(s1[s1_idx]) * 1.0 / tof_wavelengths[s1_idx]
+                        )
+                        S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])
                 else:
                     s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
                     S = s1 - expt.beam.get_s0()

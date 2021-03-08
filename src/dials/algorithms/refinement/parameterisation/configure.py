@@ -775,7 +775,7 @@ def _parameterise_goniometers(options, experiments, analysis):
 
 
 def build_prediction_parameterisation(
-    options, experiments, reflection_manager, do_stills=False
+    options, experiments, reflection_manager, do_stills=False, reflections=None
 ):
     """Given a set of parameters, create a parameterisation from a set of
     experimental models.
@@ -796,7 +796,10 @@ def build_prediction_parameterisation(
     analysis = _centroid_analysis(options, experiments, reflection_manager)
 
     # Parameterise each unique model
-    beam_params = _parameterise_beams(options, experiments, analysis)
+    if reflections is not None and reflections.contains_valid_tof_data():
+        beam_params = []
+    else:
+        beam_params = _parameterise_beams(options, experiments, analysis)
     xl_ori_params, xl_uc_params = _parameterise_crystals(options, experiments, analysis)
     det_params = _parameterise_detectors(options, experiments, analysis)
     gon_params = _parameterise_goniometers(options, experiments, analysis)
