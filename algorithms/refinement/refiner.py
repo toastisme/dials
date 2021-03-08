@@ -245,7 +245,7 @@ class RefinerFactory:
             "delpsical.weights",
             "tof_wavelength",
             "tof_s0",
-            "tof_unit_s0"
+            "tof_unit_s0",
         ]
         # NB xyzobs.px.value & xyzcal.px required by SauterPoon outlier rejector
         # NB delpsical.weights is used by ExternalDelPsiWeightingStrategy
@@ -382,9 +382,18 @@ class RefinerFactory:
 
         # Create model parameterisations
         logger.debug("Building prediction equation parameterisation")
-        pred_param = build_prediction_parameterisation(
-            params.refinement.parameterisation, experiments, refman, do_stills
-        )
+        if reflections.contains_valid_tof_data():
+            pred_param = build_prediction_parameterisation(
+                params.refinement.parameterisation,
+                experiments,
+                refman,
+                do_stills,
+                reflections,
+            )
+        else:
+            pred_param = build_prediction_parameterisation(
+                params.refinement.parameterisation, experiments, refman, do_stills
+            )
 
         # Build a constraints manager, if requested
         cmf = ConstraintManagerFactory(params, pred_param)
