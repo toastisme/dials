@@ -15,6 +15,7 @@ from dials.algorithms.spot_prediction import ScanStaticRayPredictor
 from dials.algorithms.spot_prediction import ScanStaticReflectionPredictor as sc
 from dials.algorithms.spot_prediction import ScanVaryingReflectionPredictor as sv
 from dials.algorithms.spot_prediction import StillsReflectionPredictor as st
+from dials_array_family_flex_ext import reflection_table
 
 # constants
 TWO_PI = 2.0 * pi
@@ -80,7 +81,10 @@ class ExperimentsPredictor:
             sel = reflections["id"] == iexp
             refs = reflections.select(sel)
 
-            self._predict_one_experiment(e, refs)
+            if refs.contains_valid_tof_data():
+                refs = self._predict_one_tof_experiment(e, refs)
+            else:
+                self._predict_one_experiment(e, refs)
 
             # write predictions back to overall reflections
             reflections.set_selected(sel, refs)
@@ -157,14 +161,29 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
     spherical_relp_model = False
 
     def _predict_one_experiment(self, experiment, reflections):
-        dmin=None
-        if "tof_s0" in reflections and "tof_wavelength" in reflections:
-            min_wavelength, min_idx = min((val, idx) for (idx, val) in enumerate(reflections["tof_wavelength"]))
-            min_s0 = reflections["tof_s0"][min_idx]
-            dmin = experiment.detector.get_max_resolution(min_s0)
-        predictor = st(experiment, dmin=dmin, spherical_relp=self.spherical_relp_model)
-        UB = experiment.crystal.get_A()
-        predictor.for_reflection_table(reflections, UB)
+        if reflections.contains_valid_tof_data():
+            self._predict_one_tof_experiment(experiment, reflections)
+        else:
+            predictor = st(experiment, spherical_relp=self.spherical_relp_model)
+            UB = experiment.crystal.get_A()
+            predictor.for_reflection_table(reflections, UB)
+
+    def _predict_one_tof_experiment(self, experiment, reflections):
+        predicted_reflections = reflection_table()
+        for r in range(len(reflections)):
+            wavelength = reflections[r]["tof_wavelength"]
+            s0 = reflections[r]["tof_s0"]
+            experiment.beam.set_wavelength(wavelength)
+            experiment.beam.set_s0(s0)
+            predictor = st(experiment, spherical_relp=self.spherical_relp_model)
+            UB = experiment.crystal.get_A()
+            reflection = reflection_table()
+            reflection.extend(reflections[r : r + 1])
+            predictor.for_reflection_table(reflection, UB)
+            predicted_reflections.extend(reflection)
+        experiment.beam.set_wavelength(0.0)
+        reflections = predicted_reflections
+        return reflections
 
 
 class ExperimentsPredictorFactory:
