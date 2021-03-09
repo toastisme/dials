@@ -171,9 +171,8 @@ class Script:
         reflections = flex.reflection_table.from_observations(experiments, params)
         if params.output.add_tof_data:
             reflections.add_tof_data(experiments)
-            j
         if params.output.tof_sequence_to_stills:
-            assert(len(experiments) == 1), "ExperimentList has more than one experiment"
+            assert len(experiments) == 1, "ExperimentList has more than one experiment"
             if not reflections.contains_valid_tof_data():
                 reflections.add_tof_data(experiments)
             experiments = reflections.tof_sequence_to_stills(experiments[0])
