@@ -83,8 +83,8 @@ class ExperimentsPredictor:
             sel = reflections["id"] == iexp
             refs = reflections.select(sel)
 
-            if refs.contains_valid_tof_data():
-                refs = self._predict_one_tof_experiment(e, refs)
+            if reflections.contains_valid_tof_data():
+                reflections = self._predict_one_tof_experiment(e, refs)
             else:
                 self._predict_one_experiment(e, refs)
 
