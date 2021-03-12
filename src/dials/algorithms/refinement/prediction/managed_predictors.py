@@ -84,12 +84,11 @@ class ExperimentsPredictor:
             refs = reflections.select(sel)
 
             if reflections.contains_valid_tof_data():
-                reflections = self._predict_one_tof_experiment(e, refs)
+                self._predict_one_tof_experiment(e, refs)
             else:
                 self._predict_one_experiment(e, refs)
-
-            # write predictions back to overall reflections
-            reflections.set_selected(sel, refs)
+        # write predictions back to overall reflections
+        reflections.set_selected(sel, refs)
 
         reflections = self._post_prediction(reflections)
 
@@ -171,6 +170,16 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
             predictor.for_reflection_table(reflections, UB)
 
     def _predict_one_tof_experiment(self, experiment, reflections):
+        updated_fields = [
+            "miller_index",
+            "entering",
+            "panel",
+            "s1",
+            "xyzcal.px",
+            "xyzcal.mm",
+            "flags",
+            "delpsical.rad",
+        ]
         predicted_reflections = reflection_table()
         for r in range(len(reflections)):
             wavelength = reflections[r]["tof_wavelength"]
@@ -184,8 +193,8 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
             predictor.for_reflection_table(reflection, UB)
             predicted_reflections.extend(reflection)
         experiment.beam.set_wavelength(0.0)
-        reflections = predicted_reflections
-        return reflections
+        for i in updated_fields:
+            reflections[i] = predicted_reflections[i]
 
 
 class ExperimentsPredictorFactory:
