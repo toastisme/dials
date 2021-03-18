@@ -138,6 +138,11 @@ def _copy_experiments_for_refining(experiments):
         new_exp = copy.copy(experiment)
 
         # Ensure every 'refined' attribute is uniquely copied
+
+        # TOF hack
+        print("TEST performing ToF hack")
+        experiments[0].beam.set_wavelength(1)
+
         for model in ["beam", "goniometer", "detector", "crystal"]:
             original = getattr(experiment, model)
             if id(original) not in id_memo:
@@ -147,6 +152,9 @@ def _copy_experiments_for_refining(experiments):
 
         # Collect this together
         out_list.append(new_exp)
+
+        experiments[0].beam.set_wavelength(0)
+        out_list[0].beam.set_wavelength(0)
 
     return out_list
 
@@ -270,7 +278,9 @@ class RefinerFactory:
         # or stills (the combination of both not yet supported)?
 
         # copy the experiments
+        experiments[0].beam.set_wavelength(1)
         experiments = _copy_experiments_for_refining(experiments)
+        experiments[0].beam.set_wavelength(0)
 
         # copy and filter the reflections
         reflections = cls._filter_reflections(reflections)
@@ -1012,8 +1022,8 @@ class Refiner:
         ####################################
 
         logger.debug("\nExperimental models before refinement:")
-        for i, beam in enumerate(self._experiments.beams()):
-            logger.debug(ordinal_number(i) + " " + str(beam))
+        # for i, beam in enumerate(self._experiments.beams()):
+        #    logger.debug(ordinal_number(i) + " " + str(beam))
         for i, detector in enumerate(self._experiments.detectors()):
             logger.debug(ordinal_number(i) + " " + str(detector))
         for i, goniometer in enumerate(self._experiments.goniometers()):
@@ -1043,8 +1053,8 @@ class Refiner:
         self._update_models()
 
         logger.debug("\nExperimental models after refinement:")
-        for i, beam in enumerate(self._experiments.beams()):
-            logger.debug(ordinal_number(i) + " " + str(beam))
+        # for i, beam in enumerate(self._experiments.beams()):
+        #    logger.debug(ordinal_number(i) + " " + str(beam))
         for i, detector in enumerate(self._experiments.detectors()):
             logger.debug(ordinal_number(i) + " " + str(detector))
         for i, goniometer in enumerate(self._experiments.goniometers()):

@@ -514,7 +514,11 @@ class StillsIndexer(Indexer):
                         reflections=indexed,
                         graph_verbose=False,
                     )
+
+                    R._experiments[0].beam.set_wavelength(1)
                     ref_experiments = R.get_experiments()
+                    ref_experiments[0].beam.set_wavelength(0)
+                    R._experiments[0].beam.set_wavelength(0)
 
                     # try to improve the outcome with a second round of outlier rejection post-initial refinement:
                     acceptance_flags = self.identify_outliers(
@@ -543,7 +547,15 @@ class StillsIndexer(Indexer):
                         reflections=indexed,
                         graph_verbose=False,
                     )
-                    ref_experiments = R.get_experiments()
+
+                    if indexed.contains_valid_tof_data():
+                        R._experiments[0].beam.set_wavelength(1)
+                        ref_experiments = R.get_experiments()
+                        R._experiments[0].beam.set_wavelength(0)
+                        ref_experiments[0].beam.set_wavelength(0)
+
+                    else:
+                        ref_experiments = R.get_experiments()
 
                     nv = NaveParameters(
                         params=params,
@@ -589,17 +601,30 @@ class StillsIndexer(Indexer):
                         "$$$ stills_indexer::choose_best_orientation_matrix, candidate %d done",
                         icm,
                     )
-                    candidates.append(
-                        CandidateInfo(
-                            crystal=crystal_model,
-                            green_curve_area=nv.green_curve_area,
-                            ewald_proximal_volume=nv.ewald_proximal_volume(),
-                            n_indexed=len(indexed),
-                            rmsd=rmsd,
-                            indexed=indexed,
-                            experiments=ref_experiments,
+                    if nv.reflections.contains_valid_tof_data():
+                        candidates.append(
+                            CandidateInfo(
+                                crystal=crystal_model,
+                                green_curve_area=nv.green_curve_area,
+                                ewald_proximal_volume=nv.tof_ewald_proximal_volume(),
+                                n_indexed=len(indexed),
+                                rmsd=rmsd,
+                                indexed=indexed,
+                                experiments=ref_experiments,
+                            )
                         )
-                    )
+                    else:
+                        candidates.append(
+                            CandidateInfo(
+                                crystal=crystal_model,
+                                green_curve_area=nv.green_curve_area,
+                                ewald_proximal_volume=nv.ewald_proximal_volume(),
+                                n_indexed=len(indexed),
+                                rmsd=rmsd,
+                                indexed=indexed,
+                                experiments=ref_experiments,
+                            )
+                        )
             else:
                 from dials.algorithms.refinement.prediction.managed_predictors import (
                     ExperimentsPredictorFactory,
@@ -721,7 +746,15 @@ class StillsIndexer(Indexer):
             reflections=reflections,
             graph_verbose=False,
         )
-        ref_experiments = R.get_experiments()
+
+        if reflections.contains_valid_tof_data():
+            R._experiments[0].beam.set_wavelength(1)
+            ref_experiments = R.get_experiments()
+            R._experiments[0].beam.set_wavelength(0)
+            ref_experiments[0].beam.set_wavelength(0)
+
+        else:
+            ref_experiments = R.get_experiments()
 
         # try to improve the outcome with a second round of outlier rejection post-initial refinement:
         acceptance_flags = self.identify_outliers(
@@ -746,7 +779,14 @@ class StillsIndexer(Indexer):
             reflections=reflections,
             graph_verbose=False,
         )
-        ref_experiments = R.get_experiments()
+        if reflections.contains_valid_tof_data():
+            R._experiments[0].beam.set_wavelength(1)
+            ref_experiments = R.get_experiments()
+            R._experiments[0].beam.set_wavelength(0)
+            ref_experiments[0].beam.set_wavelength(0)
+
+        else:
+            ref_experiments = R.get_experiments()
 
         nv = NaveParameters(
             params=self.all_params,
