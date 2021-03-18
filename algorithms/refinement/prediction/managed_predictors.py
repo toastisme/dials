@@ -104,6 +104,32 @@ class ExperimentsPredictor:
 
 
 class ScansExperimentsPredictor(ExperimentsPredictor):
+    def _predict_one_tof_experiment(self, experiment, reflections):
+        updated_fields = [
+            "miller_index",
+            "entering",
+            "panel",
+            "s1",
+            "xyzcal.px",
+            "xyzcal.mm",
+            "flags",
+        ]
+        predicted_reflections = reflection_table()
+        for r in range(len(reflections)):
+            wavelength = reflections[r]["tof_wavelength"]
+            s0 = reflections[r]["tof_s0"]
+            experiment.beam.set_wavelength(wavelength)
+            experiment.beam.set_s0(s0)
+            predictor = sc(experiment)
+            UB = experiment.crystal.get_A()
+            reflection = reflection_table()
+            reflection.extend(reflections[r : r + 1])
+            predictor.for_reflection_table(reflection, UB)
+            predicted_reflections.extend(reflection)
+        experiment.beam.set_wavelength(0.0)
+        for i in updated_fields:
+            reflections[i] = predicted_reflections[i]
+
     def _predict_one_experiment(self, experiment, reflections):
 
         # scan-varying
