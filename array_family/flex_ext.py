@@ -1259,6 +1259,7 @@ Found %s"""
         self.centroid_px_to_mm(experiments)
         panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
         self["tof_wavelength"] = cctbx.array_family.flex.double(self.nrows())
+        self["tof"] = cctbx.array_family.flex.double(self.nrows())
         self["tof_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
         self["tof_unit_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
 
@@ -1283,6 +1284,7 @@ Found %s"""
                 frame_tof_vals = get_frame_tof_vals(frame, tof_vals, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
+                tof = cctbx.array_family.flex.double(len(s1))
                 tof_s0 = cctbx.array_family.flex.vec3_double(len(s1))
                 tof_unit_s0 = cctbx.array_family.flex.vec3_double(len(s1))
                 for j in range(len(s1)):
@@ -1290,11 +1292,13 @@ Found %s"""
                     wavelengths[j] = get_tof_wavelength_in_ang(
                         L0_in_m, s1n, frame_tof_vals[j]
                     )
+                    tof[j] = frame_tof_vals[j] * 10 ** 6
                     unit_s0 = np.array(expt.beam.get_unit_s0())
                     tof_s0[j] = get_tof_s0(unit_s0, wavelengths[j])
                     tof_unit_s0[j] = unit_s0
 
                 self["tof_wavelength"].set_selected(sel, wavelengths)
+                self["tof"].set_selected(sel, tof)
                 self["tof_s0"].set_selected(sel, tof_s0)
                 self["tof_unit_s0"].set_selected(sel, tof_unit_s0)
 
@@ -1369,6 +1373,7 @@ Found %s"""
                     x, y, rot_angle = self["xyzcal.mm"].select(sel).parts()
                 else:
                     x, y, rot_angle = self["xyzobs.mm.value"].select(sel).parts()
+                    px, py, pz = self["xyzobs.px.value"].select(sel).parts()
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
