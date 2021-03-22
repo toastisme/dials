@@ -1239,8 +1239,8 @@ Found %s"""
         from scipy import interpolate
 
         def get_tof_wavelength_in_ang(L0_in_m, L_in_m, tof_in_s):
-            h = 6.626e-34
-            m_n = 1.675e-27
+            h = 6.62607004e-34
+            m_n = 1.67492749804e-27
             return ((h * tof_in_s) / (m_n * (L0_in_m + L_in_m))) * 10 ** 10
 
         def get_tof_s0(s0_direction, tof_wavelength):
