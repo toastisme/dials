@@ -61,7 +61,10 @@ class Render3d:
     def load_models(self, experiments, reflections):
         self.experiments = experiments
         self.reflections_input = reflections
-        if self.experiments[0].goniometer is not None and "tof_wavelength" not in reflections:
+        if (
+            self.experiments[0].goniometer is not None
+            and "tof_wavelength" not in reflections
+        ):
             self.viewer.set_rotation_axis(
                 self.experiments[0].goniometer.get_rotation_axis()
             )
@@ -157,6 +160,15 @@ class Render3d:
                 reflections = reflections.select(outlier_sel)
             if self.settings.outlier_display == "inliers":
                 reflections = reflections.select(~outlier_sel)
+
+            if (
+                self.settings.filter_by_panel is not None
+                and len(self.settings.filter_by_panel) > 0
+            ):
+                panel_sel = reflections["panel"] == 42
+                for i in list(map(int, self.settings.filter_by_panel)):
+                    panel_sel |= reflections["panel"] == i
+                reflections = reflections.select(panel_sel)
 
             indexed_sel = reflections.get_flags(reflections.flags.indexed)
             strong_sel = reflections.get_flags(reflections.flags.strong)
