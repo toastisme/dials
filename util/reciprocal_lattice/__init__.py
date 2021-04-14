@@ -161,15 +161,6 @@ class Render3d:
             if self.settings.outlier_display == "inliers":
                 reflections = reflections.select(~outlier_sel)
 
-            if (
-                self.settings.filter_by_panel is not None
-                and len(self.settings.filter_by_panel) > 0
-            ):
-                panel_sel = reflections["panel"] == 42
-                for i in list(map(int, self.settings.filter_by_panel)):
-                    panel_sel |= reflections["panel"] == i
-                reflections = reflections.select(panel_sel)
-
             indexed_sel = reflections.get_flags(reflections.flags.indexed)
             strong_sel = reflections.get_flags(reflections.flags.strong)
             integrated_sel = reflections.get_flags(reflections.flags.integrated)
@@ -239,6 +230,14 @@ class Render3d:
                 reflections = reflections.select(p <= self.settings.partiality_max)
             else:
                 self.settings.partiality_max = flex.max(p)
+        if (
+            self.settings.filter_by_panel is not None
+            and len(self.settings.filter_by_panel) > 0
+        ):
+            panel_sel = reflections["panel"] == 42
+            for i in list(map(int, self.settings.filter_by_panel)):
+                panel_sel |= reflections["panel"] == i
+            reflections = reflections.select(panel_sel)
         points = reflections["rlp"] * 100
         self.viewer.set_points(points)
         self.viewer.set_points_data(reflections)
