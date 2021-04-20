@@ -151,8 +151,8 @@ def _copy_experiments_for_refining(experiments):
         # Collect this together
         out_list.append(new_exp)
 
-        experiments[0].beam.set_wavelength(0)
-        out_list[0].beam.set_wavelength(0)
+        # experiments[0].beam.set_wavelength(0)
+        # out_list[0].beam.set_wavelength(0)
 
     return out_list
 
