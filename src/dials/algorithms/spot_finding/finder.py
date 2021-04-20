@@ -321,6 +321,8 @@ def shoeboxes_to_reflection_table(
     # Create the observations
     observed = flex.observation(shoeboxes.panels(), centroid, intensity)
 
+    observed = correct_centroid_positions(observed, shoeboxes)
+
     # Filter the reflections and select only the desired spots
     flags = filter_spots(
         None, sweep=imageset, observations=observed, shoeboxes=shoeboxes
@@ -330,6 +332,28 @@ def shoeboxes_to_reflection_table(
 
     # Return as a reflection list
     return flex.reflection_table(observed, shoeboxes)
+
+
+def correct_centroid_positions(observed, shoeboxes):
+    panel_numbers = sorted(list(set([i.panel for i in shoeboxes])))
+    max_intensities = []
+    for i in panel_numbers:
+        max_intensities.append(
+            max([sum(j.values()) for j in shoeboxes if j.panel == i])
+        )
+
+    intensities = [sum(i.values()) for i in shoeboxes]
+    peak_coordinates = shoeboxes.peak_coordinates()
+    for count, i in enumerate(shoeboxes):
+        centroid_frame = observed[count].centroid.frame
+        peak_frame = peak_coordinates[count][2]
+        r = intensities[count] / max_intensities[i.panel]
+        m_p = r ** 4
+        m_c = 1 - r
+        M = m_p + m_c
+        new_centroid_frame = ((m_p * peak_frame) + (m_c * centroid_frame)) / M
+        observed[count].centroid.frame = new_centroid_frame
+    return observed
 
 
 def pixel_list_to_reflection_table(
@@ -348,6 +372,7 @@ def pixel_list_to_reflection_table(
         max_spot_size=max_spot_size,
         write_hot_pixel_mask=write_hot_pixel_mask,
     )
+
     # Setup the reflection table converter
     return (
         shoeboxes_to_reflection_table(imageset, shoeboxes, filter_spots=filter_spots),

@@ -1443,10 +1443,10 @@ Found %s"""
                     tof_wavelengths = self["tof_wavelength"].select(sel)
                     tof_s0 = self["tof_s0"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
+                    s1 = s1 / s1.norms()
                     for s1_idx in range(len(s1)):
-                        s1[s1_idx] = s1[s1_idx] / np.linalg.norm(s1[s1_idx])
-                        s1[s1_idx] = (
-                            np.array(s1[s1_idx]) * 1.0 / tof_wavelengths[s1_idx]
+                        s1[s1_idx] = np.array(s1[s1_idx]) * (
+                            1.0 / tof_wavelengths[s1_idx]
                         )
                         S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])
                 else:
