@@ -106,7 +106,9 @@ class Extract:
 
             beam_dir = matrix.col(self._params.beam.direction.exactly)
 
-        self.beam = BeamFactory.make_beam(unit_s0=beam_dir, wavelength=wavelength)
+        self.beam = BeamFactory.make_monochromatic_beam(
+            unit_s0=beam_dir, wavelength=wavelength
+        )
 
     def build_detector(self):
 

@@ -483,14 +483,19 @@ def run_integration(params, experiments, reference=None):
     # Predict the reflections
     logger.info("\n".join(("", "=" * 80, "")))
     logger.info(heading("Predicting reflections"))
-    predicted = flex.reflection_table.from_predictions_multi(
-        experiments,
-        dmin=params.prediction.d_min,
-        dmax=params.prediction.d_max,
-        margin=params.prediction.margin,
-        force_static=params.prediction.force_static,
-        padding=params.prediction.padding,
-    )
+    if reference.contains_valid_tof_data:
+        predicted = flex.reflection_table.tof_from_predictions_multi(
+            experiments[0], reference
+        )
+    else:
+        predicted = flex.reflection_table.from_predictions_multi(
+            experiments,
+            dmin=params.prediction.d_min,
+            dmax=params.prediction.d_max,
+            margin=params.prediction.margin,
+            force_static=params.prediction.force_static,
+            padding=params.prediction.padding,
+        )
     isets = OrderedSet(e.imageset for e in experiments)
     predicted["imageset_id"] = flex.int(predicted.size(), 0)
     if len(isets) > 1:

@@ -966,9 +966,9 @@ namespace dials { namespace af { namespace boost_python {
   /**
    * Struct to facilitate wrapping reflection table type
    */
-  template <typename T>
-  struct flex_reflection_table_wrapper : public flex_table_wrapper<T> {
-    typedef flex_table_wrapper<T> base_type;
+  template <typename T, typename Beam>
+  struct flex_reflection_table_wrapper : public flex_table_wrapper<T, Beam> {
+    typedef flex_table_wrapper<T, Beam> base_type;
     typedef typename base_type::flex_table_type flex_table_type;
     typedef typename base_type::class_type class_type;
 
@@ -1178,6 +1178,7 @@ namespace dials { namespace af { namespace boost_python {
     };
   }  // namespace experiment_map_type_detail
 
+  template <typename Beam>
   void export_flex_reflection_table() {
     // Set the do
     docstring_options local_docstring_options;
@@ -1201,7 +1202,7 @@ namespace dials { namespace af { namespace boost_python {
     ;
 
     // Export the reflection table
-    flex_reflection_table_wrapper<reflection_table>::wrap("reflection_table");
+    flex_reflection_table_wrapper<reflection_table, Beam>::wrap("reflection_table");
 
     // Export the reflection object
     class_<Reflection>("Reflection")

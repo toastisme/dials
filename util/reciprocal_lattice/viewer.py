@@ -182,7 +182,15 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
     def update_settings(self, *args, **kwds):
         detector = self.experiments[0].detector
         beam = self.experiments[0].beam
+        import random
 
+        import numpy as np
+
+        s0 = np.array(
+            (-random.randint(0, 50), -random.randint(0, 50), -random.randint(0, 50))
+        )
+        s0 = s0 / np.linalg.norm(s0)
+        # beam.set_sample_to_source_direction(s0)
         try:
             panel_id, beam_centre = detector.get_ray_intersection(beam.get_s0())
         except RuntimeError:
@@ -191,6 +199,7 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
         else:
             if self.settings.beam_centre != beam_centre:
                 self.set_beam_centre(beam_centre)
+        import random
 
         self.map_points_to_reciprocal_space()
         self.set_points()

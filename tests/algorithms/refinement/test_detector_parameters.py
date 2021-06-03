@@ -119,7 +119,7 @@ def test():
     )
 
     dp = DetectorParameterisationSinglePanel(detector)
-    beam = BeamFactory().make_beam(
+    beam = BeamFactory().make_monochromatic_beam(
         sample_to_source=-1 * (matrix.col((0, 0, -110)) + 10 * d1 + 10 * d2),
         wavelength=1.0,
     )
@@ -267,7 +267,9 @@ def test():
         + shift1 * matrix.col(det[0].get_fast_axis())
         + shift2 * matrix.col(det[0].get_slow_axis())
     )
-    beam = BeamFactory().make_beam(sample_to_source=-1.0 * beam_centre, wavelength=1.0)
+    beam = BeamFactory().make_monochromatic_beam(
+        sample_to_source=-1.0 * beam_centre, wavelength=1.0
+    )
 
     multi_panel_detector = make_multi_panel(det)
 
