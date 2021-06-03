@@ -2,7 +2,14 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from dxtbx.model import Beam, Crystal, Detector, Experiment, Goniometer, Scan
+from dxtbx.model import (
+    Crystal,
+    Detector,
+    Experiment,
+    Goniometer,
+    MonochromaticBeam,
+    Scan,
+)
 from dxtbx.model.experiment_list import ExperimentList
 from libtbx import phil
 from scitbx import sparse
@@ -61,7 +68,7 @@ def generated_exp(n=1):
     }
     crystal = Crystal.from_dict(exp_dict)
     scan = Scan(image_range=[0, 90], oscillation=[0.0, 1.0])
-    beam = Beam(s0=(0.0, 0.0, 1.01))
+    beam = MonochromaticBeam(s0=(0.0, 0.0, 1.01))
     goniometer = Goniometer((1.0, 0.0, 0.0))
     detector = Detector()
     experiments.append(

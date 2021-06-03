@@ -123,6 +123,11 @@ class ScansExperimentsPredictor(ExperimentsPredictor):
             predictor = sc(experiment)
             UB = experiment.crystal.get_A()
             reflection = reflection_table()
+            reflection["xyzcal.px"][0] = (
+                reflection["xyzcalpx"][0],
+                reflection["xyzcalpx"][1],
+                reflections[r]["xyzobs.px.value"][2],
+            )
             reflection.extend(reflections[r : r + 1])
             predictor.for_reflection_table(reflection, UB)
             predicted_reflections.extend(reflection)

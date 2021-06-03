@@ -513,6 +513,8 @@ class ProfileModelCalculator:
             self._sigma_b = beam_divergence.sigma()
             # FIXME calculate properly
             self._sigma_m = 0.0
+            print("TEST sigma m set to nonsense value")
+            # self._sigma_m = beam_divergence.sigma()
         else:
             # filter reflections before determining the reflection profile
             # parameters - first by used_in_refinement then by zeta

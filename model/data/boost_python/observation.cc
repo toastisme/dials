@@ -141,11 +141,11 @@ namespace dials { namespace model { namespace boost_python {
              & Centroid::update_mm,
            (arg("panel"), arg("detector"), arg("scan")))
       .def("resolution",
-           (double (Centroid::*)(const BeamBase &, const Detector &) const)
+           (double (Centroid::*)(const MonochromaticBeam &, const Detector &) const)
              & Centroid::resolution,
            (arg("beam"), arg("detector")))
       .def("resolution",
-           (double (Centroid::*)(std::size_t, const BeamBase &, const Detector &) const)
+           (double (Centroid::*)(std::size_t, const MonochromaticBeam &, const Detector &) const)
              & Centroid::resolution,
            (arg("panel"), arg("beam"), arg("detector")))
       .def("__eq__", &Centroid::operator==)
