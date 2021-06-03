@@ -5,7 +5,7 @@ import pytest
 
 from dxtbx.format.Format import Reader
 from dxtbx.imageset import ImageSet, ImageSetData
-from dxtbx.model.beam import Beam
+from dxtbx.model.beam import MonochromaticBeam
 from dxtbx.model.detector import Detector
 from dxtbx.model.experiment_list import ExperimentListFactory
 from libtbx import easy_run
@@ -65,7 +65,7 @@ def test_translate(dials_regression, run_in_tmpdir):
     cmd = f"dials.import {image_path}"
     easy_run.fully_buffered(command=cmd).raise_if_errors()
     expt1 = ExperimentListFactory.from_serialized_format("imported.expt")[0]
-    det1 = expt1.detector
+    # det1 = expt1.detector
 
     # Should be no dx/dy lookup files
     assert not expt1.imageset.external_lookup.dx.filename
@@ -76,7 +76,7 @@ def test_translate(dials_regression, run_in_tmpdir):
 
     easy_run.fully_buffered(command=cmd).raise_if_errors()
     expt2 = ExperimentListFactory.from_serialized_format("corrected.expt")[0]
-    det2 = expt2.detector
+    # det2 = expt2.detector
 
     # Check that dx/dy lookup files have been set
     assert expt2.imageset.external_lookup.dx.filename
@@ -93,7 +93,7 @@ def test_elliptical_distortion(run_in_tmpdir):
     d = make_detector()
 
     # The beam is also essential for a experiments to be serialisable
-    b = Beam((0, 0, 1), 1.0)
+    b = MonochromaticBeam((0, 0, 1), 1.0)
 
     # Create and write out a experiments
     imageset = ImageSet(ImageSetData(Reader(None, ["non-existent.cbf"]), None))

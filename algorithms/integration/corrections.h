@@ -22,7 +22,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::BeamBase;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using scitbx::vec3;
@@ -111,7 +111,7 @@ namespace dials { namespace algorithms {
      * @param beam The beam model.
      * @param goniometer The goniometer model.
      */
-    Corrections(const BeamBase &beam, const Goniometer &goniometer)
+    Corrections(const MonochromaticBeam &beam, const Goniometer &goniometer)
         : s0_(beam.get_s0()),
           pn_(beam.get_polarization_normal()),
           pf_(beam.get_polarization_fraction()),
@@ -124,7 +124,7 @@ namespace dials { namespace algorithms {
      * @param goniometer The goniometer model.
      * @param detector The detector model.
      */
-    Corrections(const BeamBase &beam,
+    Corrections(const MonochromaticBeam &beam,
                 const Goniometer &goniometer,
                 const Detector &detector)
         : s0_(beam.get_s0()),
@@ -138,7 +138,7 @@ namespace dials { namespace algorithms {
      * @param goniometer The goniometer model.
      * @param detector The detector model.
      */
-    Corrections(const BeamBase &beam, const Detector &detector)
+    Corrections(const MonochromaticBeam &beam, const Detector &detector)
         : s0_(beam.get_s0()),
           pn_(beam.get_polarization_normal()),
           pf_(beam.get_polarization_fraction()),

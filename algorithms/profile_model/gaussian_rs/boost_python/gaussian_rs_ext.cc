@@ -131,7 +131,7 @@ namespace dials {
         dials::algorithms::boost_python::empirical_profile_modeller_wrapper<
           GaussianRSProfileModeller>("GaussianRSProfileModeller");
       result
-        .def(init<boost::shared_ptr<BeamBase>,
+        .def(init<boost::shared_ptr<MonochromaticBeam>,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -176,7 +176,7 @@ namespace dials {
              (arg("s1"), arg("frame"), arg("panel")));
 
       class_<BBoxCalculator3D, bases<BBoxCalculatorIface> >("BBoxCalculator3D", no_init)
-        .def(init<const BeamBase&,
+        .def(init<const MonochromaticBeam&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -187,7 +187,7 @@ namespace dials {
                            arg("scan"),
                            arg("delta_divergence"),
                            arg("delta_mosaicity"))))
-        .def(init<const BeamBase&,
+        .def(init<const MonochromaticBeam&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -200,7 +200,7 @@ namespace dials {
                                                  arg("delta_mosaicity"))));
 
       class_<BBoxCalculator2D, bases<BBoxCalculatorIface> >("BBoxCalculator2D", no_init)
-        .def(init<const BeamBase&, const Detector&, double, double>(
+        .def(init<const MonochromaticBeam&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),
@@ -233,9 +233,9 @@ namespace dials {
 
       class_<PartialityCalculator3D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator3D", no_init)
-        .def(init<const BeamBase&, const Goniometer&, const Scan&, double>(
+        .def(init<const MonochromaticBeam&, const Goniometer&, const Scan&, double>(
           (arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))))
-        .def(init<const BeamBase&,
+        .def(init<const MonochromaticBeam&,
                   const Goniometer&,
                   const Scan&,
                   const af::const_ref<double>&>(
@@ -243,7 +243,7 @@ namespace dials {
 
       class_<PartialityCalculator2D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator2D", no_init)
-        .def(init<const BeamBase&, double>((arg("beam"), arg("delta_m"))));
+        .def(init<const MonochromaticBeam&, double>((arg("beam"), arg("delta_m"))));
 
       class_<PartialityMultiCalculator>("PartialityMultiCalculator")
         .def("append", &PartialityMultiCalculator::push_back)
@@ -251,7 +251,7 @@ namespace dials {
         .def("__call__", &PartialityMultiCalculator::operator());
 
       class_<MaskCalculator3D, bases<MaskCalculatorIface> >("MaskCalculator3D", no_init)
-        .def(init<const BeamBase&,
+        .def(init<const MonochromaticBeam&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -262,7 +262,7 @@ namespace dials {
                            arg("scan"),
                            arg("delta_divergence"),
                            arg("delta_mosaicity"))))
-        .def(init<const BeamBase&,
+        .def(init<const MonochromaticBeam&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -275,7 +275,7 @@ namespace dials {
                                                  arg("delta_mosaicity"))));
 
       class_<MaskCalculator2D, bases<MaskCalculatorIface> >("MaskCalculator2D", no_init)
-        .def(init<const BeamBase&, const Detector&, double, double>(
+        .def(init<const MonochromaticBeam&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),

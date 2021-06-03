@@ -104,15 +104,15 @@ def get_flex_image_multipanel(
 
     # Calculate the average beam center across all panels, in meters
     # not sure this makes sense for detector which is not on a plane?
-    beam_center = scitbx.matrix.col((0, 0, 0))
-    npanels = 0
-    for panel in panels:
-        try:
-            beam_center += scitbx.matrix.col(panel.get_beam_centre_lab(beam.get_s0()))
-            npanels += 1
-        except RuntimeError:  # catch DXTBX_ASSERT for no intersection
-            pass
-    beam_center /= npanels / 1e-3
+    beam_center = scitbx.matrix.col((300, 54, -540))
+    # npanels = 0
+    # for panel in panels:
+    #    try:
+    #        beam_center += scitbx.matrix.col(panel.get_beam_centre_lab(beam.get_s0()))
+    #        npanels += 1
+    #    except RuntimeError:  # catch DXTBX_ASSERT for no intersection
+    #        pass
+    # beam_center /= npanels / 1e-3
 
     # XXX If a point is contained in two panels simultaneously, it will
     # be assigned to the panel defined first.  XXX Use a Z-buffer

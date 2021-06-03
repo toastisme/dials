@@ -24,7 +24,7 @@ namespace dials {
       namespace gaussian_rs {
   namespace transform {
 
-    using dxtbx::model::BeamBase;
+    using dxtbx::model::MonochromaticBeam;
     using dxtbx::model::Detector;
     using dxtbx::model::Panel;
     using scitbx::vec2;
@@ -42,7 +42,7 @@ namespace dials {
      * @returns An array of beam vectors
      */
     inline af::versa<vec3<double>, af::c_grid<2> > beam_vector_map(const Panel &panel,
-                                                                   const BeamBase &beam,
+                                                                   const MonochromaticBeam&beam,
                                                                    std::size_t n_div,
                                                                    bool corner) {
       // check the input
@@ -94,7 +94,7 @@ namespace dials {
      * @returns An array of beam vectors
      */
     inline af::versa<vec3<double>, af::c_grid<2> > beam_vector_map(const Panel &panel,
-                                                                   const BeamBase &beam,
+                                                                   const MonochromaticBeam &beam,
                                                                    bool corner) {
       return beam_vector_map(panel, beam, 1, corner);
     }
@@ -107,7 +107,7 @@ namespace dials {
      */
     inline af::versa<vec3<double>, af::c_grid<2> > beam_vector_map(
       const Panel &panel,
-      const BeamBase &beam) {
+      const MonochromaticBeam &beam) {
       return beam_vector_map(panel, beam, 1, false);
     }
 

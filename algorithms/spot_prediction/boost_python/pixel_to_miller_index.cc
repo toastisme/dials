@@ -33,12 +33,12 @@ namespace dials { namespace algorithms { namespace boost_python {
 
   void export_pixel_to_miller_index() {
     class_<PixelToMillerIndex>("PixelToMillerIndex", no_init)
-      .def(init<const BeamBase &,
+      .def(init<const MonochromaticBeam &,
                 const Detector &,
                 const Goniometer &,
                 const Scan &,
                 const CrystalBase &>())
-      .def(init<const BeamBase &, const Detector &, const CrystalBase &>())
+      .def(init<const MonochromaticBeam &, const Detector &, const CrystalBase &>())
       .def("h", &PixelToMillerIndex_h_rotation)
       .def("h", &PixelToMillerIndex_h_stills)
       .def("q", &PixelToMillerIndex::q);

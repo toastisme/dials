@@ -70,7 +70,9 @@ def crystal_factory():
 
 @pytest.fixture
 def experiment():
-    beam = BeamFactory.make_beam(wavelength=0.97625, sample_to_source=(0, 0, 1))
+    beam = BeamFactory.make_monochromatic_beam(
+        wavelength=0.97625, sample_to_source=(0, 0, 1)
+    )
 
     detector = DetectorFactory.simple(
         sensor="PAD",

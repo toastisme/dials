@@ -23,7 +23,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::BeamBase;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Panel;
   using scitbx::mat3;
@@ -43,7 +43,7 @@ namespace dials { namespace algorithms {
      * @param beam The beam model
      * @param detector The detector model
      */
-    PixelLabeller(BeamBase &beam, Detector detector) {
+    PixelLabeller(MonochromaticBeam &beam, Detector detector) {
       p_star_.resize(detector.size());
       vec3<double> s0 = beam.get_s0();
       for (std::size_t p = 0; p < detector.size(); ++p) {

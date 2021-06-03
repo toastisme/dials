@@ -41,7 +41,7 @@ namespace dials {
     using dials::model::Foreground;
     using dials::model::Shoebox;
     using dials::model::Valid;
-    using dxtbx::model::BeamBase;
+    using dxtbx::model::MonochromaticBeam;
     using dxtbx::model::Detector;
     using dxtbx::model::Goniometer;
     using dxtbx::model::Scan;
@@ -79,7 +79,7 @@ namespace dials {
        * @param n_sigma The number of standard deviations
        * @param grid_size The size of the reflection basis grid
        */
-      TransformSpec(const boost::shared_ptr<BeamBase> beam,
+      TransformSpec(const boost::shared_ptr<MonochromaticBeam> beam,
                     const Detector &detector,
                     const Goniometer &gonio,
                     const Scan &scan,
@@ -109,7 +109,7 @@ namespace dials {
       }
 
       /** @returns the beam */
-      const boost::shared_ptr<BeamBase> beam() const {
+      const boost::shared_ptr<MonochromaticBeam> beam() const {
         return beam_;
       }
 
@@ -164,7 +164,7 @@ namespace dials {
       }
 
     private:
-      boost::shared_ptr<BeamBase> beam_;
+      boost::shared_ptr<MonochromaticBeam> beam_;
       Detector detector_;
       Goniometer goniometer_;
       Scan scan_;
