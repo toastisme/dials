@@ -13,7 +13,7 @@ def test_extract_experiment_data():
     from dxtbx.model import BeamFactory, Crystal, GoniometerFactory, ScanFactory
     from dxtbx.model.experiment_list import Experiment
 
-    beam = BeamFactory.make_beam(unit_s0=(0, 0, -1), wavelength=1.0)
+    beam = BeamFactory.make_monochromatic_beam(unit_s0=(0, 0, -1), wavelength=1.0)
     goniometer = GoniometerFactory.known_axis((1, 0, 0))
     a = (100, 0, 0)
     b = (0, 90, 0)

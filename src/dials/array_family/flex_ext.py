@@ -107,6 +107,45 @@ class _:
         return predict()
 
     @staticmethod
+    def tof_from_predictions_multi(experiment, reflections, dmin=None, dmax=None):
+        result = dials_array_family_flex_ext.reflection_table()
+        current_wavelength = experiment.beam.get_wavelength()
+        current_s0 = experiment.beam.get_s0()
+        fmt_cls = experiment.imageset.get_format_class()
+        fmt_cls_inst = fmt_cls(experiment.imageset.paths()[0])
+        wavelengths = fmt_cls_inst.get_wavelength_channels_in_ang()
+
+        for idx, i in enumerate(wavelengths):
+            # for i in range(len(reflections)):
+            # experiment.beam.set_wavelength(reflections[i]["tof_wavelength"])
+            experiment.beam.set_wavelength(i)
+            rlist = dials_array_family_flex_ext.reflection_table.from_predictions(
+                experiment,
+                dmin=dmin,
+                dmax=dmax,
+            )
+            rlist["tof_wavelength"] = cctbx.array_family.flex.double(rlist.nrows(), i)
+            for j in range(len(rlist)):
+                # xyzcal_px[j] =  (rlist[j]["xyzcal.px"][0], rlist[j]["xyzcal.px"][1], idx+1)
+                rlist["xyzcal.px"][j] = (
+                    rlist[j]["xyzcal.px"][0],
+                    rlist[j]["xyzcal.px"][1],
+                    idx + 1,
+                )
+                # rlist[j]["xyzcal.px"] = cctbx.array_family.flex.vec3_double(1,(rlist[j]["xyzcal.px"][0], rlist[j]["xyzcal.px"][1], idx))
+            # rlist["tof_wavelength"] = cctbx.array_family.flex.double(rlist.nrows(), reflections[i]["tof_wavelength"])
+            rlist["tof_s0"] = cctbx.array_family.flex.vec3_double(
+                rlist.nrows(), experiment.beam.get_s0()
+            )
+            # rlist["xyzcal.px"] = xyzcal_px
+
+            result.extend(rlist)
+        result["id"] = cctbx.array_family.flex.int(len(result), 0)
+        experiment.beam.set_wavelength(current_wavelength)
+        experiment.beam.set_s0(current_s0)
+        return result
+
+    @staticmethod
     def from_predictions_multi(
         experiments, dmin=None, dmax=None, margin=1, force_static=False, padding=0
     ):
@@ -620,7 +659,7 @@ class _:
         distance = cctbx.array_family.flex.sqrt(
             cctbx.array_family.flex.pow2(x1 - x2)
             + cctbx.array_family.flex.pow2(y1 - y2)
-            + cctbx.array_family.flex.pow2(z1 - z2)
+            + cctbx.array_family.flex.pow2(z1 - z1)
         )
         mask = distance < 2
         logger.info(" %d reflections matched", len(o2))
@@ -1293,11 +1332,6 @@ Found %s"""
         import numpy as np
         from scipy import interpolate
 
-        def get_tof_wavelength_in_ang(L0_in_m, L_in_m, tof_in_s):
-            h = 6.62607004e-34
-            m_n = 1.67492749804e-27
-            return ((h * tof_in_s) / (m_n * (L0_in_m + L_in_m))) * 10 ** 10
-
         def get_tof_s0(s0_direction, tof_wavelength):
             return s0_direction * 1.0 / tof_wavelength
 
@@ -1344,8 +1378,8 @@ Found %s"""
                 tof_unit_s0 = cctbx.array_family.flex.vec3_double(len(s1))
                 for j in range(len(s1)):
                     s1n = np.linalg.norm(s1[j]) * 10 ** -3
-                    wavelengths[j] = get_tof_wavelength_in_ang(
-                        L0_in_m, s1n, frame_tof_vals[j]
+                    wavelengths[j] = fmt_cls_inst.get_tof_wavelength_in_ang(
+                        L0_in_m + s1n, frame_tof_vals[j]
                     )
                     tof[j] = frame_tof_vals[j] * 10 ** 6
                     unit_s0 = np.array(expt.beam.get_unit_s0())
@@ -1441,20 +1475,18 @@ Found %s"""
                     import numpy as np
 
                     tof_wavelengths = self["tof_wavelength"].select(sel)
-                    tof_s0 = self["tof_s0"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
                     s1 = s1 / s1.norms()
                     for s1_idx in range(len(s1)):
-                        s1[s1_idx] = np.array(s1[s1_idx]) * (
-                            1.0 / tof_wavelengths[s1_idx]
-                        )
-                        S[s1_idx] = np.array(s1[s1_idx]) - np.array(tof_s0[s1_idx])
+                        S[s1_idx] = (
+                            np.array(s1[s1_idx]) - np.array(expt.beam.get_unit_s0())
+                        ) / tof_wavelengths[s1_idx]
                 else:
                     s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
                     S = s1 - expt.beam.get_s0()
                 self["s1"].set_selected(sel, s1)
 
-                if expt.goniometer is not None and "tof_wavelength" not in self:
+                if expt.goniometer is not None:
                     setting_rotation = matrix.sqr(
                         expt.goniometer.get_setting_rotation()
                     )

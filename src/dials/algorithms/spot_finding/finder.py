@@ -321,7 +321,7 @@ def shoeboxes_to_reflection_table(
     # Create the observations
     observed = flex.observation(shoeboxes.panels(), centroid, intensity)
 
-    observed = correct_centroid_positions(observed, shoeboxes)
+    # observed = correct_centroid_positions(observed, shoeboxes)
 
     # Filter the reflections and select only the desired spots
     flags = filter_spots(

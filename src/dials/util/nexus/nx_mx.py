@@ -487,7 +487,7 @@ def dump_details(entry):
 
 
 def load_beam(entry):
-    from dxtbx.model import Beam
+    from dxtbx.model import MonochromaticBeam
 
     EPS = 1e-7
 
@@ -500,7 +500,7 @@ def load_beam(entry):
     assert n.dot(matrix.col((0, 0, -1))) < EPS
 
     # Return the beam model
-    return Beam((0, 0, -1), wavelength, 0, 0, n, p, 0, 1)
+    return MonochromaticBeam((0, 0, -1), wavelength, 0, 0, n, p, 0, 1)
 
 
 def load_detector(entry):

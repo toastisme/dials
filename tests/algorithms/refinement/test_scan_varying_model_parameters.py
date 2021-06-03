@@ -6,7 +6,7 @@ import textwrap
 
 import pytest
 
-from dxtbx.model import Beam, Crystal, Goniometer
+from dxtbx.model import Crystal, Goniometer, MonochromaticBeam
 from libtbx.test_utils import approx_equal
 from scitbx import matrix
 from scitbx.array_family import flex
@@ -214,7 +214,7 @@ class _TestScanVaryingModelParameterisation:
         s0 = random.uniform(0.8, 1.2) * self.random_direction_close_to(
             matrix.col((0, 0, 1))
         )
-        self.beam = Beam(s0)
+        self.beam = MonochromaticBeam(s0)
 
         # Make a standard goniometer model along X
         self.goniometer = Goniometer((1, 0, 0))

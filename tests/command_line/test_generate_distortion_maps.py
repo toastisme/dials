@@ -7,7 +7,7 @@ import pytest
 
 from dxtbx.format.Format import Reader
 from dxtbx.imageset import ImageSet, ImageSetData
-from dxtbx.model.beam import Beam
+from dxtbx.model.beam import MonochromaticBeam
 from dxtbx.model.detector import Detector
 from dxtbx.model.experiment_list import ExperimentListFactory
 from libtbx import easy_run
@@ -94,7 +94,7 @@ def test_elliptical_distortion(run_in_tmp_path):
     d = make_detector()
 
     # The beam is also essential for a experiments to be serialisable
-    b = Beam((0, 0, 1), 1.0)
+    b = MonochromaticBeam((0, 0, 1), 1.0)
 
     # Create and write out a experiments
     imageset = ImageSet(ImageSetData(Reader(None, ["non-existent.cbf"]), None))

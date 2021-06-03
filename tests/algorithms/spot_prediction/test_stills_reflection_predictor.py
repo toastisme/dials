@@ -13,7 +13,9 @@ class Model:
         from dxtbx.model import BeamFactory, DetectorFactory, GoniometerFactory
 
         # Beam along the Z axis
-        self.beam = BeamFactory.make_beam(unit_s0=matrix.col((0, 0, 1)), wavelength=1.0)
+        self.beam = BeamFactory.make_monochromatic_beam(
+            unit_s0=matrix.col((0, 0, 1)), wavelength=1.0
+        )
 
         # Goniometer (used only for index generation) along X axis
         self.goniometer = GoniometerFactory.known_axis(matrix.col((1, 0, 0)))

@@ -5,7 +5,7 @@ from __future__ import annotations
 import procrunner
 import pytest
 
-from dxtbx.model import Beam, Experiment, ExperimentList
+from dxtbx.model import Experiment, ExperimentList, MonochromaticBeam
 from dxtbx.serialize import load
 
 from dials.array_family import flex
@@ -13,7 +13,7 @@ from dials.array_family import flex
 
 def generate_exp(wavelength=1):
     """Generate an experiment containing a beam with a given wavelength."""
-    beam = Beam(direction=(0.0, 0.0, 1.0), wavelength=wavelength)
+    beam = MonochromaticBeam(direction=(0.0, 0.0, 1.0), wavelength=wavelength)
     exp = Experiment(beam=beam)
     return exp
 
