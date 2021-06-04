@@ -52,6 +52,7 @@ namespace dials { namespace af { namespace boost_python {
     export_flex_intensity();
     export_flex_observation();
     export_flex_reflection_table();
+    export_flex_reflection_table();
     export_flex_unit_cell();
     export_flex_shoebox_extractor();
     export_flex_binner();
