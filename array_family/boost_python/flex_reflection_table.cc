@@ -25,6 +25,7 @@
 #include <scitbx/vec3.h>
 #include <scitbx/vec2.h>
 #include <cctbx/miller.h>
+#include <dxtbx/model/beam.h>
 
 namespace dials { namespace af { namespace boost_python {
 
@@ -1178,7 +1179,6 @@ namespace dials { namespace af { namespace boost_python {
     };
   }  // namespace experiment_map_type_detail
 
-  template <typename Beam>
   void export_flex_reflection_table() {
     // Set the do
     docstring_options local_docstring_options;
@@ -1202,7 +1202,8 @@ namespace dials { namespace af { namespace boost_python {
     ;
 
     // Export the reflection table
-    flex_reflection_table_wrapper<reflection_table, Beam>::wrap("reflection_table");
+    flex_reflection_table_wrapper<reflection_table, dxtbx::model::MonochromaticBeam>::wrap("reflection_table");
+    flex_reflection_table_wrapper<reflection_table, dxtbx::model::TOFBeam>::wrap("reflection_table");
 
     // Export the reflection object
     class_<Reflection>("Reflection")
