@@ -20,7 +20,7 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
 #include <dxtbx/model/goniometer.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
 #include <dials/algorithms/profile_model/gaussian_rs/coordinate_system.h>
 

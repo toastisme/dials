@@ -5,7 +5,7 @@ import pickle
 from collections import namedtuple
 
 import dxtbx.model.compare as compare
-from dxtbx.imageset import ImageGrid, ImageSequence
+from dxtbx.imageset import ImageGrid, RotImageSequence, TOFImageSequence
 from dxtbx.model.experiment_list import (
     Experiment,
     ExperimentList,
@@ -336,23 +336,23 @@ class ManualGeometryUpdater:
         """
         from copy import deepcopy
 
-        from dxtbx.imageset import ImageSequence, ImageSetFactory
+        from dxtbx.imageset import ImageSetFactory, RotImageSequence
         from dxtbx.model import (
             BeamFactory,
             DetectorFactory,
             GoniometerFactory,
-            ScanFactory,
+            SequenceFactory,
         )
 
         if self.params.geometry.convert_sequences_to_stills:
             imageset = ImageSetFactory.imageset_from_anyset(imageset)
             for j in imageset.indices():
-                imageset.set_scan(None, j)
+                imageset.set_sequence(None, j)
                 imageset.set_goniometer(None, j)
-        if not isinstance(imageset, ImageSequence):
+        if not isinstance(imageset, RotImageSequence):
             if self.params.geometry.convert_stills_to_sequences:
                 imageset = self.convert_stills_to_sequence(imageset)
-        if isinstance(imageset, ImageSequence):
+        if isinstance(imageset, RotImageSequence):
             beam = BeamFactory.from_phil(self.params.geometry, imageset.get_beam())
             detector = DetectorFactory.from_phil(
                 self.params.geometry, imageset.get_detector(), beam
@@ -360,24 +360,24 @@ class ManualGeometryUpdater:
             goniometer = GoniometerFactory.from_phil(
                 self.params.geometry, imageset.get_goniometer()
             )
-            scan = ScanFactory.from_phil(
-                self.params.geometry, deepcopy(imageset.get_scan())
+            sequence = SequenceFactory.from_phil(
+                self.params.geometry, deepcopy(imageset.get_sequence())
             )
-            i0, i1 = scan.get_array_range()
-            j0, j1 = imageset.get_scan().get_array_range()
+            i0, i1 = sequence.get_array_range()
+            j0, j1 = imageset.get_sequence().get_array_range()
             if i0 < j0 or i1 > j1:
                 imageset = self.extrapolate_imageset(
                     imageset=imageset,
                     beam=beam,
                     detector=detector,
                     goniometer=goniometer,
-                    scan=scan,
+                    sequence=sequence,
                 )
             else:
                 imageset.set_beam(beam)
                 imageset.set_detector(detector)
                 imageset.set_goniometer(goniometer)
-                imageset.set_scan(scan)
+                imageset.set_sequence(sequence)
         else:
             for i in range(len(imageset)):
                 beam = BeamFactory.from_phil(self.params.geometry, imageset.get_beam(i))
@@ -387,19 +387,21 @@ class ManualGeometryUpdater:
                 goniometer = GoniometerFactory.from_phil(
                     self.params.geometry, imageset.get_goniometer(i)
                 )
-                scan = ScanFactory.from_phil(self.params.geometry, imageset.get_scan(i))
+                sequence = SequenceFactory.from_phil(
+                    self.params.geometry, imageset.get_sequence(i)
+                )
                 imageset.set_beam(beam, i)
                 imageset.set_detector(detector, i)
                 imageset.set_goniometer(goniometer, i)
-                imageset.set_scan(scan, i)
+                imageset.set_sequence(sequence, i)
         return imageset
 
     def extrapolate_imageset(
-        self, imageset=None, beam=None, detector=None, goniometer=None, scan=None
+        self, imageset=None, beam=None, detector=None, goniometer=None, sequence=None
     ):
         from dxtbx.imageset import ImageSetFactory
 
-        first, last = scan.get_image_range()
+        first, last = sequence.get_image_range()
         sequence = ImageSetFactory.make_sequence(
             template=imageset.get_template(),
             indices=list(range(first, last + 1)),
@@ -407,7 +409,7 @@ class ManualGeometryUpdater:
             beam=beam,
             detector=detector,
             goniometer=goniometer,
-            scan=scan,
+            sequence=sequence,
             format_kwargs=imageset.params(),
         )
         return sequence
@@ -461,7 +463,7 @@ class ManualGeometryUpdater:
             beam=beam,
             detector=detector,
             goniometer=goniometer,
-            scan=scan,
+            sequence=scan,
         )
         return new_sequence
 
@@ -558,8 +560,11 @@ class MetaDataUpdater:
                 )
 
             # Append to new imageset list
-            if isinstance(imageset, ImageSequence):
-                if imageset.get_scan().is_still():
+            if type(imageset) in [RotImageSequence, TOFImageSequence]:
+                if (
+                    isinstance(imageset, RotImageSequence)
+                    and imageset.get_sequence().is_still()
+                ):
                     # make lots of experiments all pointing at one
                     # image set
 
@@ -567,10 +572,10 @@ class MetaDataUpdater:
                     # that these are in people numbers (1...) and are inclusive
                     if self.params.geometry.scan.image_range:
                         user_start, user_end = self.params.geometry.scan.image_range
-                        offset = imageset.get_scan().get_array_range()[0]
+                        offset = imageset.get_sequence().get_array_range()[0]
                         start, end = user_start - 1, user_end
                     else:
-                        start, end = imageset.get_scan().get_array_range()
+                        start, end = imageset.get_sequence().get_array_range()
                         offset = 0
 
                     for j in range(start, end):
@@ -581,7 +586,7 @@ class MetaDataUpdater:
                                 beam=imageset.get_beam(),
                                 detector=imageset.get_detector(),
                                 goniometer=imageset.get_goniometer(),
-                                scan=subset.get_scan(),
+                                sequence=subset.get_sequence(),
                                 crystal=None,
                             )
                         )
@@ -593,7 +598,7 @@ class MetaDataUpdater:
                             beam=imageset.get_beam(),
                             detector=imageset.get_detector(),
                             goniometer=imageset.get_goniometer(),
-                            scan=imageset.get_scan(),
+                            sequence=imageset.get_sequence(),
                             crystal=None,
                         )
                     )
@@ -605,7 +610,7 @@ class MetaDataUpdater:
                             beam=imageset.get_beam(i),
                             detector=imageset.get_detector(i),
                             goniometer=imageset.get_goniometer(i),
-                            scan=imageset.get_scan(i),
+                            sequence=imageset.get_sequence(i),
                             crystal=None,
                         )
                     )
@@ -821,8 +826,11 @@ class ImageImporter:
         for e in experiments:
             if e.imageset in counted_imagesets:
                 continue
-            if isinstance(e.imageset, ImageSequence):
-                if e.imageset.get_scan().is_still():
+            if type(e.imageset) in [RotImageSequence, TOFImageSequence]:
+                if (
+                    isinstance(e.imageset, RotImageSequence)
+                    and e.imageset.get_sequence().is_still()
+                ):
                     num_still_sequences += 1
                 else:
                     num_sweeps += 1
@@ -849,7 +857,7 @@ class ImageImporter:
             # Print some experiment info - override the output of image range
             # if appropriate
             image_range = params.geometry.scan.image_range
-            if isinstance(experiment.imageset, ImageSequence):
+            if isinstance(experiment.imageset, RotImageSequence):
                 imageset_type = "sequence"
             else:
                 imageset_type = "stills"
@@ -866,7 +874,7 @@ class ImageImporter:
             logger.debug(experiment.imageset.get_beam())
             logger.debug(experiment.imageset.get_goniometer())
             logger.debug(experiment.imageset.get_detector())
-            logger.debug(experiment.imageset.get_scan())
+            logger.debug(experiment.imageset.get_sequence())
 
         # Only allow a single sequence
         if params.input.allow_multiple_sequences is False:
@@ -891,7 +899,7 @@ class ImageImporter:
         Print an error message if more than 1 sequence
         """
         sequences = [
-            e.imageset for e in experiments if isinstance(e.imageset, ImageSequence)
+            e.imageset for e in experiments if isinstance(e.imageset, RotImageSequence)
         ]
 
         if len(sequences) > 1:

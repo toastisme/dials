@@ -6,7 +6,7 @@ import pkg_resources
 import iotbx.phil
 import libtbx
 from cctbx import sgtbx
-from dxtbx.model import ExperimentList, ImageSequence
+from dxtbx.model import ExperimentList, RotImageSequence
 
 import dials.util
 from dials.algorithms.indexing import (
@@ -378,7 +378,7 @@ class Indexer:
             has_stills = False
             has_sequences = False
             for expt in experiments:
-                if isinstance(expt.imageset, ImageSequence):
+                if isinstance(expt.imageset, RotImageSequence):
                     has_sequences = True
                 else:
                     has_stills = True

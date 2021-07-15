@@ -1231,8 +1231,8 @@ class Integrator:
                         if experiment.imageset == imageset:
                             subset.extend(reflections.select(reflections["id"] == j))
                 try:
-                    if imageset.get_scan():
-                        frame0, frame1 = imageset.get_scan().get_array_range()
+                    if imageset.get_sequence():
+                        frame0, frame1 = imageset.get_sequence().get_array_range()
                     else:
                         raise RuntimeError
                 except RuntimeError:  # catch DXTBX_ASSERT if no scan in imageset

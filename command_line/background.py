@@ -82,7 +82,7 @@ def run(args=None):
         ax = fig.add_subplot(111)
 
     for i_imgset, imageset in enumerate(imagesets):
-        first, last = imageset.get_scan().get_image_range()
+        first, last = imageset.get_sequence().get_image_range()
         images = range(first, last + 1)
 
         if params.images:
