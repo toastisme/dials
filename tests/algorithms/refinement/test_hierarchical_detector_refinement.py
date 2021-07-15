@@ -85,9 +85,9 @@ def test1(dials_regression):
     goniometer = GoniometerFactory.known_axis((1.0, 0.0, 0.0))
 
     # Build a mock scan for a 180 degree sequence
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(1, 1800),
         exposure_times=0.1,

@@ -66,8 +66,13 @@ def test(args=[]):
     crystal2 = models.crystal
     mybeam = models.beam
 
+<<<<<<< HEAD:tests/algorithms/refinement/test_multi_experiment_refinement.py
     # Build a mock scan for an 18 degree sequence
     sf = ScanFactory()
+=======
+    # Build a mock scan for a 180 degree sequence
+    sf = SequenceFactory()
+>>>>>>> Name changes for Scan/sequence.:test/algorithms/refinement/test_multi_experiment_refinement.py
     myscan = sf.make_scan(
         image_range=(1, 180),
         exposure_times=0.1,
