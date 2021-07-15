@@ -709,8 +709,8 @@ namespace dials { namespace af { namespace boost_python { namespace flex_table_s
     return select_cols_keys(self, keys_array.const_ref());
   }
 
-  template <typename T, typename Beam>
-  T select_using_experiment(T &self, dxtbx::model::Experiment<Beam> expt) {
+  template <typename T>
+  T select_using_experiment(T &self, dxtbx::model::Experiment expt) {
     typedef typename T::experiment_map_type::const_iterator const_iterator;
 
     std::string identifier = expt.get_identifier();
@@ -741,10 +741,10 @@ namespace dials { namespace af { namespace boost_python { namespace flex_table_s
     return result;
   }
 
-  template <typename T, typename Beam>
-  T select_using_experiments(T &self, dxtbx::model::ExperimentList<Beam> expts) {
+  template <typename T>
+  T select_using_experiments(T &self, dxtbx::model::ExperimentList expts) {
     typedef typename T::experiment_map_type::const_iterator const_iterator;
-    typedef typename dxtbx::model::ExperimentList<Beam>::shared_type::const_iterator
+    typedef typename dxtbx::model::ExperimentList::shared_type::const_iterator
       expt_const_iterator;
     T result;
     for (expt_const_iterator expt = expts.begin(); expt != expts.end(); ++expt) {
@@ -1253,7 +1253,7 @@ namespace dials { namespace af { namespace boost_python { namespace flex_table_s
   /**
    * Export the wrapped column table class to python
    */
-  template <typename T, typename Beam>
+  template <typename T>
   struct flex_table_wrapper {
     typedef T flex_table_type;
     typedef class_<flex_table_type> class_type;
@@ -1295,8 +1295,8 @@ namespace dials { namespace af { namespace boost_python { namespace flex_table_s
         .def("select", &select_rows_flags<flex_table_type>)
         .def("select", &select_cols_keys<flex_table_type>)
         .def("select", &select_cols_tuple<flex_table_type>)
-        .def("select", &select_using_experiment<flex_table_type, Beam>)
-        .def("select", &select_using_experiments<flex_table_type, Beam>)
+        .def("select", &select_using_experiment<flex_table_type>)
+        .def("select", &select_using_experiments<flex_table_type>)
         .def("set_selected", &set_selected_rows_index<flex_table_type>)
         .def("set_selected", &set_selected_rows_flags<flex_table_type>)
         .def("set_selected", &set_selected_cols_keys<flex_table_type>)
