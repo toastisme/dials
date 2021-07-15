@@ -138,7 +138,7 @@ def run(args=None):
     detector = panels[0]
     nfast, nslow = detector.get_image_size()
 
-    first, last = imageset.get_scan().get_image_range()
+    first, last = imageset.get_sequence().get_image_range()
     images = range(first, last + 1)
 
     if params.images is None and params.image_range is not None:

@@ -11,7 +11,7 @@
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <dials/algorithms/spot_prediction/stills_ray_predictor.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/goniometer.h>
 #include <dxtbx/model/detector.h>

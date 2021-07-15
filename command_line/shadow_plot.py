@@ -70,7 +70,7 @@ def run(args=None):
     imageset = imagesets[0]
     goniometer = imageset.get_goniometer()
     detector = imageset.get_detector()
-    scan = imageset.get_scan()
+    scan = imageset.get_sequence()
     masker = imageset.masker()
     if masker is None:
         raise Sorry("Goniometer model does not support shadowing.")

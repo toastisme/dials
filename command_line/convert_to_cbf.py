@@ -34,7 +34,7 @@ def convert_to_cbf(imageset, template):
             imageset.get_detector(),
             imageset.get_beam(),
             imageset.get_goniometer(),
-            imageset.get_scan()[i],
+            imageset.get_sequence()[i],
             imageset.get_raw_data(i)[0],
             template % (i + 1),
         )

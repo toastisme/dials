@@ -15,7 +15,7 @@
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dxtbx/model/crystal.h>
 #include <dxtbx/imageset.h>
 #include <dials/array_family/reflection_table.h>
@@ -38,7 +38,7 @@ namespace dials { namespace algorithms {
   using dxtbx::model::Panel;
   using dxtbx::model::Scan;
 
-  using dxtbx::ImageSequence;
+  using dxtbx::RotImageSequence;
   using dxtbx::format::Image;
   using dxtbx::format::ImageTile;
 
@@ -1067,7 +1067,7 @@ namespace dials { namespace algorithms {
      * @param debug Add debug output
      */
     ParallelIntegrator(af::reflection_table reflections,
-                       ImageSequence imageset,
+                       RotImageSequence imageset,
                        const MaskCalculatorIface &compute_mask,
                        const BackgroundCalculatorIface &compute_background,
                        const IntensityCalculatorIface &compute_intensity,
@@ -1083,9 +1083,9 @@ namespace dials { namespace algorithms {
 
       // Check the models
       DIALS_ASSERT(imageset.get_detector() != NULL);
-      DIALS_ASSERT(imageset.get_scan() != NULL);
+      DIALS_ASSERT(imageset.get_sequence() != NULL);
       Detector detector = *imageset.get_detector();
-      Scan scan = *imageset.get_scan();
+      Scan scan = *imageset.get_sequence();
 
       // Get the size of the data buffer needed
       std::size_t zsize = imageset.size();
@@ -1178,12 +1178,12 @@ namespace dials { namespace algorithms {
      * Static method to get the memory in bytes needed
      * @param imageset the imageset class
      */
-    static std::size_t compute_required_memory(ImageSequence imageset,
+    static std::size_t compute_required_memory(RotImageSequence imageset,
                                                std::size_t block_size) {
       DIALS_ASSERT(imageset.get_detector() != NULL);
-      DIALS_ASSERT(imageset.get_scan() != NULL);
+      DIALS_ASSERT(imageset.get_sequence() != NULL);
       Detector detector = *imageset.get_detector();
-      Scan scan = *imageset.get_scan();
+      Scan scan = *imageset.get_sequence();
       block_size = std::min(block_size, (std::size_t)scan.get_num_images());
       std::size_t nelements = 0;
       for (std::size_t i = 0; i < detector.size(); ++i) {
@@ -1201,7 +1201,7 @@ namespace dials { namespace algorithms {
      * @param imageset the imageset class
      * @param max_memory_usage The maximum memory usage
      */
-    static std::size_t compute_max_block_size(ImageSequence imageset,
+    static std::size_t compute_max_block_size(RotImageSequence imageset,
                                               std::size_t max_memory_usage) {
       DIALS_ASSERT(max_memory_usage > 0);
       DIALS_ASSERT(imageset.get_detector() != NULL);
@@ -1244,7 +1244,7 @@ namespace dials { namespace algorithms {
                  Buffer &buffer,
                  af::ref<af::Reflection> reflections,
                  const AdjacencyList &overlaps,
-                 ImageSequence imageset,
+                 RotImageSequence imageset,
                  af::const_ref<int6> bbox,
                  af::const_ref<std::size_t> flags,
                  std::size_t nthreads,
@@ -1256,7 +1256,7 @@ namespace dials { namespace algorithms {
       ThreadPool pool(nthreads);
 
       // Get the size of the array
-      int zstart = imageset.get_scan()->get_array_range()[0];
+      int zstart = imageset.get_sequence()->get_array_range()[0];
       std::size_t zsize = imageset.size();
 
       // Create the buffer manager

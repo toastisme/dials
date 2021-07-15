@@ -17,7 +17,7 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/goniometer.h>
 #include <dxtbx/model/detector.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/model/data/shoebox.h>
 #include <dials/model/data/image_volume.h>
 #include <dials/algorithms/profile_model/gaussian_rs/coordinate_system.h>

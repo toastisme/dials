@@ -18,7 +18,7 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
 #include <dxtbx/model/goniometer.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dxtbx/model/scan_helpers.h>
 #include <dials/array_family/reflection_table.h>
 #include <dials/algorithms/spot_prediction/index_generator.h>
