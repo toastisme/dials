@@ -1628,7 +1628,14 @@ class SpotFrame(XrayFrame):
         strong_code = MaskCode.Valid | MaskCode.Strong
         shoebox_dict = {"width": 2, "color": "#0000FFA0", "closed": False}
         ctr_mass_dict = {"width": 2, "color": "#FF0000", "closed": False}
-
+        vector_dict = {"width": 4, "color": "#F62817", "closed": False}
+        if self.viewing_stills:
+            i_frame = self.images.selected_index  # NOTE, the underbar is intentional
+        else:
+            i_frame = self.images.selected.index
+        imageset = self.images.selected.image_set
+        if imageset.get_sequence() is not None:
+            i_frame += imageset.get_sequence().get_array_range()[0]
         shoebox_data = []
         all_pix_data = {}
         all_foreground_circles = {}
@@ -2000,8 +2007,68 @@ class SpotFrame(XrayFrame):
                     basis_vector_data = self._basis_vector_overlay_data(
                         i_expt, i_frame, experiment
                     )
-                    vector_data.extend(basis_vector_data[0])
-                    vector_text_data.extend(basis_vector_data[1])
+                    cb_op = cs.change_of_basis_op_to_reference_setting()
+                    crystal_model = crystal_model.change_basis(cb_op)
+                    A = matrix.sqr(crystal_model.get_A())
+                    scan = imageset.get_sequence()
+                    beam = imageset.get_beam()
+                    gonio = imageset.get_goniometer()
+                    still = scan is None or gonio is None
+                    if not still:
+                        phi = scan.get_angle_from_array_index(
+                            i_frame - imageset.get_array_range()[0], deg=True
+                        )
+                        axis = matrix.col(imageset.get_goniometer().get_rotation_axis())
+                    try:
+                        panel, beam_centre = detector.get_ray_intersection(
+                            beam.get_s0()
+                        )
+                    except RuntimeError as e:
+                        if "DXTBX_ASSERT(w_max > 0)" in str(e):
+                            # direct beam didn't hit a panel
+                            panel = 0
+                            beam_centre = detector[panel].get_ray_intersection(
+                                beam.get_s0()
+                            )
+                        else:
+                            raise
+                    beam_x, beam_y = detector[panel].millimeter_to_pixel(beam_centre)
+                    beam_x, beam_y = map_coords(beam_x, beam_y, panel)
+                    for i, h in enumerate(((1, 0, 0), (0, 1, 0), (0, 0, 1))):
+                        r = A * matrix.col(h) * self.settings.basis_vector_scale
+
+                        if still:
+                            s1 = matrix.col(beam.get_s0()) + r
+                        else:
+                            r_phi = r.rotate_around_origin(axis, phi, deg=True)
+                            s1 = matrix.col(beam.get_s0()) + r_phi
+                        panel = detector.get_panel_intersection(s1)
+                        if panel < 0:
+                            continue
+                        x, y = detector[panel].get_ray_intersection_px(s1)
+                        x, y = map_coords(x, y, panel)
+                        vector_data.append(
+                            (
+                                ((beam_x, beam_y), (x, y)),
+                                {
+                                    **vector_dict,
+                                    "color": self.prediction_colours[i_expt],
+                                },
+                            ),
+                        )
+
+                        vector_text_data.append(
+                            (
+                                x,
+                                y,
+                                ("a*", "b*", "c*")[i],
+                                {
+                                    "placement": "ne",
+                                    "fontsize": self.settings.fontsize,
+                                    "textcolor": self.prediction_colours[i_expt],
+                                },
+                            )
+                        )
 
         return SpotfinderData(
             all_pix_data=refl_data["all_pix_data"],

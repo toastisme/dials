@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 
 from cctbx.sgtbx import space_group, space_group_symbols
-from dxtbx.model import ScanFactory
+from dxtbx.model import SequenceFactory
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from libtbx.phil import parse
 from libtbx.test_utils import approx_equal
@@ -38,7 +38,7 @@ def setup_models(args):
     beam = models.beam
 
     # Build a mock scan for a 180 degree sequence
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(1, 180),
         exposure_times=0.1,

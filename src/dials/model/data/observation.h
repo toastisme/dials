@@ -15,7 +15,7 @@
 #include <scitbx/vec3.h>
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/error.h>
 
 namespace dials { namespace model {

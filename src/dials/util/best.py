@@ -51,7 +51,7 @@ def write_par_file(file_name, experiment):
     detector = imageset.get_detector()
     goniometer = imageset.get_goniometer()
     beam = imageset.get_beam()
-    scan = imageset.get_scan()
+    scan = imageset.get_sequence()
 
     R_to_mosflm = align_reference_frame(
         beam.get_s0(), (1.0, 0.0, 0.0), goniometer.get_rotation_axis(), (0.0, 0.0, 1.0)

@@ -15,7 +15,7 @@ import pytest
 
 from cctbx.sgtbx import space_group, space_group_symbols
 from cctbx.uctbx import unit_cell
-from dxtbx.model import Detector, Panel, ScanFactory
+from dxtbx.model import Detector, Panel, SequenceFactory
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from libtbx.phil import parse
 from libtbx.test_utils import approx_equal
@@ -107,7 +107,7 @@ def init_test():
             multi_panel_detector.add_panel(new_panel)
 
     # Build a mock scan for a 180 degree sequence
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(1, 1800),
         exposure_times=0.1,

@@ -59,9 +59,9 @@ def test():
 
     # Build a mock scan for a 72 degree sequence
     sequence_range = (0.0, math.pi / 5.0)
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     myscan = sf.make_scan(
         image_range=(1, 720),
         exposure_times=0.1,

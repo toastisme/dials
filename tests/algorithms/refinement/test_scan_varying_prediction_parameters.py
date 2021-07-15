@@ -42,7 +42,7 @@ from dials_refinement_helpers_ext import (
 
 class _Test:
     def create_models(self, cmdline_overrides=None):
-        from dxtbx.model import ScanFactory
+        from dxtbx.model import SequenceFactory
         from libtbx.phil import parse
 
         from . import geometry_phil
@@ -64,7 +64,7 @@ geometry.parameters.crystal.c.length.range = 10 50"""
         self.beam = models.beam
 
         # Make a scan of 1-20 * 0.5 deg images
-        sf = ScanFactory()
+        sf = SequenceFactory()
         self.scan = sf.make_scan((1, 20), 0.5, (0, 0.5), list(range(20)))
 
         # Generate an ExperimentList

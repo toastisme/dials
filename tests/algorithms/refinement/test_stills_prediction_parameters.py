@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from cctbx.sgtbx import space_group, space_group_symbols
-from dxtbx.model import ScanFactory
+from dxtbx.model import SequenceFactory
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from libtbx.phil import parse
 from scitbx.math import five_number_summary
@@ -77,7 +77,7 @@ class _Test:
 
     def generate_reflections(self):
         # Build a mock scan for a 3 degree sequence
-        sf = ScanFactory()
+        sf = SequenceFactory()
         self.scan = sf.make_scan(
             image_range=(1, 1),
             exposure_times=0.1,
