@@ -11,7 +11,7 @@ def test():
     from cctbx.sgtbx import space_group, space_group_symbols
 
     # We will set up a mock scan
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
     from dxtbx.model.experiment_list import Experiment, ExperimentList
     from libtbx.phil import parse
     from scitbx import matrix
@@ -61,7 +61,7 @@ def test():
     indices = index_generator.to_array()
 
     # Build a mock scan for a 30 degree sequence
-    sf = ScanFactory()
+    sf = SequenceFactory()
     myscan = sf.make_scan(
         image_range=(1, 300),
         exposure_times=0.1,

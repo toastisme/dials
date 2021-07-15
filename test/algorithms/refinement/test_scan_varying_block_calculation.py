@@ -37,9 +37,9 @@ def create_experiments(image_start=1):
     beam = models.beam
 
     # Build a mock scan for a 72 degree sequence
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(image_start, image_start + 720 - 1),
         exposure_times=0.1,
