@@ -10,7 +10,7 @@ from dxtbx.model import (
     Crystal,
     DetectorFactory,
     GoniometerFactory,
-    ScanFactory,
+    SequenceFactory,
 )
 from iotbx import pdb
 from scitbx import matrix
@@ -61,7 +61,7 @@ class Simulation:
         image_range = (1, nframes)
         exposure_times = 0.0
         epochs = [0] * nframes
-        self.scan = ScanFactory().make_scan(
+        self.scan = SequenceFactory().make_scan(
             image_range, exposure_times, oscillation, epochs, deg=True
         )
 

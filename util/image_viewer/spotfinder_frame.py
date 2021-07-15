@@ -1375,8 +1375,8 @@ class SpotFrame(XrayFrame):
         else:
             i_frame = self.images.selected.index
         imageset = self.images.selected.image_set
-        if imageset.get_scan() is not None:
-            i_frame += imageset.get_scan().get_array_range()[0]
+        if imageset.get_sequence() is not None:
+            i_frame += imageset.get_sequence().get_array_range()[0]
         shoebox_data = []
         all_pix_data = {}
         all_foreground_circles = {}
@@ -1653,7 +1653,7 @@ class SpotFrame(XrayFrame):
                     cb_op = cs.change_of_basis_op_to_reference_setting()
                     crystal_model = crystal_model.change_basis(cb_op)
                     A = matrix.sqr(crystal_model.get_A())
-                    scan = imageset.get_scan()
+                    scan = imageset.get_sequence()
                     beam = imageset.get_beam()
                     gonio = imageset.get_goniometer()
                     still = scan is None or gonio is None

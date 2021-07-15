@@ -103,7 +103,7 @@ geometry
   include scope dxtbx.model.beam.beam_phil_scope
   include scope dxtbx.model.detector.detector_phil_scope
   include scope dxtbx.model.goniometer.goniometer_phil_scope
-  include scope dxtbx.model.scan.scan_phil_scope
+  include scope dxtbx.model.sequence.scan_phil_scope
 
   convert_stills_to_sequences = False
     .type = bool

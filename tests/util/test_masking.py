@@ -42,7 +42,7 @@ def test_dynamic_shadowing(
         )
         imageset = experiments.imagesets()[0]
         detector = imageset.get_detector()
-        scan = imageset.get_scan()
+        scan = imageset.get_sequence()
         masker = imageset.masker()
         if shadowing is not False:
             assert masker is not None
