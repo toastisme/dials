@@ -62,7 +62,7 @@ def run(args=None):
         return
 
     detector = imageset.get_detector()
-    scan = imageset.get_scan()
+    scan = imageset.get_sequence()
 
     panel_origin_shifts = {0: (0, 0, 0)}
     try:

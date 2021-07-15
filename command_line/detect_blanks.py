@@ -79,7 +79,7 @@ def run(args=None):
 
     assert len(imagesets) == 1
     imageset = imagesets[0]
-    scan = imageset.get_scan()
+    scan = imageset.get_sequence()
 
     integrated_sel = reflections.get_flags(reflections.flags.integrated)
     indexed_sel = reflections.get_flags(reflections.flags.indexed)
