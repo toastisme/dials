@@ -181,8 +181,8 @@ indexing_min_spots = 10
 
         if (
             imageset.get_goniometer() is not None
-            and imageset.get_scan() is not None
-            and imageset.get_scan().is_still()
+            and imageset.get_sequence() is not None
+            and imageset.get_sequence().is_still()
         ):
             imageset.set_goniometer(None)
             imageset.set_scan(None)

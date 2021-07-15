@@ -142,7 +142,7 @@ class Script:
 
         for i in range(len(imageset)):
             axis = imageset.get_goniometer().get_rotation_axis()
-            osc_range = imageset.get_scan(i).get_oscillation_range()
+            osc_range = imageset.get_sequence(i).get_oscillation_range()
             print(f"Oscillation range: {osc_range[0]:.2f} - {osc_range[1]:.2f}")
             angle = (osc_range[0] + osc_range[1]) / 2 / 180 * math.pi
             if not self.reverse_phi:

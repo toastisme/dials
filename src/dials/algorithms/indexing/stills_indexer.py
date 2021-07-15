@@ -447,7 +447,7 @@ class StillsIndexer(Indexer):
                     beam=imageset.get_beam(),
                     detector=imageset.get_detector(),
                     goniometer=imageset.get_goniometer(),
-                    scan=imageset.get_scan(),
+                    scan=imageset.get_sequence(),
                     crystal=crystal,
                 )
             )

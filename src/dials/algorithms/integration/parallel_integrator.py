@@ -433,7 +433,7 @@ class IntegrationJob:
         nice = select_ice.count(True)
         nint = select_int.count(True)
         ntot = len(self.reflections)
-        frame0, frame1 = imageset.get_scan().get_array_range()
+        frame0, frame1 = imageset.get_sequence().get_array_range()
 
         # Write some output
         logger.info(" Beginning integration job %d", self.index)
@@ -880,7 +880,7 @@ class ReferenceCalculatorJob:
         nice = select_ice.count(True)
         nint = select_int.count(True)
         ntot = len(self.reflections)
-        frame0, frame1 = imageset.get_scan().get_array_range()
+        frame0, frame1 = imageset.get_sequence().get_array_range()
 
         # Write some output
         logger.info(" Beginning integration job %d", self.index)

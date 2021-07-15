@@ -209,7 +209,7 @@ class render_3d:
         from dxtbx.model.experiment_list import Experiment
 
         imageset = self.imageset
-        scan = copy.deepcopy(imageset.get_scan())
+        scan = copy.deepcopy(imageset.get_sequence())
         gonio = imageset.get_goniometer()
         prediction_width = self.settings.prediction_width
         if prediction_width is None:
@@ -497,7 +497,7 @@ class GeometryWindow(wx_viewer.show_points_and_lines_mixin):
         crystal = self.parent.crystal
         if self.settings.show_crystal_axes and crystal is not None:
             crystal = copy.deepcopy(crystal)
-            scan = self.parent.imageset.get_scan()
+            scan = self.parent.imageset.get_sequence()
             fixed_rotation = matrix.sqr(gonio.get_fixed_rotation())
             setting_rotation = matrix.sqr(gonio.get_setting_rotation())
             rotation_axis = matrix.col(gonio.get_rotation_axis_datum())

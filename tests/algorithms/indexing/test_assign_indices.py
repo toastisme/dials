@@ -9,13 +9,13 @@ import pytest
 from cctbx import crystal, sgtbx
 from cctbx.sgtbx import bravais_types
 from dxtbx.format import Format
-from dxtbx.imageset import ImageSequence, ImageSetData
+from dxtbx.imageset import ImageSetData, RotImageSequence
 from dxtbx.model import (
     BeamFactory,
     Crystal,
     DetectorFactory,
     GoniometerFactory,
-    ScanFactory,
+    SequenceFactory,
 )
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from dxtbx.serialize import load
@@ -89,7 +89,7 @@ def experiment():
 
     goniometer = GoniometerFactory.single_axis()
 
-    scan = ScanFactory.make_scan(
+    scan = SequenceFactory.make_scan(
         image_range=(1, 20),
         exposure_times=0.067,
         oscillation=(82, 0.15),
@@ -99,7 +99,7 @@ def experiment():
     isetdata = ImageSetData(
         reader=Format.Reader(None, ["path"] * len(scan)), masker=None
     )
-    iset = ImageSequence(
+    iset = RotImageSequence(
         isetdata, beam=beam, detector=detector, goniometer=goniometer, scan=scan
     )
 

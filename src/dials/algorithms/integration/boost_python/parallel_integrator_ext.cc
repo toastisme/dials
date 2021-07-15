@@ -370,7 +370,7 @@ namespace dials { namespace algorithms { namespace boost_python {
   void export_integrator() {
     class_<ParallelIntegrator>("MultiThreadedIntegrator", no_init)
       .def(init<const af::reflection_table &,
-                ImageSequence,
+                RotImageSequence,
                 const MaskCalculatorIface &,
                 const BackgroundCalculatorIface &,
                 const IntensityCalculatorIface &,
@@ -400,7 +400,7 @@ namespace dials { namespace algorithms { namespace boost_python {
 
     class_<ParallelReferenceProfiler>("MultiThreadedReferenceProfiler", no_init)
       .def(init<const af::reflection_table &,
-                ImageSequence,
+                RotImageSequence,
                 const MaskCalculatorIface &,
                 const BackgroundCalculatorIface &,
                 ReferenceCalculatorIface &,

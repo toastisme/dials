@@ -150,7 +150,7 @@ def imageset_as_bitmaps(imageset, params):
     detector.projection = params.projection
 
     panel = detector[0]
-    scan = imageset.get_scan()
+    scan = imageset.get_sequence()
     # XXX is this inclusive or exclusive?
     saturation = panel.get_trusted_range()[1]
     if params.saturation:
