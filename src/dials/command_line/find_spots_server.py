@@ -185,7 +185,7 @@ indexing_min_spots = 10
             and imageset.get_sequence().is_still()
         ):
             imageset.set_goniometer(None)
-            imageset.set_scan(None)
+            imageset.set_sequence(None)
 
         try:
             idxr = indexer.Indexer.from_parameters(

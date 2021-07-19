@@ -67,7 +67,19 @@ def run(args: List[str] = None, phil: libtbx.phil.scope = phil_scope) -> None:
         parser.print_help()
         exit(0)
 
-    new_experiments = update(experiments, params)
+    from dials.command_line.dials_import import ManualGeometryUpdater
+
+    update_geometry = ManualGeometryUpdater(params)
+
+    if len(experiments):
+        imagesets = experiments.imagesets()
+
+    for imageset in imagesets:
+        imageset_new = update_geometry(imageset)
+        imageset.set_detector(imageset_new.get_detector())
+        imageset.set_beam(imageset_new.get_beam())
+        imageset.set_goniometer(imageset_new.get_goniometer())
+        imageset.set_sequence(imageset_new.get_sequence())
 
     if len(new_experiments):
         print(f"Saving modified experiments to {params.output.experiments}")

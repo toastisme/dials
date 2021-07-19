@@ -27,7 +27,7 @@ def dump(experiments, reflections, directory):
             imageset.set_detector(experiment.detector)
             imageset.set_beam(experiment.beam)
             imageset.set_goniometer(experiment.goniometer)
-            imageset.set_scan(experiment.scan)
+            imageset.set_sequence(experiment.scan)
 
             if experiment.crystal is None:
                 space_group_number = None
