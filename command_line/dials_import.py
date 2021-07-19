@@ -857,7 +857,7 @@ class ImageImporter:
             # Print some experiment info - override the output of image range
             # if appropriate
             image_range = params.geometry.scan.image_range
-            if isinstance(experiment.imageset, RotImageSequence):
+            if type(experiment.imageset) in [RotImageSequence, TOFImageSequence]:
                 imageset_type = "sequence"
             else:
                 imageset_type = "stills"
@@ -899,7 +899,9 @@ class ImageImporter:
         Print an error message if more than 1 sequence
         """
         sequences = [
-            e.imageset for e in experiments if isinstance(e.imageset, RotImageSequence)
+            e.imageset
+            for e in experiments
+            if type(e.imageset) in [RotImageSequence, TOFImageSequence]
         ]
 
         if len(sequences) > 1:
