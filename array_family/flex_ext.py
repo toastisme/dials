@@ -1348,6 +1348,7 @@ Found %s"""
             "tof_wavelength" in self
         ), "Reflection table does not contain ToF wavelengths."
         from dxtbx_imageset_ext import ImageSet
+
         from scitbx.array_family import flex
 
         experiment_list = ExperimentList()
@@ -1358,7 +1359,7 @@ Found %s"""
             single_file_indices = [int(frame)]
             single_file_indices = flex.size_t(single_file_indices)
             imageset = ImageSet(experiment.imageset.data(), single_file_indices)
-            imageset.set_scan(None)
+            imageset.set_sequence(None)
             imageset.set_goniometer(None)
             imageset.set_beam(beam)
             new_experiment = Experiment(
