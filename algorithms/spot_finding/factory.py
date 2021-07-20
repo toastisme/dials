@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from dxtbx.imageset import RotImageSequence
+from dxtbx.imageset import ImageSet
 from iotbx.phil import parse
 
 import dials.extensions
@@ -422,7 +422,7 @@ class SpotFinderFactory:
             no_shoeboxes_2d = False
             all_stills = True
             for experiment in experiments:
-                if isinstance(experiment.imageset, RotImageSequence):
+                if ImageSet.is_sequence(experiment.imageset):
                     all_stills = False
                     break
             if all_stills:
