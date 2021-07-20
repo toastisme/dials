@@ -440,7 +440,7 @@ def test_template_with_missing_image_outside_of_image_range(
                 "imported_%i_%i.expt" % image_range
             )
         )
-        assert expts[0].scan.get_image_range() == image_range
+        assert expts[0].sequence.get_image_range() == image_range
 
 
 def test_import_still_sequence_as_experiments(dials_data, tmp_path):
@@ -465,7 +465,7 @@ def test_import_still_sequence_as_experiments(dials_data, tmp_path):
     assert len(iset) == 1
 
     # verify scans, goniometers kept too
-    assert all(exp.scan.get_oscillation() == (0.0, 0.0) for exp in imported_exp)
+    assert all(exp.sequence.get_oscillation() == (0.0, 0.0) for exp in imported_exp)
     assert all(exp.goniometer is not None for exp in imported_exp)
 
 
@@ -491,7 +491,7 @@ def test_import_still_sequence_as_experiments_subset(dials_data, tmpdir):
     assert len(iset) == 1
 
     # verify scans, goniometers kept too
-    assert all(exp.scan.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
+    assert all(exp.sequence.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
     assert all(exp.goniometer is not None for exp in imported_exp)
 
 
@@ -527,7 +527,7 @@ def test_import_still_sequence_as_expts_subset_by_range(dials_data, tmp_path):
     assert list(iset)[0].get_image_identifier(0) == os.fspath(image_files[2])
 
     # verify scans, goniometers kept too
-    assert all(exp.scan.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
+    assert all(exp.sequence.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
     assert all(exp.goniometer is not None for exp in imported_exp)
 
 

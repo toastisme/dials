@@ -224,7 +224,7 @@ class render_3d:
             crystal=self.crystal,
             detector=imageset.get_detector(),
             beam=imageset.get_beam(),
-            scan=scan[:1],
+            sequence=scan[:1],
             goniometer=imageset.get_goniometer(),
         )
 

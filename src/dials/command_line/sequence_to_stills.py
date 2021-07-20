@@ -93,21 +93,14 @@ def sequence_to_stills(experiments, reflections, params):
             experiment.goniometer.get_setting_rotation()
         )
         goniometer_axis = matrix.col(experiment.goniometer.get_rotation_axis())
-        step = experiment.scan.get_oscillation()[1]
+        step = experiment.sequence.get_oscillation()[1]
 
         refls = reflections.select(reflections["id"] == expt_id)
         _, _, _, _, z1, z2 = refls["bbox"].parts()
 
-        # Create an experiment for each scanpoint.
-        # Note that a simplification of the use of scan-points here introduces a
-        # (small) error. The scan-varying crystal model has 1 more scan-point
-        # than the scan has images because scan-points are taken at the boundaries
-        # between images, including the scan extrema. This code assumes that
-        # the crystal model at the start of each image applies to the whole
-        # image and ignores the final scan-point.
-        start, stop = experiment.scan.get_array_range()
-        for i_array in range(start, stop):
-            if params.max_scan_points and i_array >= params.max_scan_points:
+        # Create an experiment for each scanpoint
+        for i_scan_point in range(*experiment.sequence.get_array_range()):
+            if params.max_scan_points and i_scan_point >= params.max_scan_points:
                 break
             # Shift array position to scan-point index
             i_scan_point = i_array - start
@@ -121,7 +114,7 @@ def sequence_to_stills(experiments, reflections, params):
             # by a further half oscillation step.
             A = (
                 goniometer_axis.axis_and_angle_as_r3_rotation_matrix(
-                    angle=experiment.scan.get_angle_from_array_index(i_array)
+                    angle=experiment.sequence.get_angle_from_array_index(i_scan_point)
                     + (step / 2),
                     deg=True,
                 )

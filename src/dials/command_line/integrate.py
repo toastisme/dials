@@ -236,7 +236,7 @@ def filter_reference_pixels(reference, experiments):
             experiment.beam,
             experiment.detector,
             experiment.goniometer,
-            experiment.scan,
+            experiment.sequence,
             experiment.crystal,
         )
         modified_count += modified.count(True)
@@ -275,8 +275,8 @@ def sample_predictions(experiments, predicted, params):
         nrefs = sample_size = len(isel)
 
         # set sample size according to nref_per_degree (per experiment)
-        if exp.scan and nref_per_degree:
-            sequence_range_rad = exp.scan.get_oscillation_range(deg=False)
+        if exp.sequence and nref_per_degree:
+            sequence_range_rad = exp.sequence.get_oscillation_range(deg=False)
             width = math.degrees(abs(sequence_range_rad[1] - sequence_range_rad[0]))
             sample_size = int(nref_per_degree * width)
         else:
@@ -319,13 +319,13 @@ def split_for_scan_range(experiments, reference, scan_range):
 
         # Ensure that all experiments have the same imageset and scan
         iset = [e.imageset for e in experiments]
-        scan = [e.scan for e in experiments]
+        scan = [e.sequence for e in experiments]
         assert all(x == iset[0] for x in iset)
         assert all(x == scan[0] for x in scan)
 
         # Get the imageset and scan
         iset = experiments[0].imageset
-        scan = experiments[0].scan
+        scan = experiments[0].sequence
 
         # Get the array range
         if scan is not None:
@@ -455,8 +455,8 @@ def run_integration(params, experiments, reference=None):
         )
         if exp.goniometer:
             summary += str(exp.goniometer) + "\n"
-        if exp.scan:
-            summary += str(exp.scan) + "\n"
+        if exp.sequence:
+            summary += str(exp.sequence) + "\n"
         summary += str(exp.crystal)
         logger.info(summary)
 
@@ -468,7 +468,7 @@ def run_integration(params, experiments, reference=None):
         reference, rubbish = process_reference(reference)
 
         # Check pixels don't belong to neighbours
-        if exp.goniometer is not None and exp.scan is not None:
+        if exp.goniometer is not None and exp.sequence is not None:
             reference = filter_reference_pixels(reference, experiments)
 
         # Modify experiment list if scan range is set.

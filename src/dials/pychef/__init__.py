@@ -87,7 +87,7 @@ equal to the number of experiments (%s)"""
         accumulated_dose = 0
         # adjust starting doses to account for a shared crystal.
         for expt, dose_per_img in zip(experiments, doses_per_image):
-            imgrange = expt.scan.get_image_range()
+            imgrange = expt.sequence.get_image_range()
             n_images = imgrange[1] - imgrange[0] + 1
             accumulated_dose += n_images * dose_per_img
             start_doses.append(accumulated_dose)

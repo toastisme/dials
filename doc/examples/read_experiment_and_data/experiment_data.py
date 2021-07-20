@@ -95,7 +95,7 @@ class Script:
         # a rotation image in here i.e. if scan is not None; derive goniometer
         # matrix else set this to identity
 
-        scan = experiments[0].scan
+        scan = experiments[0].sequence
         goniometer = experiments[0].goniometer
 
         if scan and goniometer:

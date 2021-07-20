@@ -72,7 +72,7 @@ def run(args=None):
         crystal = experiment.crystal
         gonio = experiment.goniometer
         assert len(experiments) == (len(gonio.get_axes()) + 1)
-        scan = experiment.scan
+        scan = experiment.sequence
         fixed_rotation = matrix.sqr(gonio.get_fixed_rotation())
         setting_rotation = matrix.sqr(gonio.get_setting_rotation())
         rotation_axis = matrix.col(gonio.get_rotation_axis_datum())

@@ -27,7 +27,7 @@ def test_extract_experiment_data():
         deg=True,
     )
 
-    exp = Experiment(beam=beam, goniometer=goniometer, scan=scan, crystal=crystal)
+    exp = Experiment(beam=beam, goniometer=goniometer, sequence=scan, crystal=crystal)
 
     # Extract experiment data
     dat = extract_experiment_data(exp, scale=100)

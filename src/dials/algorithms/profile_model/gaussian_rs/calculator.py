@@ -531,7 +531,7 @@ class ProfileModelCalculator:
                     beam=beam,
                     detector=detector,
                     goniometer=goniometer,
-                    scan=scan,
+                    sequence=scan,
                 )
             )
             reflections = reflections.select(flex.abs(zeta) >= min_zeta)
@@ -605,7 +605,7 @@ class ScanVaryingProfileModelCalculator:
                 beam=beam,
                 detector=detector,
                 goniometer=goniometer,
-                scan=scan,
+                sequence=scan,
             )
         )
         mask = flex.abs(zeta) >= min_zeta

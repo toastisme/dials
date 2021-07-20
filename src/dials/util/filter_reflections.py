@@ -192,8 +192,8 @@ def filtered_arrays_from_experiments_reflections(
     ids_to_del = []
 
     if return_batches:
-        assert all(expt.scan is not None for expt in experiments)
-        batch_offsets = [expt.scan.get_batch_offset() for expt in experiments]
+        assert all(expt.sequence is not None for expt in experiments)
+        batch_offsets = [expt.sequence.get_batch_offset() for expt in experiments]
         reflections = assign_batches_to_reflections(reflections, batch_offsets)
         batch_arrays = []
 

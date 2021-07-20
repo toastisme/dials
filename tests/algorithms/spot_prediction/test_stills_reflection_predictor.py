@@ -62,7 +62,7 @@ class Model:
             beam=self.beam,
             detector=self.detector,
             goniometer=None,
-            scan=None,
+            sequence=None,
             crystal=self.crystal,
             imageset=None,
         )

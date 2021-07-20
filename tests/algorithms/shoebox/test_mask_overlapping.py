@@ -28,7 +28,7 @@ def predict_reflections(sequence, crystal):
             beam=beam,
             detector=detector,
             goniometer=gonio,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             profile=Model(None, 3, sigma_b, sigma_m, deg=True),
         )

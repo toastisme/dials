@@ -249,7 +249,7 @@ def test_scan_varying_missing_segments_multi_crystal(dials_data, tmp_path):
     )
 
     # verify scans start and finish correctly
-    image_ranges = [e.scan.get_image_range() for e in el]
+    image_ranges = [e.sequence.get_image_range() for e in el]
 
     assert image_ranges[0][1] == 850
     assert image_ranges[1][0] == 1

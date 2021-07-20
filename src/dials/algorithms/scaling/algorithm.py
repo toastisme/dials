@@ -371,8 +371,8 @@ multi-dataset scaling mode (not single dataset or scaling against a reference)""
 
                 if counter == 1:
                     results.initial_expids_and_image_ranges = [
-                        (exp.identifier, exp.scan.get_image_range())
-                        if exp.scan
+                        (exp.identifier, exp.sequence.get_image_range())
+                        if exp.sequence
                         else None
                         for exp in self.experiments
                     ]
@@ -397,7 +397,7 @@ multi-dataset scaling mode (not single dataset or scaling against a reference)""
 
                 valid_image_ranges = get_valid_image_ranges(self.experiments)
                 results.expids_and_image_ranges = [
-                    (exp.identifier, valid_image_ranges[i]) if exp.scan else None
+                    (exp.identifier, valid_image_ranges[i]) if exp.sequence else None
                     for i, exp in enumerate(self.experiments)
                 ]
 

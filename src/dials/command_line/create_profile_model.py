@@ -208,7 +208,7 @@ class Script:
                 experiment.beam,
                 experiment.detector,
                 experiment.goniometer,
-                experiment.scan,
+                experiment.sequence,
                 experiment.crystal,
             )
             modified_count += modified.count(True)

@@ -24,19 +24,19 @@ def slice_experiments(experiments, image_ranges):
     for exp, sr in zip(experiments, image_ranges):
         if sr is None:
             continue
-        im_range = exp.scan.get_image_range()
+        im_range = exp.sequence.get_image_range()
         if sr[0] < im_range[0] or sr[1] > im_range[1]:
             raise IndexError("requested slice outside current scan range")
 
         # slicing uses the array range, not the image range
-        arr_start = exp.scan.get_array_range()[0]
+        arr_start = exp.sequence.get_array_range()[0]
         beg = sr[0] - 1 - arr_start
         end = sr[1] - arr_start
-        exp.scan.swap(exp.scan[beg:end])
+        exp.sequence.swap(exp.sequence[beg:end])
         if exp.imageset is not None:
             # Gorilla of temporary workarounds for inconsistent scan and imageset slicing
             # https://github.com/cctbx/dxtbx/issues/213
-            offset = exp.scan.get_batch_offset()
+            offset = exp.sequence.get_batch_offset()
             exp.imageset = exp.imageset[beg + offset : end + offset]
 
         # account for scan-varying crystal

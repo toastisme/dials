@@ -14,10 +14,10 @@ def filter_shadowed_reflections(experiments, reflections, experiment_goniometer=
         sel = reflections["id"] == expt_id
         isel = sel.iselection()
         x, y, z = reflections["xyzcal.px"].select(isel).parts()
-        start, end = expt.scan.get_array_range()
+        start, end = expt.sequence.get_array_range()
         for i in range(start, end):
             shadow = masker.project_extrema(
-                detector, expt.scan.get_angle_from_array_index(i)
+                detector, expt.sequence.get_angle_from_array_index(i)
             )
             img_sel = (z >= i) & (z < (i + 1))
             img_isel = img_sel.iselection()

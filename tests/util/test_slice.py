@@ -13,10 +13,10 @@ def test_slice_experiments():
     image_range = (0, 1000)
     oscillation = (0, 0.1)
     scan = Scan(image_range, oscillation)
-    experiments = ExperimentList([Experiment(scan=scan)])
+    experiments = ExperimentList([Experiment(sequence=scan)])
     sliced_image_range = [(1, 5)]
     sliced_experiments = slice_experiments(experiments, sliced_image_range)
-    assert sliced_experiments[0].scan.get_image_range() == sliced_image_range[0]
+    assert sliced_experiments[0].sequence.get_image_range() == sliced_image_range[0]
     copy.deepcopy(sliced_experiments)
 
 
@@ -25,7 +25,7 @@ def test_slice_experiments_centroid_test_data(dials_data):
     experiments = ExperimentListFactory.from_filenames(files)
     sliced_image_range = [(1, 3)]
     sliced_experiments = slice_experiments(experiments, sliced_image_range)
-    assert sliced_experiments[0].scan.get_image_range() == sliced_image_range[0]
+    assert sliced_experiments[0].sequence.get_image_range() == sliced_image_range[0]
     # for some reason the sliced_experiments is not copyable
     assert copy.deepcopy(sliced_experiments)
 
@@ -35,7 +35,7 @@ def test_slice_experiments_centroid_test_data_starting_from_2(dials_data):
     experiments = ExperimentListFactory.from_filenames(files)
     sliced_image_range = [(2, 4)]
     sliced_experiments = slice_experiments(experiments, sliced_image_range)
-    assert sliced_experiments[0].scan.get_image_range() == sliced_image_range[0]
+    assert sliced_experiments[0].sequence.get_image_range() == sliced_image_range[0]
 
 
 def test_slice_reflections():

@@ -653,7 +653,7 @@ def test_stills_indexer_multi_lattice_bug_MosaicSauter2014(dials_regression, tmp
         beam=explist[0].beam,
         detector=explist[0].detector,
         goniometer=None,
-        scan=None,
+        sequence=None,
         crystal=cs0,
     )
 
@@ -664,7 +664,7 @@ def test_stills_indexer_multi_lattice_bug_MosaicSauter2014(dials_regression, tmp
         beam=explist[1].beam,
         detector=explist[1].detector,
         goniometer=None,
-        scan=None,
+        sequence=None,
         crystal=cs1,
     )
     # Construct a new experiment_list that will be passed on for refinement

@@ -284,8 +284,8 @@ def get_subset_for_symmetry(experiments, reflection_tables, exclude_images=None)
                 # Use first 360 degrees if <360 deg i.e. first measured data,
                 # but only if no reflections have been explicitly excluded
                 # already
-                scan_end = int(math.ceil(360 / abs(expt.scan.get_oscillation()[1])))
-                if scan_end < len(expt.scan):
+                scan_end = int(math.ceil(360 / abs(expt.sequence.get_oscillation()[1])))
+                if scan_end < len(expt.sequence):
                     sel = refl["xyzobs.px.value"].parts()[2] <= scan_end
             refls_for_sym.append(refl.select(sel))
     return refls_for_sym

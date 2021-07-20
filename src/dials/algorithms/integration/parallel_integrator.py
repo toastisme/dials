@@ -673,7 +673,7 @@ class IntegrationManager:
                 )
                 block_size = max_block_size
         else:
-            scan = self.experiments[0].scan
+            scan = self.experiments[0].sequence
             if block.units == "radians":
                 phi0, dphi = scan.get_oscillation(deg=False)
                 block_size = int(math.ceil(block.size / dphi))
@@ -734,7 +734,7 @@ class IntegrationManager:
             ]
             for i in range(len(self)):
                 f0, f1 = self.manager.job(i)
-                scan = self.experiments[0].scan
+                scan = self.experiments[0].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 n = self.manager.num_reflections(i)
@@ -1143,7 +1143,7 @@ class ReferenceCalculatorManager:
                 )
                 block_size = max_block_size
         else:
-            scan = self.experiments[0].scan
+            scan = self.experiments[0].sequence
             if block.units == "radians":
                 phi0, dphi = scan.get_oscillation(deg=False)
                 block_size = int(math.ceil(block.size / dphi))
@@ -1201,7 +1201,7 @@ class ReferenceCalculatorManager:
             ]
             for i in range(len(self)):
                 f0, f1 = self.manager.job(i)
-                scan = self.experiments[0].scan
+                scan = self.experiments[0].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 n = self.manager.num_reflections(i)

@@ -91,7 +91,7 @@ def test(args=[]):
             detector=mydetector,
             crystal=crystal,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             imageset=None,
         )
     )

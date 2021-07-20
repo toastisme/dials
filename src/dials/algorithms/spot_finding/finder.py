@@ -335,7 +335,7 @@ def shoeboxes_to_reflection_table(
 
 
 def correct_centroid_positions(observed, shoeboxes):
-    panel_numbers = sorted(list(set([i.panel for i in shoeboxes])))
+    panel_numbers = sorted({i.panel for i in shoeboxes})
     max_intensities = []
     for i in panel_numbers:
         max_intensities.append(
@@ -465,10 +465,6 @@ class ExtractSpots:
             mp_nproc = available_cores()
             logger.info(f"Setting nproc={mp_nproc}")
 
-        if os.name == "nt" and (mp_nproc > 1 or mp_njobs > 1):
-            logger.warning(_no_multiprocessing_on_windows)
-            mp_nproc = 1
-            mp_njobs = 1
         if mp_nproc * mp_njobs > num_tasks:
             mp_nproc = min(mp_nproc, num_tasks)
             mp_njobs = int(math.ceil(num_tasks / mp_nproc))
@@ -745,8 +741,8 @@ class SpotFinder:
             for i, experiment in enumerate(experiments):
                 if experiment.imageset is not imageset:
                     continue
-                if not self.is_stills and experiment.scan:
-                    z0, z1 = experiment.scan.get_array_range()
+                if not self.is_stills and experiment.sequence:
+                    z0, z1 = experiment.sequence.get_array_range()
                     z = table["xyzobs.px.value"].parts()[2]
                     table["id"].set_selected((z > z0) & (z < z1), i)
                     if experiment.identifier:

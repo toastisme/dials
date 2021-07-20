@@ -86,7 +86,7 @@ def test(dials_regression, tmp_path):
         assert exp_single[0].crystal == e.crystal
         assert exp_single[0].beam == e.beam
         assert exp_single[0].detector == e.detector
-        assert exp_single[0].scan == e.scan
+        assert exp_single[0].scan == e.sequence
         assert exp_single[0].goniometer == e.goniometer
         assert exp_single[0].imageset == e.imageset
         assert len(ref_single) == len(ref.select(ref["id"] == i))

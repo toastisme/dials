@@ -176,8 +176,8 @@ class UnmergedMTZWriter(MTZWriterBase):
 
         i0 = image_range[0]
         for i in range(n_batches):
-            if experiment.scan:
-                phi_start[i], phi_range[i] = experiment.scan.get_image_oscillation(
+            if experiment.sequence:
+                phi_start[i], phi_range[i] = experiment.sequence.get_image_oscillation(
                     i + i0
                 )
 
@@ -189,47 +189,9 @@ class UnmergedMTZWriter(MTZWriterBase):
             ):
 
                 # Get the index of the image in the sequence e.g. first => 0, second => 1
-                image_index = i + i0 - experiment.scan.get_image_range()[0]
-
-                # Find the U matrix at the frame centre by calculating the linear transform
-                # that goes from the start of the frame to the end, and then applying half of
-                # that to the start value
-                U0 = matrix.sqr(experiment.crystal.get_U_at_scan_point(image_index))
-                U1 = matrix.sqr(experiment.crystal.get_U_at_scan_point(image_index + 1))
-                M = U1 * U0.inverse()
-                (
-                    angle_M,
-                    axis_M,
-                ) = M.r3_rotation_matrix_as_unit_quaternion().unit_quaternion_as_axis_and_angle(
-                    deg=False
-                )
-                M_half = axis_M.axis_and_angle_as_r3_rotation_matrix(
-                    angle_M / 2, deg=False
-                )
-                Ucentre = M_half * U0
-
-                # Find the B matrix at the frame centre by interpolation
-                B0 = matrix.sqr(experiment.crystal.get_B_at_scan_point(image_index))
-                B1 = matrix.sqr(experiment.crystal.get_B_at_scan_point(image_index + 1))
-                Bcentre = (B0 + B1) / 2
-
-                # Unit cell at the frame centre
-                unit_cell = uctbx.unit_cell(
-                    orthogonalization_matrix=Bcentre.transpose().inverse()
-                )
-
-                # Get full lab frame UB then unwind to zero scan angle
-                phi_centre = phi_start[i] + phi_range[i] / 2
-                R = matrix.sqr(
-                    axis_datum.axis_and_angle_as_r3_rotation_matrix(
-                        phi_centre, deg=False
-                    )
-                )
-                Rlab_inv = matrix.sqr(
-                    axis.axis_and_angle_as_r3_rotation_matrix(-phi_centre, deg=False)
-                )
-                _UBlab = Rlab_inv * S * R * F * Ucentre * Bcentre
-
+                image_index = i + i0 - experiment.sequence.get_image_range()[0]
+                _unit_cell = experiment.crystal.get_unit_cell_at_scan_point(image_index)
+                _U = matrix.sqr(experiment.crystal.get_U_at_scan_point(image_index))
             else:
                 unit_cell = experiment.crystal.get_unit_cell()
                 _UBlab = UBlab
@@ -525,16 +487,17 @@ def export_mtz(
 
     # get batch offsets and image ranges - even for scanless experiments
     batch_offsets = [
-        expt.scan.get_batch_offset()
+        expt.sequence.get_batch_offset()
         for expt in experiment_list
-        if expt.scan is not None
+        if expt.sequence is not None
     ]
     unique_offsets = set(batch_offsets)
     if len(set(unique_offsets)) <= 1:
         logger.debug("Calculating new batches")
         batch_offsets = calculate_batch_offsets(experiment_list)
         batch_starts = [
-            e.scan.get_image_range()[0] if e.scan else 0 for e in experiment_list
+            e.sequence.get_image_range()[0] if e.sequence else 0
+            for e in experiment_list
         ]
         effective_offsets = [o + s for o, s in zip(batch_offsets, batch_starts)]
         unique_offsets = set(effective_offsets)
@@ -602,8 +565,8 @@ def export_mtz(
 
         # Calculate whether we have a ROT value for this experiment, and set the column
         _, _, z = experiment.data["xyzcal.px"].parts()
-        if experiment.scan:
-            experiment.data["ROT"] = experiment.scan.get_angle_from_array_index(z)
+        if experiment.sequence:
+            experiment.data["ROT"] = experiment.sequence.get_angle_from_array_index(z)
         else:
             experiment.data["ROT"] = z
 

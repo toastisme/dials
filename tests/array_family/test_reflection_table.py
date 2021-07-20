@@ -1424,7 +1424,7 @@ def test_map_centroids_to_reciprocal_space(dials_regression):
 
     # pretend this is a still and hence no scan or goniometer
     expts[0].goniometer = None
-    expts[0].scan = None
+    expts[0].sequence = None
     refl1.centroid_px_to_mm(expts)
     refl1.map_centroids_to_reciprocal_space(expts)
 

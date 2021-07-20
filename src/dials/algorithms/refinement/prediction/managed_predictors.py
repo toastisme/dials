@@ -176,7 +176,7 @@ class ScansExperimentsPredictor(ExperimentsPredictor):
         for iexp, e in enumerate(self._experiments):
             sel = reflections["id"] == iexp
             x_px, y_px, z_px = reflections["xyzcal.px"].select(sel).parts()
-            scan = e.scan
+            scan = e.sequence
             if scan is not None:
                 z_px = scan.get_array_index_from_angle(phi_calc.select(sel), deg=False)
             else:

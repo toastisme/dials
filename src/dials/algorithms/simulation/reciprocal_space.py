@@ -83,7 +83,7 @@ class Simulator:
                     self.experiment.beam,
                     self.experiment.detector,
                     self.experiment.goniometer,
-                    self.experiment.scan,
+                    self.experiment.sequence,
                     self.sigma_b,
                     self.sigma_m,
                     s1[i],
@@ -126,7 +126,7 @@ class Simulator:
         # self.experiment.beam,
         # self.experiment.detector,
         # self.experiment.goniometer,
-        # self.experiment.scan,
+        # self.experiment.sequence,
         # self.sigma_b,
         # self.sigma_m,
         # s1[i],
@@ -179,7 +179,7 @@ class Simulator:
         refl.compute_bbox([self.experiment])
         index = []
         image_size = self.experiment.detector[0].get_image_size()
-        array_range = self.experiment.scan.get_array_range()
+        array_range = self.experiment.sequence.get_array_range()
         bbox = refl["bbox"]
         for i in range(len(refl)):
             x0, x1, y0, y1, z0, z1 = bbox[i]
@@ -211,7 +211,7 @@ class Simulator:
             self.experiment.beam,
             self.experiment.detector,
             self.experiment.goniometer,
-            self.experiment.scan,
+            self.experiment.sequence,
             self.n_sigma * self.sigma_b,
             self.n_sigma * self.sigma_m,
         )

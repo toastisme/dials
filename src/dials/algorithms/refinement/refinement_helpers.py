@@ -276,7 +276,7 @@ def calculate_frame_numbers(reflections, experiments):
     # Ok, frames are not set, so set them, with dummy observed pixel values
     frames = flex.double(len(reflections), 0.0)
     for iexp, exp in enumerate(experiments):
-        scan = exp.scan
+        scan = exp.sequence
         if not scan:
             continue
         sel = reflections["id"] == iexp

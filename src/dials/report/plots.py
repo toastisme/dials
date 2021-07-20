@@ -33,11 +33,11 @@ def make_image_range_table(experiments, batch_manager):
         ]
     ]
     for i, exp in enumerate(experiments):
-        if exp.scan:
+        if exp.sequence:
             valid_image_ranges = ",".join(
-                str(j) for j in exp.scan.get_valid_image_ranges(exp.identifier)
+                str(j) for j in exp.sequence.get_valid_image_ranges(exp.identifier)
             )
-            image_range = exp.scan.get_image_range()
+            image_range = exp.sequence.get_image_range()
             template = exp.imageset.get_template()
             b_0 = batch_manager._batch_increments[i]
             batch_params = batch_manager.batch_params[i]

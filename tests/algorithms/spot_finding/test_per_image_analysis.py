@@ -106,10 +106,10 @@ def test_stats_per_image(centroid_test_data):
     stats = per_image_analysis.stats_per_image(experiments[0], reflections)
     result = stats._asdict()
     for v in result.values():
-        assert len(v) == len(experiments[0].scan)
+        assert len(v) == len(experiments[0].sequence)
     assert stats.n_spots_total == [90, 100, 67, 49, 54, 62, 68, 83, 81]
     t = stats.as_table()
-    assert len(t) == len(experiments[0].scan) + 1
+    assert len(t) == len(experiments[0].sequence) + 1
     assert t[0] == [
         "image",
         "#spots",
@@ -124,7 +124,7 @@ def test_stats_per_image(centroid_test_data):
     t = stats.as_table(n_rows=3)
     assert len(t) == 4
     # Test perm option
-    perm = flex.random_permutation(len(experiments[0].scan))
+    perm = flex.random_permutation(len(experiments[0].sequence))
     t = stats.as_table(perm=perm)
     assert [tt[0] for tt in t[1:]] == [str(i + 1) for i in perm]
 

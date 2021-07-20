@@ -120,7 +120,7 @@ class Script:
         for iexp, exp in enumerate(experiments):
 
             crystal = exp.crystal
-            scan = exp.scan
+            scan = exp.sequence
 
             if crystal.num_scan_points == 0:
                 print("Ignoring scan-static crystal")
@@ -173,7 +173,7 @@ class Script:
         for iexp, exp in enumerate(experiments):
 
             crystal = exp.crystal
-            scan = exp.scan
+            scan = exp.sequence
 
             if crystal.num_scan_points == 0:
                 print("Ignoring scan-static crystal")
@@ -215,7 +215,7 @@ class Script:
 
             beam = exp.beam
             detector = exp.detector
-            scan = exp.scan
+            scan = exp.sequence
 
             if beam.num_scan_points == 0:
                 print("Ignoring scan-static beam")

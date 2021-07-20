@@ -99,7 +99,7 @@ class IntensityCalculatorFactory:
 
             sampler = CircleSampler(
                 e.detector[0].get_image_size(),
-                e.scan.get_array_range(),
+                e.sequence.get_array_range(),
                 num_scan_points,
             )
 
@@ -107,7 +107,7 @@ class IntensityCalculatorFactory:
                 e.beam,
                 e.detector,
                 e.goniometer,
-                e.scan,
+                e.sequence,
                 e.profile.sigma_b(deg=False),
                 e.profile.sigma_m(deg=False),
                 e.profile.n_sigma() * 1.5,
@@ -314,14 +314,16 @@ def test_gaussianrs_profile_data_pickling(data):
     for e in experiments:
 
         sampler = CircleSampler(
-            e.detector[0].get_image_size(), e.scan.get_array_range(), num_scan_points
+            e.detector[0].get_image_size(),
+            e.sequence.get_array_range(),
+            num_scan_points,
         )
 
         spec = TransformSpec(
             e.beam,
             e.detector,
             e.goniometer,
-            e.scan,
+            e.sequence,
             e.profile.sigma_b(deg=False),
             e.profile.sigma_m(deg=False),
             e.profile.n_sigma() * 1.5,

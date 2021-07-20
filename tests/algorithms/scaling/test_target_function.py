@@ -98,7 +98,7 @@ def single_exp():
         }
     )
     scan = Scan(image_range=[0, 60], oscillation=[0.0, 1.0])
-    return Experiment(scan=scan, crystal=crystal)
+    return Experiment(sequence=scan, crystal=crystal)
 
 
 @pytest.fixture

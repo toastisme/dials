@@ -350,7 +350,7 @@ def _centroid_analysis(options, experiments, reflection_manager):
         except ValueError:
             # empty list - analysis was unable to suggest a suitable interval
             # width. Default to the safest case
-            phi_min, phi_max = experiments[i].scan.get_oscillation_range(deg=True)
+            phi_min, phi_max = experiments[i].sequence.get_oscillation_range(deg=True)
             a["interval_width"] = abs(phi_max - phi_min)
             logger.info(
                 "Exp id {} suggested interval width could not be "
@@ -398,7 +398,7 @@ def _parameterise_beams(options, experiments, analysis):
         # Use the first (if any) Goniometers this Beam is associated with.
         exp_ids = experiments.indices(beam)
         assoc_models = [
-            (experiments[i].goniometer, experiments[i].scan) for i in exp_ids
+            (experiments[i].goniometer, experiments[i].sequence) for i in exp_ids
         ]
         goniometer, scan = assoc_models[0]
 
@@ -473,7 +473,7 @@ def _parameterise_crystals(options, experiments, analysis):
         # (otherwise it requires a different crystal model)
         exp_ids = experiments.indices(crystal)
         assoc_models = [
-            (experiments[i].goniometer, experiments[i].scan) for i in exp_ids
+            (experiments[i].goniometer, experiments[i].sequence) for i in exp_ids
         ]
         goniometer, scan = assoc_models[0]
         if goniometer is None:
@@ -589,7 +589,7 @@ def _parameterise_detectors(options, experiments, analysis):
         # keep associated gonio and scan in case we are scan-varying
         exp_ids = experiments.indices(detector)
         assoc_models = [
-            (experiments[i].goniometer, experiments[i].scan) for i in exp_ids
+            (experiments[i].goniometer, experiments[i].sequence) for i in exp_ids
         ]
         goniometer, scan = assoc_models[0]
 
@@ -715,7 +715,7 @@ def _parameterise_goniometers(options, experiments, analysis):
         # A Goniometer is parameterised with reference to the beam axis.
         # Use the first Beam this Goniometer is associated with.
         exp_ids = experiments.indices(goniometer)
-        assoc_models = [(experiments[i].beam, experiments[i].scan) for i in exp_ids]
+        assoc_models = [(experiments[i].beam, experiments[i].sequence) for i in exp_ids]
         beam, scan = assoc_models[0]
 
         if sv_gon:

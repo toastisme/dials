@@ -149,7 +149,7 @@ class BlockCalculator:
             isel = sel.iselection()
             exp_phi = phi_obs.select(isel)
 
-            start, stop = exp.scan.get_oscillation_range(deg=False)
+            start, stop = exp.sequence.get_oscillation_range(deg=False)
             nblocks = int(abs(stop - start) / width) + 1
             # ensure width has the right sign and is wide enough that all reflections
             # get assigned a block
@@ -164,7 +164,7 @@ class BlockCalculator:
 
             block_starts = [start + n * _width for n in range(nblocks)]
             block_centres = [
-                exp.scan.get_array_index_from_angle(e + half_width, deg=False)
+                exp.sequence.get_array_index_from_angle(e + half_width, deg=False)
                 for e in block_starts
             ]
 
@@ -192,7 +192,7 @@ class BlockCalculator:
             exp_phi = phi_obs.select(isel)
 
             # convert phi to integer frames
-            frames = exp.scan.get_array_index_from_angle(exp_phi, deg=False)
+            frames = exp.sequence.get_array_index_from_angle(exp_phi, deg=False)
             frames = flex.floor(frames).iround()
 
             start, stop = flex.min(frames), flex.max(frames)
@@ -357,8 +357,11 @@ class ReflectionManager:
             matrix.col(g.get_rotation_axis()) if g else None for g in goniometers
         ]
         if "tof_s0" in reflections and len(experiments) == 1:
-            self._s0vecs = [matrix.col(reflections["tof_s0"][r]) for r in range(len(reflections))]
+            self._s0vecs = [
+                matrix.col(reflections["tof_s0"][r]) for r in range(len(reflections))
+            ]
         else:
+            # print(f"TEST {len(self._experiments)} {self._experiments[0].beam}")
             self._s0vecs = [matrix.col(e.beam.get_s0()) for e in self._experiments]
 
         # unset the refinement flags (creates flags field if needed)
@@ -535,9 +538,9 @@ class ReflectionManager:
 
         for iexp, exp in enumerate(self._experiments):
             axis = self._axes[iexp]
-            if not axis or exp.scan is None:
+            if not axis or exp.sequence is None:
                 continue
-            if exp.scan.is_still():
+            if exp.sequence.is_still():
                 continue
             sel = obs_data["id"] == iexp
             s0 = self._s0vecs[iexp]
@@ -553,7 +556,7 @@ class ReflectionManager:
             passed1 = p_vol > self._close_to_spindle_cutoff
 
             # second test: reject reflections that lie outside the scan range
-            passed2 = exp.scan.is_angle_valid(phi, deg=False)
+            passed2 = exp.sequence.is_angle_valid(phi, deg=False)
 
             # sanity check to catch a mutilated scan that does not make sense
             if passed2.count(True) == 0:
@@ -568,10 +571,10 @@ class ReflectionManager:
             # third test: reject reflections close to the centres of the first and
             # last images in the scan
             if self._scan_margin > 0.0:
-                edge1, edge2 = [e + 0.5 for e in exp.scan.get_image_range()]
-                edge1 = exp.scan.get_angle_from_image_index(edge1, deg=False)
+                edge1, edge2 = [e + 0.5 for e in exp.sequence.get_image_range()]
+                edge1 = exp.sequence.get_angle_from_image_index(edge1, deg=False)
                 edge1 += self._scan_margin
-                edge2 = exp.scan.get_angle_from_image_index(edge2, deg=False)
+                edge2 = exp.sequence.get_angle_from_image_index(edge2, deg=False)
                 edge2 -= self._scan_margin
                 passed3 = (edge1 <= phi) & (phi <= edge2)
 
@@ -605,8 +608,8 @@ class ReflectionManager:
             nrefs = sample_size = len(isel)
 
             # set sample size according to nref_per_degree (per experiment)
-            if exp.scan and self._nref_per_degree:
-                sequence_range_rad = exp.scan.get_oscillation_range(deg=False)
+            if exp.sequence and self._nref_per_degree:
+                sequence_range_rad = exp.sequence.get_oscillation_range(deg=False)
                 width = abs(sequence_range_rad[1] - sequence_range_rad[0]) * RAD2DEG
                 if self._nref_per_degree is libtbx.Auto:
                     # For multi-turn, set sample size to the greater of the approx nref

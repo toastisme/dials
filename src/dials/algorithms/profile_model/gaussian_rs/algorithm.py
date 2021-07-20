@@ -22,7 +22,7 @@ class GaussianRSMaskCalculatorFactory:
                 e.beam,
                 e.detector,
                 e.goniometer,
-                e.scan,
+                e.sequence,
                 e.profile.delta_b(deg=False),
                 e.profile.delta_m(deg=False),
             )
@@ -72,7 +72,7 @@ class GaussianRSReferenceCalculatorFactory:
 
         # Assume the detector and scan are the same in each case
         detector = experiments[0].detector
-        scan = experiments[0].scan
+        scan = experiments[0].sequence
 
         # Get the number of scan points
         scan_range = scan.get_oscillation_range(deg=True)
@@ -107,7 +107,7 @@ class GaussianRSReferenceCalculatorFactory:
                 experiment.beam,
                 experiment.detector,
                 experiment.goniometer,
-                experiment.scan,
+                experiment.sequence,
                 experiment.profile.sigma_b(deg=False),
                 experiment.profile.sigma_m(deg=False),
                 experiment.profile.n_sigma() * 1.5,

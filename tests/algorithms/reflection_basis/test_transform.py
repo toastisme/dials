@@ -49,7 +49,7 @@ def test_forward(dials_data):
     beam = expt.beam
     detector = expt.detector
     gonio = expt.goniometer
-    scan = expt.scan
+    scan = expt.sequence
 
     # Set some parameters
     sigma_divergence = 0.00101229
@@ -243,7 +243,7 @@ def test_forward_no_model(dials_data):
     beam = expt.beam
     detector = expt.detector
     gonio = expt.goniometer
-    scan = expt.scan
+    scan = expt.sequence
     scan.set_image_range((0, 1000))
 
     # Set some parameters
@@ -393,7 +393,7 @@ def test_forward_panel_edge(dials_data):
     beam = expt.beam
     detector = expt.detector
     gonio = expt.goniometer
-    scan = expt.scan
+    scan = expt.sequence
 
     # Set some parameters
     sigma_divergence = 0.00101229

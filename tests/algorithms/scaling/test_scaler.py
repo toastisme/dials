@@ -70,7 +70,7 @@ def generated_exp(n=1):
     experiments.append(
         Experiment(
             beam=beam,
-            scan=scan,
+            sequence=scan,
             goniometer=goniometer,
             detector=detector,
             crystal=crystal,
@@ -82,7 +82,7 @@ def generated_exp(n=1):
             experiments.append(
                 Experiment(
                     beam=beam,
-                    scan=scan,
+                    sequence=scan,
                     goniometer=goniometer,
                     detector=detector,
                     crystal=crystal,

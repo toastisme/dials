@@ -262,7 +262,7 @@ class ManagerImage:
         self._split_reflections()
 
         # Create the reflection manager
-        frames = self.experiments[0].scan.get_array_range()
+        frames = self.experiments[0].sequence.get_array_range()
         self.manager = ReflectionManagerPerImage(frames, self.reflections)
 
         # Set the initialization time

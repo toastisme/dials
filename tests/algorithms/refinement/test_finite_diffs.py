@@ -102,7 +102,7 @@ def test(args=[]):
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal,
             imageset=None,
         )

@@ -382,7 +382,7 @@ class StillsIndexer(Indexer):
                     expt.detector = refined_expt.detector
                     expt.beam = refined_expt.beam
                     expt.goniometer = refined_expt.goniometer
-                    expt.scan = refined_expt.scan
+                    expt.sequence = refined_expt.scan
                     refined_expt.imageset = expt.imageset
 
             if not (
@@ -515,10 +515,7 @@ class StillsIndexer(Indexer):
                         graph_verbose=False,
                     )
 
-                    R._experiments[0].beam.set_wavelength(1)
                     ref_experiments = R.get_experiments()
-                    ref_experiments[0].beam.set_wavelength(0)
-                    R._experiments[0].beam.set_wavelength(0)
 
                     # try to improve the outcome with a second round of outlier rejection post-initial refinement:
                     acceptance_flags = self.identify_outliers(

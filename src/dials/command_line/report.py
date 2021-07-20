@@ -183,7 +183,7 @@ class ScanVaryingCrystalAnalyser:
         for iexp, exp in enumerate(experiments):
 
             crystal = exp.crystal
-            scan = exp.scan
+            scan = exp.sequence
 
             if crystal is None:
                 print("Ignoring absent crystal model")
@@ -340,7 +340,7 @@ the refinement algorithm accounting for unmodelled features in the data.
         for iexp, exp in enumerate(experiments):
 
             crystal = exp.crystal
-            scan = exp.scan
+            scan = exp.sequence
 
             if crystal is None:
                 print("Ignoring absent crystal model")
@@ -2372,14 +2372,14 @@ class Analyser:
                             )
                         )
 
-            if expt.scan is not None:
+            if expt.sequence is not None:
                 expt_geom_table.append(
                     (
                         "<strong>Scan:</strong>",
                         "Image range:",
-                        "%i, %i" % expt.scan.get_image_range(),
+                        "%i, %i" % expt.sequence.get_image_range(),
                         "Oscillation:",
-                        "%.2f&deg;, %+.2f&deg;/frame" % expt.scan.get_oscillation(),
+                        "%.2f&deg;, %+.2f&deg;/frame" % expt.sequence.get_oscillation(),
                     )
                 )
 

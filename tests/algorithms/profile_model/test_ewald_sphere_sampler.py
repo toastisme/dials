@@ -13,7 +13,7 @@ def test_run(dials_data):
     beam = experiments[0].beam
     detector = experiments[0].detector
     goniometer = experiments[0].goniometer
-    scan = experiments[0].scan
+    scan = experiments[0].sequence
 
     sampler = EwaldSphereSampler(beam, detector, goniometer, scan, 1)
 

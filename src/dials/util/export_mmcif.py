@@ -210,7 +210,7 @@ class MMCIFOutputFile:
         epochs = []
         for exp in experiments:
             wls.append(round(exp.beam.get_wavelength(), 5))
-            epochs.append(exp.scan.get_epochs()[0])
+            epochs.append(exp.sequence.get_epochs()[0])
         unique_wls = set(wls)
         cif_block["_exptl_crystal.id"] = 1  # links to crystal_id
         cif_block["_diffrn.id"] = 1  # links to diffrn_id
@@ -432,7 +432,7 @@ class MMCIFOutputFile:
         expid_to_scan_id = {exp.identifier: i + 1 for i, exp in enumerate(experiments)}
 
         for i, exp in enumerate(experiments):
-            scan = exp.scan
+            scan = exp.sequence
             crystal_id = crystal_to_id[exp.crystal]
             image_range = scan.get_image_range()
             osc_range = scan.get_oscillation_range(deg=True)

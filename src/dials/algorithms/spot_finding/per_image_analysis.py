@@ -638,7 +638,7 @@ def stats_per_image(experiment, reflections, resolution_analysis=True):
     image_number = flex.floor(image_number)
 
     try:
-        start, end = experiment.scan.get_array_range()
+        start, end = experiment.sequence.get_array_range()
     except AttributeError:
         start, end = 0, 1
     for i in range(start, end):

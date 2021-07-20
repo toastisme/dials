@@ -50,7 +50,7 @@ def generate_experiments_reflections(
         expts.append(
             Experiment(
                 crystal=Crystal(B, space_group=dataset.space_group(), reciprocal=True),
-                scan=Scan(image_range=(0, 180), oscillation=(0.0, 1.0)),
+                sequence=Scan(image_range=(0, 180), oscillation=(0.0, 1.0)),
             )
         )
         refl = flex.reflection_table()

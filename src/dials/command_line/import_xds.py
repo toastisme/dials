@@ -232,8 +232,8 @@ class XDSFileImporter:
                     print(exp.goniometer)
                 else:
                     print("no goniometer!")
-                if exp.scan:
-                    print(exp.scan)
+                if exp.sequence:
+                    print(exp.sequence)
                 else:
                     print("no scan!")
                 if exp.crystal:

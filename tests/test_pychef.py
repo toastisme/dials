@@ -63,9 +63,15 @@ def test_accumulators(dials_data):
 def test_interpret_images_to_doses_options():
     """Test handling of command line options for experiments input."""
     experiments = ExperimentList()
-    experiments.append(Experiment(scan=Scan(image_range=(1, 10), oscillation=(0, 1.0))))
-    experiments.append(Experiment(scan=Scan(image_range=(1, 20), oscillation=(0, 1.0))))
-    experiments.append(Experiment(scan=Scan(image_range=(1, 10), oscillation=(0, 1.0))))
+    experiments.append(
+        Experiment(sequence=Scan(image_range=(1, 10), oscillation=(0, 1.0)))
+    )
+    experiments.append(
+        Experiment(sequence=Scan(image_range=(1, 20), oscillation=(0, 1.0)))
+    )
+    experiments.append(
+        Experiment(sequence=Scan(image_range=(1, 10), oscillation=(0, 1.0)))
+    )
 
     # Default
     starting_doses, dpi = dials.pychef.interpret_images_to_doses_options(

@@ -45,8 +45,10 @@ def get_valid_image_ranges(experiments):
     """Extract valid image ranges from experiments, returning None if no scan"""
     valid_images_ranges = []
     for exp in experiments:
-        if exp.scan:
-            valid_images_ranges.append(exp.scan.get_valid_image_ranges(exp.identifier))
+        if exp.sequence:
+            valid_images_ranges.append(
+                exp.sequence.get_valid_image_ranges(exp.identifier)
+            )
         else:
             valid_images_ranges.append(None)
     return valid_images_ranges
@@ -58,10 +60,10 @@ def set_initial_valid_image_ranges(experiments):
     Also this function can be called for a mix of sequences and scanless experiments.
     """
     for exp in experiments:
-        if exp.scan:
-            if not exp.scan.get_valid_image_ranges(exp.identifier):
-                exp.scan.set_valid_image_ranges(
-                    exp.identifier, [exp.scan.get_image_range()]
+        if exp.sequence:
+            if not exp.sequence.get_valid_image_ranges(exp.identifier):
+                exp.sequence.set_valid_image_ranges(
+                    exp.identifier, [exp.sequence.get_image_range()]
                 )
     return experiments
 
@@ -69,8 +71,8 @@ def set_initial_valid_image_ranges(experiments):
 def get_selection_for_valid_image_ranges(reflection_table, experiment):
     """Determine a selection for the reflection table corresponding to reflections
     that are located in valid image ranges (according to zobs.px.value)."""
-    if experiment.scan:
-        valid_ranges = experiment.scan.get_valid_image_ranges(experiment.identifier)
+    if experiment.sequence:
+        valid_ranges = experiment.sequence.get_valid_image_ranges(experiment.identifier)
         if valid_ranges:
             valid_mask = flex.bool(reflection_table.size(), False)
             z = reflection_table["xyzobs.px.value"].parts()[2]
@@ -134,9 +136,9 @@ def _remove_ranges_from_valid_image_ranges(experiments, ranges_to_remove):
     for r in ranges_to_remove:
         idx = ids.index(r[0])
         exp = experiments[idx]
-        if not exp.scan:
+        if not exp.sequence:
             raise ValueError("Trying to exclude a scanless experiment")
-        current_range = exp.scan.get_valid_image_ranges(
+        current_range = exp.sequence.get_valid_image_ranges(
             exp.identifier
         )  # list of tuples
         # use set arithmetic on image numbers to work out images to keep
@@ -168,7 +170,7 @@ def _remove_ranges_from_valid_image_ranges(experiments, ranges_to_remove):
             ]
         else:
             valid_ranges = []
-        exp.scan.set_valid_image_ranges(exp.identifier, valid_ranges)
+        exp.sequence.set_valid_image_ranges(exp.identifier, valid_ranges)
     return experiments
 
 
@@ -178,7 +180,7 @@ Functions for scaling
 
 
 def exclude_image_ranges_for_scaling(reflections, experiments, exclude_images):
-    """Set the initial valid ranges, then exclude in the exp.scan and set
+    """Set the initial valid ranges, then exclude in the exp.sequence and set
     user_excluded_in_scaling flags."""
     experiments = exclude_image_ranges_from_scans(
         reflections, experiments, exclude_images

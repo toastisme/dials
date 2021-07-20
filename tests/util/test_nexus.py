@@ -93,8 +93,8 @@ def test_run(dials_regression, run_in_tmp_path):
     )
 
     # Check the scan
-    s1 = exp1.scan
-    s2 = exp2.scan
+    s1 = exp1.sequence
+    s2 = exp2.sequence
     assert len(s1) == len(s2)
     assert s1.get_image_range() == s2.get_image_range()
     assert abs(s1.get_oscillation()[0] - s1.get_oscillation()[0]) < EPS

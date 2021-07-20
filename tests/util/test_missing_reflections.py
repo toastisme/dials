@@ -15,7 +15,7 @@ def test_connected_components(dials_data):
     image_ranges = [(1, 9), (1, 100), (1, 1000)]
     expected_ms_sizes = [[755], [242, 14, 10, 5, 2, 2, 2], []]
     for image_range, expected_sizes in zip(image_ranges, expected_ms_sizes):
-        experiment.scan.set_image_range(image_range)
+        experiment.sequence.set_image_range(image_range)
         predict = ScanStaticReflectionPredictor(experiment, dmin=3, margin=1)
         refl = predict.for_ub(experiment.crystal.get_A())
         miller_set = miller.set(
@@ -39,7 +39,7 @@ def test_connected_components_centred_cell(dials_data):
         check_format=False,
     )[0]
 
-    experiment.scan.set_image_range((1, 10))
+    experiment.sequence.set_image_range((1, 10))
     predict = ScanStaticReflectionPredictor(experiment, dmin=3, margin=1)
     refl = predict.for_ub(experiment.crystal.get_A())
     miller_set = miller.set(

@@ -17,7 +17,7 @@ def test_blank_counts_analysis(dials_data):
         dials_data("insulin_processed", pathlib=True) / "strong.refl"
     )
     results = detect_blanks.blank_counts_analysis(
-        refl, expts[0].scan, phi_step=5, fractional_loss=0.1
+        refl, expts[0].sequence, phi_step=5, fractional_loss=0.1
     )
     assert set(results) == {"data", "layout", "blank_regions"}
     assert results["data"][0]["x"] == [
@@ -48,7 +48,7 @@ def test_blank_counts_analysis(dials_data):
     z = refl["xyzobs.px.value"].parts()[2]
     refl_subset = refl.select((z < 10) | (z > 20))
     results = detect_blanks.blank_counts_analysis(
-        refl_subset, expts[0].scan, phi_step=2, fractional_loss=0.1
+        refl_subset, expts[0].sequence, phi_step=2, fractional_loss=0.1
     )
     assert results["data"][0]["blank"].count(True) == 5
     assert results["blank_regions"] == [(10, 21)]
@@ -63,7 +63,7 @@ def test_blank_integrated_analysis(dials_data):
         dials_data("insulin_processed", pathlib=True) / "integrated.refl"
     )
     results = detect_blanks.blank_integrated_analysis(
-        refl, expts[0].scan, phi_step=5, fractional_loss=0.1
+        refl, expts[0].sequence, phi_step=5, fractional_loss=0.1
     )
     assert results["data"][0]["x"] == [
         2.5,
@@ -96,7 +96,7 @@ def test_blank_integrated_analysis(dials_data):
     z = refl["xyzobs.px.value"].parts()[2]
     refl["intensity.prf.value"].set_selected(z < 10, refl["intensity.prf.value"] * 0.05)
     results = detect_blanks.blank_integrated_analysis(
-        refl, expts[0].scan, phi_step=5, fractional_loss=0.1
+        refl, expts[0].sequence, phi_step=5, fractional_loss=0.1
     )
     assert results["data"][0]["y"] == pytest.approx(
         [
@@ -128,7 +128,7 @@ def test_blank_integrated_analysis(dials_data):
     # intensity.sum.value instead
     refl.unset_flags(flex.bool(len(refl), True), refl.flags.integrated_prf)
     results = detect_blanks.blank_integrated_analysis(
-        refl, expts[0].scan, phi_step=5, fractional_loss=0.1
+        refl, expts[0].sequence, phi_step=5, fractional_loss=0.1
     )
     assert not any(results["data"][0]["blank"])
     assert results["blank_regions"] == []
