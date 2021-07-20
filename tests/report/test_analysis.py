@@ -117,7 +117,7 @@ def test_reflections_to_batch_properties(
     reflections.set_flags(flex.bool(9, True), reflections.flags.scaled)
 
     experiments = [mock.Mock()]
-    experiments[0].scan.get_image_range.return_value = [1, 10]
+    experiments[0].sequence.get_image_range.return_value = [1, 10]
     experiments[0].crystal = example_crystal
     experiments[0].beam.get_wavelength.return_value = 1
 
@@ -144,7 +144,7 @@ def test_reflections_to_batch_properties(
     reflections_2["id"] = flex.int(9, 2)
     reflections.extend(reflections_2)
     experiments = [mock.Mock(), mock.Mock()]
-    experiments[0].scan.get_image_range.return_value = [1, 10]
+    experiments[0].sequence.get_image_range.return_value = [1, 10]
     experiments[0].crystal = example_crystal
     experiments[0].beam.get_wavelength.return_value = 1
     experiments[1].scan.get_image_range.return_value = [1, 10]

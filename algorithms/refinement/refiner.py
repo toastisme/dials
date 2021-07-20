@@ -151,9 +151,6 @@ def _copy_experiments_for_refining(experiments):
         # Collect this together
         out_list.append(new_exp)
 
-        # experiments[0].beam.set_wavelength(0)
-        # out_list[0].beam.set_wavelength(0)
-
     return out_list
 
 
@@ -186,9 +183,9 @@ def _trim_scans_to_observations(experiments, reflections):
             exp_z = obs_z.select(isel)
         else:
             exp_phi = obs_phi.select(isel)
-            exp_z = exp.scan.get_array_index_from_angle(exp_phi, deg=False)
+            exp_z = exp.sequence.get_array_index_from_angle(exp_phi, deg=False)
 
-        start, stop = exp.scan.get_array_range()
+        start, stop = exp.sequence.get_array_range()
         min_exp_z = flex.min(exp_z)
         max_exp_z = flex.max(exp_z)
 
@@ -203,7 +200,7 @@ def _trim_scans_to_observations(experiments, reflections):
         else:
             obs_start = int(min_exp_z)
             obs_stop = int(math.ceil(max_exp_z))
-            half_deg_in_images = int(math.ceil(0.5 / exp.scan.get_oscillation()[1]))
+            half_deg_in_images = int(math.ceil(0.5 / exp.sequence.get_oscillation()[1]))
             obs_start -= half_deg_in_images
             obs_stop += half_deg_in_images
 
@@ -220,13 +217,13 @@ def _trim_scans_to_observations(experiments, reflections):
             )
 
             # Ensure the scan is unique to this experiment and set trimmed limits
-            exp.scan = copy.deepcopy(exp.scan)
+            exp.sequence = copy.deepcopy(exp.sequence)
             new_oscillation = (
-                exp.scan.get_angle_from_image_index(im_start),
-                exp.scan.get_oscillation()[1],
+                exp.sequence.get_angle_from_image_index(im_start),
+                exp.sequence.get_oscillation()[1],
             )
-            exp.scan.set_image_range((im_start, im_stop))
-            exp.scan.set_oscillation(new_oscillation)
+            exp.sequence.set_image_range((im_start, im_stop))
+            exp.sequence.set_oscillation(new_oscillation)
 
     return experiments
 
@@ -276,9 +273,7 @@ class RefinerFactory:
         # or stills (the combination of both not yet supported)?
 
         # copy the experiments
-        experiments[0].beam.set_wavelength(1)
         experiments = _copy_experiments_for_refining(experiments)
-        experiments[0].beam.set_wavelength(0)
 
         # copy and filter the reflections
         reflections = cls._filter_reflections(reflections)
@@ -296,17 +291,17 @@ class RefinerFactory:
         single_as_still = params.refinement.parameterisation.treat_single_image_as_still
         exps_are_stills = []
         for exp in experiments:
-            if exp.scan is None:
+            if exp.sequence is None:
                 exps_are_stills.append(True)
-            elif exp.scan.get_num_images() == 1:
+            elif exp.sequence.get_num_images() == 1:
                 if single_as_still:
                     exps_are_stills.append(True)
-                elif exp.scan.is_still():
+                elif exp.sequence.is_still():
                     exps_are_stills.append(True)
                 else:
                     exps_are_stills.append(False)
             else:
-                if exp.scan.get_oscillation()[1] <= 0.0:
+                if exp.sequence.get_oscillation()[1] <= 0.0:
                     raise DialsRefineConfigError("Cannot refine a zero-width scan")
                 exps_are_stills.append(False)
 
@@ -919,7 +914,7 @@ class Refiner:
                 continue
             px_per_mm = [1.0 / e for e in px_size]
 
-            scan = exp.scan
+            scan = exp.sequence
             try:
                 images_per_rad = 1.0 / abs(scan.get_oscillation(deg=False)[1])
             except (AttributeError, ZeroDivisionError):
@@ -1121,7 +1116,7 @@ class ScanVaryingRefiner(Refiner):
 
     def _update_models(self):
         for iexp, exp in enumerate(self._experiments):
-            ar_range = exp.scan.get_array_range()
+            ar_range = exp.sequence.get_array_range()
             obs_image_numbers = list(range(ar_range[0], ar_range[1] + 1))
 
             # write scan-varying s0 vectors back to beam models

@@ -38,8 +38,8 @@ def test_reflections():
 def mock_exp():
     """Mock experiments object."""
     exp = Mock()
-    exp.scan.get_oscillation.return_value = [0.0, 1.0]
-    exp.scan.get_oscillation_range.return_value = [0, 90]
+    exp.sequence.get_oscillation.return_value = [0.0, 1.0]
+    exp.sequence.get_oscillation_range.return_value = [0, 90]
     exp.beam.get_s0.return_value = (0.0, 0.0, 1.01)
     exp.goniometer.get_rotation_axis.return_value = (1.0, 0.0, 0.0)
     return exp

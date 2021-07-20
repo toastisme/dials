@@ -89,7 +89,7 @@ plot_filename = None
             print(f"For Experiment id = {iexp}")
             print(exp.beam)
             print(exp.crystal)
-            print(exp.scan)
+            print(exp.sequence)
 
             if self.params.scale == "ewald_sphere_radius":
                 scale = 1.0 / exp.beam.get_wavelength()
@@ -161,7 +161,7 @@ def extract_experiment_data(exp, scale=1):
     experiment"""
     crystal = exp.crystal
     beam = exp.beam
-    scan = exp.scan
+    scan = exp.sequence
     gonio = exp.goniometer
 
     image_range = scan.get_image_range()

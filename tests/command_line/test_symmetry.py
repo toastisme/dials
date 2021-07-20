@@ -56,7 +56,7 @@ def test_symmetry_laue_only(dials_data, tmpdir):
     assert len(set(joint_reflections["imageset_id"])) == 2
     for id_ in range(2):
         sel = joint_reflections["id"] == id_
-        assert set(joint_reflections["imageset_id"].select(sel)) == set([id_])
+        assert set(joint_reflections["imageset_id"].select(sel)) == set(id_)
 
 
 def test_symmetry_basis_changes_for_C2(run_in_tmpdir):
@@ -267,8 +267,8 @@ def _make_input_for_exclude_tests(exclude_images=True):
     reflection."""
     if exclude_images:
         exclude_images = [["0:360:720"], ["1:360:720"]]
-    expt1 = Experiment(scan=Scan(image_range=(0, 720), oscillation=(0.0, 1.0)))
-    expt2 = Experiment(scan=Scan(image_range=(0, 720), oscillation=(0.0, -1.0)))
+    expt1 = Experiment(sequence=Scan(image_range=(0, 720), oscillation=(0.0, 1.0)))
+    expt2 = Experiment(sequence=Scan(image_range=(0, 720), oscillation=(0.0, -1.0)))
     refls1 = flex.reflection_table()
     refls2 = flex.reflection_table()
     refls1["xyzobs.mm.value"] = flex.vec3_double(

@@ -339,8 +339,11 @@ class Indexer:
                 # can only share a beam if we share a goniometer?
                 if expt.beam.is_similar_to(self.experiments[0].beam):
                     expt.beam = self.experiments[0].beam
-                if self.params.combine_scans and expt.scan == self.experiments[0].scan:
-                    expt.scan = self.experiments[0].scan
+                if (
+                    self.params.combine_scans
+                    and expt.sequence == self.experiments[0].sequence
+                ):
+                    expt.sequence = self.experiments[0].sequence
 
         if "flags" in self.reflections:
             strong_sel = self.reflections.get_flags(self.reflections.flags.strong)
@@ -430,7 +433,7 @@ class Indexer:
                     #   imageset._models = imagesequence._models
                     experiment.imageset.set_sequence(None)
                     experiment.imageset.set_goniometer(None)
-                    experiment.scan = None
+                    experiment.sequence = None
                     experiment.goniometer = None
 
             IndexerType = None
@@ -684,7 +687,7 @@ class Indexer:
                         expt.detector = refined_expt.detector
                         expt.beam = refined_expt.beam
                         expt.goniometer = refined_expt.goniometer
-                        expt.scan = refined_expt.scan
+                        expt.sequence = refined_expt.scan
                         refined_expt.imageset = expt.imageset
 
                 if not (
@@ -828,8 +831,8 @@ class Indexer:
                     sel, panel.millimeter_to_pixel(xy_cal_mm.select(sel))
                 )
             x_px, y_px = xy_cal_px.parts()
-            if expt.scan is not None:
-                z_px = expt.scan.get_array_index_from_angle(z_rad, deg=False)
+            if expt.sequence is not None:
+                z_px = expt.sequence.get_array_index_from_angle(z_rad, deg=False)
             else:
                 # must be a still image, z centroid not meaningful
                 z_px = z_rad

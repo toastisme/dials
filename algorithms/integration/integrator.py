@@ -1667,7 +1667,7 @@ def create_integrator(params, experiments, reflections):
     # Remove scan if stills
     if experiments.all_stills():
         for experiment in experiments:
-            experiment.scan = None
+            experiment.sequence = None
 
     # Return an instantiation of the class
     return IntegratorClass(experiments, reflections, params)

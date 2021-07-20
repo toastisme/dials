@@ -113,7 +113,7 @@ class SpotFrame(XrayFrame):
 
         self.viewing_stills = True
         for experiment_list in self.experiments:
-            if any(exp.scan or exp.goniometer for exp in experiment_list):
+            if any(exp.sequence or exp.goniometer for exp in experiment_list):
                 self.viewing_stills = False
                 break
 

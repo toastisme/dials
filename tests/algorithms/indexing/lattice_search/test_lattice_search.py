@@ -79,7 +79,7 @@ def test_stills_indexer_methods_i04_weak_data(
         )
         experiment.imageset.set_sequence(None)
         experiment.imageset.set_goniometer(None)
-        experiment.scan = None
+        experiment.sequence = None
         experiment.goniometer = None
     params = phil_scope.fetch().extract()
     params.indexing.method = indexing_method

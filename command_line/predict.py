@@ -86,7 +86,7 @@ class Script:
             if params.buffer_size > 0:
                 # Hack to make the predicter predict reflections outside of the range
                 # of the scan
-                scan = expt.scan
+                scan = expt.sequence
                 image_range = scan.get_image_range()
                 oscillation = scan.get_oscillation()
                 scan.set_image_range(

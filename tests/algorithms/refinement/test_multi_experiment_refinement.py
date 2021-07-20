@@ -6,7 +6,7 @@ from math import pi
 
 from cctbx.sgtbx import space_group, space_group_symbols
 from cctbx.uctbx import unit_cell
-from dxtbx.model import ScanFactory
+from dxtbx.model import SequenceFactory
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from libtbx.phil import parse
 from libtbx.test_utils import approx_equal
@@ -66,13 +66,8 @@ def test(args=[]):
     crystal2 = models.crystal
     mybeam = models.beam
 
-<<<<<<< HEAD:tests/algorithms/refinement/test_multi_experiment_refinement.py
-    # Build a mock scan for an 18 degree sequence
-    sf = ScanFactory()
-=======
     # Build a mock scan for a 180 degree sequence
     sf = SequenceFactory()
->>>>>>> Name changes for Scan/sequence.:test/algorithms/refinement/test_multi_experiment_refinement.py
     myscan = sf.make_scan(
         image_range=(1, 180),
         exposure_times=0.1,
@@ -92,7 +87,7 @@ def test(args=[]):
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=crystal1,
             imageset=None,
         )
@@ -102,7 +97,7 @@ def test(args=[]):
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=crystal2,
             imageset=None,
         )

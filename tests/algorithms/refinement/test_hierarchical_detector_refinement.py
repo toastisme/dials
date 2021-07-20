@@ -28,7 +28,7 @@ def generate_reflections(experiments):
     indices = index_generator.to_array()
 
     # Predict rays within the sequence range
-    scan = experiments[0].scan
+    scan = experiments[0].sequence
     sequence_range = scan.get_oscillation_range(deg=False)
     ray_predictor = ScansRayPredictor(experiments, sequence_range)
     obs_refs = ray_predictor(indices)
@@ -109,7 +109,7 @@ def test1(dials_regression):
             beam=beam,
             detector=detector,
             goniometer=goniometer,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             imageset=None,
         )

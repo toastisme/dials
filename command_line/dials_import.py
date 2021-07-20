@@ -5,7 +5,7 @@ import pickle
 from collections import namedtuple
 
 import dxtbx.model.compare as compare
-from dxtbx.imageset import ImageGrid, RotImageSequence, TOFImageSequence
+from dxtbx.imageset import ImageGrid, ImageSet, RotImageSequence
 from dxtbx.model.experiment_list import (
     Experiment,
     ExperimentList,
@@ -560,7 +560,7 @@ class MetaDataUpdater:
                 )
 
             # Append to new imageset list
-            if type(imageset) in [RotImageSequence, TOFImageSequence]:
+            if ImageSet.is_sequence(imageset):
                 if (
                     isinstance(imageset, RotImageSequence)
                     and imageset.get_sequence().is_still()
@@ -826,7 +826,7 @@ class ImageImporter:
         for e in experiments:
             if e.imageset in counted_imagesets:
                 continue
-            if type(e.imageset) in [RotImageSequence, TOFImageSequence]:
+            if ImageSet.is_sequence(e.imageset):
                 if (
                     isinstance(e.imageset, RotImageSequence)
                     and e.imageset.get_sequence().is_still()
@@ -857,7 +857,7 @@ class ImageImporter:
             # Print some experiment info - override the output of image range
             # if appropriate
             image_range = params.geometry.scan.image_range
-            if type(experiment.imageset) in [RotImageSequence, TOFImageSequence]:
+            if ImageSet.is_sequence(experiment.imageset):
                 imageset_type = "sequence"
             else:
                 imageset_type = "stills"
@@ -899,9 +899,7 @@ class ImageImporter:
         Print an error message if more than 1 sequence
         """
         sequences = [
-            e.imageset
-            for e in experiments
-            if type(e.imageset) in [RotImageSequence, TOFImageSequence]
+            e.imageset for e in experiments if ImageSet.is_sequence(e.imageset)
         ]
 
         if len(sequences) > 1:

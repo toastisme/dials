@@ -179,11 +179,11 @@ class SingleScalerFactory(ScalerFactory):
             experiment.scaling_model.id_ == "physical"
             and "absorption" in experiment.scaling_model.components
         ):
-            if experiment.scan:
+            if experiment.sequence:
                 # calc theta and phi cryst
                 reflection_table["phi"] = (
                     reflection_table["xyzobs.px.value"].parts()[2]
-                    * experiment.scan.get_oscillation()[1]
+                    * experiment.sequence.get_oscillation()[1]
                 )
                 reflection_table = calc_crystal_frame_vectors(
                     reflection_table, experiment

@@ -64,7 +64,7 @@ def generate_test_experiments(n=2):
         experiments.append(
             Experiment(
                 crystal=Crystal.from_dict(exp_dict),
-                scan=Scan(image_range=[1, 10], oscillation=[0.0, 1.0]),
+                sequence=Scan(image_range=[1, 10], oscillation=[0.0, 1.0]),
                 scaling_model=get_scaling_model(),
                 identifier=str(i),
             )
