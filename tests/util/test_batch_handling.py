@@ -54,7 +54,7 @@ def test_calculate_batch_offsets():
     """Test offset calculation. Offset is next number ending in 01 bigger than
     previous batch numbers which is not consecutive"""
     scan = Scan(image_range=[1, 200], oscillation=[0.0, 1.0])
-    exp1 = Experiment(scan=scan)
+    exp1 = Experiment(sequence=scan)
     exp2 = Experiment()
     offsets = calculate_batch_offsets([exp1, exp2])
     assert offsets == [0, 301]
@@ -63,17 +63,17 @@ def test_calculate_batch_offsets():
 def test_set_batch_offsets():
     """Test for namesake function"""
     scan = Scan(image_range=[1, 200], oscillation=[0.0, 1.0])
-    exp1 = Experiment(scan=scan)
+    exp1 = Experiment(sequence=scan)
     exp2 = Experiment()
     set_batch_offsets([exp2, exp1], [0, 101])
-    assert exp1.scan.get_batch_offset() == 101
+    assert exp1.sequence.get_batch_offset() == 101
 
 
 def test_get_batch_ranges():
     """Test for namesake function"""
     scan = Scan(image_range=[1, 200], oscillation=[0.0, 1.0])
-    exp1 = Experiment(scan=scan)
-    exp2 = Experiment(scan=scan)
+    exp1 = Experiment(sequence=scan)
+    exp2 = Experiment(sequence=scan)
     batch_offsets = [0, 300]
     experiments = [exp1, exp2]
     batch_ranges = get_batch_ranges(experiments, batch_offsets)
@@ -83,7 +83,7 @@ def test_get_batch_ranges():
 def test_get_image_ranges():
     """Test for namesake function"""
     scan = Scan(image_range=[1, 200], oscillation=[0.0, 1.0])
-    exp1 = Experiment(scan=scan)
+    exp1 = Experiment(sequence=scan)
     exp2 = Experiment()
     experiments = [exp1, exp2]
     image_ranges = get_image_ranges(experiments)

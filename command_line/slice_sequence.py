@@ -165,7 +165,7 @@ class Script:
 
             if len(experiments) > 1:
                 raise Sorry("For slicing into blocks please provide a single scan only")
-            scan = experiments[0].scan
+            scan = experiments[0].sequence
 
             # Having extracted the scan, calculate the blocks
             params.image_range = calculate_block_ranges(scan, params.block_size)

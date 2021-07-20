@@ -81,7 +81,7 @@ class _:
                 experiment.beam,
                 experiment.detector,
                 experiment.goniometer,
-                experiment.scan,
+                experiment.sequence,
                 dmin=dmin,
                 dmax=dmax,
                 margin=margin,
@@ -1260,7 +1260,7 @@ Found %s"""
                 sel = sel_expt & (panel_numbers == i_panel)
                 centroid_position, centroid_variance, _ = centroid_px_to_mm_panel(
                     expt.detector[i_panel],
-                    expt.scan,
+                    expt.sequence,
                     self["xyzobs.px.value"].select(sel),
                     self["xyzobs.px.variance"].select(sel),
                     cctbx.array_family.flex.vec3_double(sel.count(True), (1, 1, 1)),
@@ -1366,7 +1366,7 @@ Found %s"""
                 beam=beam,
                 detector=experiment.imageset.get_detector(),
                 goniometer=None,
-                scan=None,
+                sequence=None,
                 crystal=None,
                 identifier=str(i),
                 imageset=imageset,

@@ -239,7 +239,7 @@ def run(args=None):
         if params.use_starting_angle:
             rotation_axis = matrix.col(experiments[0].goniometer.get_rotation_axis())
             R = rotation_axis.axis_and_angle_as_r3_rotation_matrix(
-                experiments[0].scan.get_oscillation()[0], deg=True
+                experiments[0].sequence.get_oscillation()[0], deg=True
             )
         elif params.phi_angle != 0:
             rotation_axis = matrix.col(experiments[0].goniometer.get_rotation_axis())
@@ -279,7 +279,7 @@ def run(args=None):
                 if params.use_starting_angle:
                     rotation_axis = matrix.col(expt.goniometer.get_rotation_axis())
                     R = rotation_axis.axis_and_angle_as_r3_rotation_matrix(
-                        expt.scan.get_oscillation()[0], deg=True
+                        expt.sequence.get_oscillation()[0], deg=True
                     )
             else:
                 U = matrix.sqr(cryst.get_U())
@@ -304,8 +304,8 @@ def run(args=None):
     if params.plot.filename:
         epochs = None
         if params.plot.colour_map is not None:
-            if experiments[0].scan is not None:
-                epochs = [expt.scan.get_epochs()[0] for expt in experiments]
+            if experiments[0].sequence is not None:
+                epochs = [expt.sequence.get_epochs()[0] for expt in experiments]
             else:
                 epochs = [i for i, expt in enumerate(experiments)]
         plot_projections(

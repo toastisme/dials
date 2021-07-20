@@ -364,7 +364,7 @@ def filter_by_dead_time(reflections, experiments, dead_time=0, reject_fraction=0
     )
     phi1, phi2 = phi_range.parts()
 
-    scan = experiment.scan
+    scan = experiment.sequence
     exposure_time = scan.get_exposure_times()[0]
     assert scan.get_exposure_times().all_eq(exposure_time)
     phi_start, phi_width = scan.get_oscillation(deg=False)

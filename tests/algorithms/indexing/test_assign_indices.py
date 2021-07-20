@@ -98,11 +98,15 @@ def experiment():
         reader=Format.Reader(None, ["path"] * len(scan)), masker=None
     )
     iset = RotImageSequence(
-        isetdata, beam=beam, detector=detector, goniometer=goniometer, scan=scan
+        isetdata, beam=beam, detector=detector, goniometer=goniometer, sequence=scan
     )
 
     return Experiment(
-        imageset=iset, beam=beam, detector=detector, goniometer=goniometer, scan=scan
+        imageset=iset,
+        beam=beam,
+        detector=detector,
+        goniometer=goniometer,
+        sequence=scan,
     )
 
 
@@ -254,7 +258,7 @@ def test_local_multiple_rotations(dials_data):
         check_format=False,
     )
     # Override the scan range to ensure we have 4 full rotations
-    experiments[0].scan.set_image_range((1, 1440))
+    experiments[0].sequence.set_image_range((1, 1440))
 
     # Generate some predicted reflections
     reflections = flex.reflection_table.from_predictions(experiments[0], dmin=4)
@@ -279,7 +283,7 @@ def test_local_multiple_rotations(dials_data):
     assert (reflections["miller_index"] == predicted_miller_indices).count(False) == 0
 
     # Modify the scan oscillation such that we are out by 1 degree per rotation
-    experiments[0].scan.set_oscillation((0, 1 - 1 / 360), deg=True)
+    experiments[0].sequence.set_oscillation((0, 1 - 1 / 360), deg=True)
 
     # Reset miller indices and re-map to reciprocal space
     reflections["miller_index"] = flex.miller_index(len(reflections), (0, 0, 0))

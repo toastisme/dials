@@ -98,13 +98,13 @@ def _export_experiment(filename, integrated_data, experiment, params, var_model=
 
     unit_cell = experiment.crystal.get_unit_cell()
 
-    if experiment.scan is None:
+    if experiment.sequence is None:
         print("Warning: No Scan. Experimentally exporting no-oscillation values")
         image_range = (1, 1)
         phi_start, phi_range = 0.0, 0.0
     else:
-        image_range = experiment.scan.get_image_range()
-        phi_start, phi_range = experiment.scan.get_image_oscillation(image_range[0])
+        image_range = experiment.sequence.get_image_range()
+        phi_start, phi_range = experiment.sequence.get_image_oscillation(image_range[0])
 
     # gather the required information for the reflection file
 

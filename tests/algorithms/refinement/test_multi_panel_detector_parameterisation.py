@@ -127,7 +127,7 @@ def init_test():
             beam=beam,
             detector=single_panel_detector,
             goniometer=gonio,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             imageset=None,
         )
@@ -137,7 +137,7 @@ def init_test():
             beam=beam,
             detector=multi_panel_detector,
             goniometer=gonio,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             imageset=None,
         )

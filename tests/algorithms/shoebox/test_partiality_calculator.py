@@ -27,7 +27,7 @@ def test(dials_data):
     from dials.array_family import flex
 
     calculator = PartialityCalculator3D(
-        experiment.beam, experiment.goniometer, experiment.scan, sigma_m
+        experiment.beam, experiment.goniometer, experiment.sequence, sigma_m
     )
 
     predicted = flex.reflection_table.from_predictions_multi(experiments)

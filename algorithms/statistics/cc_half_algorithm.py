@@ -380,7 +380,7 @@ class CCHalfFromDials:
             for exp_id, imgrange in image_group_to_expid_and_range.values():
                 if exp_id == exp.identifier:
                     tested.extend(list(range(imgrange[0], imgrange[1] + 1)))
-            for imgrange in exp.scan.get_valid_image_ranges(exp.identifier):
+            for imgrange in exp.sequence.get_valid_image_ranges(exp.identifier):
                 if all([j not in tested for j in range(imgrange[0], imgrange[1] + 1)]):
                     table_id = expid_to_tableid[exp.identifier]
                     exclude_images.append([f"{table_id}:{imgrange[0]}:{imgrange[1]}"])
@@ -395,7 +395,7 @@ class CCHalfFromDials:
         # if a whole experiment has been excluded: need to remove it here
         ids_removed = []
         for exp, refl in zip(experiments, reflection_list):
-            if not exp.scan.get_valid_image_ranges(
+            if not exp.sequence.get_valid_image_ranges(
                 exp.identifier
             ):  # if all removed above
                 experiments_to_delete.append(exp.identifier)

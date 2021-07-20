@@ -90,7 +90,7 @@ class Script:
         # at this point, predict all of the reflections in the scan possible (i.e.
         # extend scan to 360 degrees) - this points back to expt
 
-        self.make_scan_360(expt.scan)
+        self.make_scan_360(expt.sequence)
 
         # now get a full set of all unique miller indices
         all_indices = miller.build_set(

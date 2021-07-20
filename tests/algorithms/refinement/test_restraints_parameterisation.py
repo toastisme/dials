@@ -76,7 +76,7 @@ def test_single_crystal_restraints_gradients():
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal,
             imageset=None,
         )
@@ -217,7 +217,7 @@ def test_two_triclinic_crystals():
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal,
             imageset=None,
         )
@@ -227,7 +227,7 @@ def test_two_triclinic_crystals():
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal2,
             imageset=None,
         )

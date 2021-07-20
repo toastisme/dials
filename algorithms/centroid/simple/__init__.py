@@ -14,8 +14,8 @@ def centroid(experiments, reflections, image_volume=None):
 
     # Add all the experiments
     for exp in experiments:
-        if exp.scan is not None:
-            centroider.add(exp.detector, exp.scan)
+        if exp.sequence is not None:
+            centroider.add(exp.detector, exp.sequence)
         else:
             centroider.add(exp.detector)
 

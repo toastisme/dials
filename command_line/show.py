@@ -269,8 +269,8 @@ def show_experiments(experiments, show_scan_varying=False):
         )
         text.append("")
         text.append(show_beam(expt.detector, expt.beam))
-        if expt.scan is not None:
-            text.append(str(expt.scan))
+        if expt.sequence is not None:
+            text.append(str(expt.sequence))
         if expt.goniometer is not None:
             text.append(show_goniometer(expt.goniometer))
 

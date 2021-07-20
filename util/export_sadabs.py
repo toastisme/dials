@@ -42,7 +42,7 @@ def export_sadabs(integrated_data, experiment_list, params):
     )
 
     experiment = experiment_list[0]
-    assert experiment.scan is not None
+    assert experiment.sequence is not None
 
     # sort data before output
     nref = len(integrated_data["miller_index"])
@@ -108,7 +108,7 @@ def export_sadabs(integrated_data, experiment_list, params):
     scl_x = 512.0 / (dims[0] * pixel[0])
     scl_y = 512.0 / (dims[1] * pixel[1])
 
-    image_range = experiment.scan.get_image_range()
+    image_range = experiment.sequence.get_image_range()
 
     from cctbx.array_family import flex as cflex  # implicit import # noqa: F401
     from cctbx.miller import map_to_asu_isym  # implicit import # noqa: F401
@@ -142,7 +142,7 @@ def export_sadabs(integrated_data, experiment_list, params):
         I = I * scale
         sigI = sigI * scale
 
-    phi_start, phi_range = experiment.scan.get_image_oscillation(image_range[0])
+    phi_start, phi_range = experiment.sequence.get_image_oscillation(image_range[0])
 
     if params.sadabs.predict:
         logger.info("Using scan static predicted spot locations")
