@@ -824,7 +824,7 @@ class SpotFinder:
         extract_spots = self._get_spot_finding_algorithm(imageset)
 
         # Get the max scan range
-        if isinstance(imageset, RotImageSequence):
+        if ImageSet.is_sequence(imageset):
             max_scan_range = imageset.get_array_range()
         else:
             max_scan_range = (0, len(imageset))
