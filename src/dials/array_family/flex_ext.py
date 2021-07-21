@@ -1336,10 +1336,6 @@ Found %s"""
         from scipy import interpolate
         from scipy.constants import Planck, m_n
 
-        from dxtbx.imageset import TOFImageSequence
-        from dxtbx.model.beam import TOFBeam
-        from dxtbx.model.sequence import TOFSequence
-
         def get_tof_s0(s0_direction, tof_wavelength):
             return s0_direction * 1.0 / tof_wavelength
 
@@ -1355,15 +1351,6 @@ Found %s"""
 
         def get_tof_wavelength_in_ang(L, tof):
             return ((Planck * tof) / (m_n * L)) * 10 ** 10
-
-        def is_tof_experiment(experiment):
-            if not isinstance(experiment.imageset, TOFImageSequence):
-                return False
-            if not isinstance(experiment.beam, TOFBeam):
-                return False
-            if not isinstance(experiment.sequence, TOFSequence):
-                return False
-            return True
 
         def add_tof_data(sel_expt):
 
@@ -1432,7 +1419,7 @@ Found %s"""
             else:
                 sel_expt = self["id"] == i
 
-            if is_tof_experiment(expt):
+            if expt.is_tof_experiment():
                 add_tof_data(sel_expt)
             else:
                 add_monochromatic_data(sel_expt)
