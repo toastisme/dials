@@ -1323,14 +1323,22 @@ Found %s"""
                 self["xyzobs.mm.value"].set_selected(sel, centroid_position)
                 self["xyzobs.mm.variance"].set_selected(sel, centroid_variance)
 
-    def add_tof_data(self, experiments, L0_in_m=8.3):
+    def add_beam_data(self, experiments):
 
         """
-        Adds tof_wavelength, tof_s0, and tof_unit_s0 columns to self
+        Adds wavelength, tof, s0, and unit_s0 columns to self.
+        All experiments with a TOFImageSequence have values set from their time-of-flight.
+        All monochromatic experiments just take values from the MonochromaticBeam object,
+        with a tof value of -1.
         """
 
         import numpy as np
         from scipy import interpolate
+        from scipy.constants import Planck, m_n
+
+        from dxtbx.imageset import TOFImageSequence
+        from dxtbx.model.beam import TOFBeam
+        from dxtbx.model.sequence import TOFSequence
 
         def get_tof_s0(s0_direction, tof_wavelength):
             return s0_direction * 1.0 / tof_wavelength
@@ -1339,29 +1347,31 @@ Found %s"""
             x = [i + 1 for i in range(len(tof_vals))]
             return interpolate.splrep(x, tof_vals)
 
-        def get_frame_tof_vals(frames, tof_vals, tof_curve_coeffs):
+        def get_frame_tof_vals(frames, tof_curve_coeffs):
             frame_tof_vals = []
             for i in range(len(frames)):
                 frame_tof_vals.append(interpolate.splev(frames[i], tof_curve_coeffs))
             return frame_tof_vals
 
-        self.centroid_px_to_mm(experiments)
-        panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
-        self["tof_wavelength"] = cctbx.array_family.flex.double(self.nrows())
-        self["tof"] = cctbx.array_family.flex.double(self.nrows())
-        self["tof_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
-        self["tof_unit_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
+        def get_tof_wavelength_in_ang(L, tof):
+            return ((Planck * tof) / (m_n * L)) * 10 ** 10
 
-        for i, expt in enumerate(experiments):
-            if "imageset_id" in self:
-                sel_expt = self["imageset_id"] == i
-            else:
-                sel_expt = self["id"] == i
+        def is_tof_experiment(experiment):
+            if not isinstance(experiment.imageset, TOFImageSequence):
+                return False
+            if not isinstance(experiment.beam, TOFBeam):
+                return False
+            if not isinstance(experiment.sequence, TOFSequence):
+                return False
+            return True
 
-            fmt_cls = expt.imageset.get_format_class()
-            fmt_cls_inst = fmt_cls(expt.imageset.get_template())
-            tof_vals = fmt_cls_inst._get_time_channels_in_seconds()
-            tof_curve_coeffs = get_tof_curve_coefficients(tof_vals)
+        def add_tof_data(sel_expt):
+
+            L0_in_m = expt.beam.get_sample_to_moderator_distance()
+            unit_s0 = expt.beam.get_unit_s0()
+            tof_in_s = expt.sequence.get_tof_in_seconds()
+            # Cubic spline for estimating ToF between frames
+            tof_curve_coeffs = get_tof_curve_coefficients(tof_in_s)
 
             for i_panel in range(len(expt.detector)):
                 sel = sel_expt & (panel_numbers == i_panel)
@@ -1370,26 +1380,62 @@ Found %s"""
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
-                frame_tof_vals = get_frame_tof_vals(frame, tof_vals, tof_curve_coeffs)
+                frame_tof_vals = get_frame_tof_vals(frame, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
-                tof = cctbx.array_family.flex.double(len(s1))
-                tof_s0 = cctbx.array_family.flex.vec3_double(len(s1))
-                tof_unit_s0 = cctbx.array_family.flex.vec3_double(len(s1))
+                tofs = cctbx.array_family.flex.double(len(s1))
+                s0s = cctbx.array_family.flex.vec3_double(len(s1))
+                unit_s0s = cctbx.array_family.flex.vec3_double(len(s1), unit_s0)
                 for j in range(len(s1)):
                     s1n = np.linalg.norm(s1[j]) * 10 ** -3
-                    wavelengths[j] = fmt_cls_inst.get_tof_wavelength_in_ang(
+                    wavelengths[j] = get_tof_wavelength_in_ang(
                         L0_in_m + s1n, frame_tof_vals[j]
                     )
-                    tof[j] = frame_tof_vals[j] * 10 ** 6
-                    unit_s0 = np.array(expt.beam.get_unit_s0())
-                    tof_s0[j] = get_tof_s0(unit_s0, wavelengths[j])
-                    tof_unit_s0[j] = unit_s0
+                    tofs[j] = frame_tof_vals[j] * 10 ** 6
+                    s0s[j] = get_tof_s0(unit_s0, wavelengths[j])
 
-                self["tof_wavelength"].set_selected(sel, wavelengths)
-                self["tof"].set_selected(sel, tof)
-                self["tof_s0"].set_selected(sel, tof_s0)
-                self["tof_unit_s0"].set_selected(sel, tof_unit_s0)
+                self["wavelength"].set_selected(sel, wavelengths)
+                self["tof"].set_selected(sel, tofs)
+                self["s0"].set_selected(sel, s0s)
+                self["unit_s0"].set_selected(sel, unit_s0s)
+
+        def add_monochromatic_data(sel_expt):
+
+            unit_s0 = expt.beam.get_unit_s0()
+            wavelength = expt.beam.get_wavelength()
+            s0 = expt.beam.get_s0()
+            tof = -1
+            num_reflections = len(self.select(sel_expt))
+
+            wavelengths = cctbx.array_family.flex.double(num_reflections, wavelength)
+            tofs = cctbx.array_family.flex.double(len(num_reflections), tof)
+            s0s = cctbx.array_family.flex.vec3_double(len(num_reflections), s0)
+            unit_s0s = cctbx.array_family.flex.vec3_double(
+                len(num_reflections), unit_s0
+            )
+
+            self["wavelength"].set_selected(sel_expt, wavelengths)
+            self["tof"].set_selected(sel_expt, tofs)
+            self["s0"].set_selected(sel_expt, s0s)
+            self["unit_s0"].set_selected(sel_expt, unit_s0s)
+
+        self.centroid_px_to_mm(experiments)
+        panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
+        self["wavelength"] = cctbx.array_family.flex.double(self.nrows())
+        self["tof"] = cctbx.array_family.flex.double(self.nrows())
+        self["s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
+        self["unit_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
+
+        for i, expt in enumerate(experiments):
+            if "imageset_id" in self:
+                sel_expt = self["imageset_id"] == i
+            else:
+                sel_expt = self["id"] == i
+
+            if is_tof_experiment(expt):
+                add_tof_data(sel_expt)
+            else:
+                add_monochromatic_data(sel_expt)
 
     def tof_sequence_to_stills(self, experiment):
 
