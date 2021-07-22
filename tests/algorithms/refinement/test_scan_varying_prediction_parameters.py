@@ -74,7 +74,7 @@ geometry.parameters.crystal.c.length.range = 10 50"""
                 beam=self.beam,
                 detector=self.detector,
                 goniometer=self.goniometer,
-                scan=self.scan,
+                sequence=self.scan,
                 crystal=self.crystal,
                 imageset=None,
             )
