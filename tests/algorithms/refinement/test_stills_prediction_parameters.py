@@ -95,7 +95,7 @@ class _Test:
                 beam=self.beam,
                 detector=self.detector,
                 goniometer=self.gonio,
-                scan=self.scan,
+                sequence=self.scan,
                 crystal=self.crystal,
                 imageset=None,
             )
