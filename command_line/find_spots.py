@@ -64,14 +64,6 @@ phil_scope = parse(
     log = 'dials.find_spots.log'
       .type = str
       .help = "The log filename"
-
-    tof_sequence_to_stills = False
-      .type = bool
-      .help = "Outputs a ToF Experiment as an ExperimentList with one Experiment for each reflection."
-
-    add_tof_data = False
-      .type = bool
-      .help = Adds tof_wavelength, tof_s0, and tof_unit_s0 to the reflection table
   }
 
   maximum_trusted_value = None

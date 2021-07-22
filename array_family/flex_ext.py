@@ -1300,13 +1300,16 @@ Found %s"""
         def add_tof_data(sel_expt):
 
             L0_in_m = expt.beam.get_sample_to_moderator_distance()
-            unit_s0 = expt.beam.get_unit_s0()
+            unit_s0 = np.asarray(expt.beam.get_unit_s0())
             tof_in_s = expt.sequence.get_tof_in_seconds()
             # Cubic spline for estimating ToF between frames
             tof_curve_coeffs = get_tof_curve_coefficients(tof_in_s)
 
             for i_panel in range(len(expt.detector)):
+
                 sel = sel_expt & (panel_numbers == i_panel)
+                # rot_angle is a zero vector here, set from centroid_px_to_mm
+                # This component is used to store the ToF
                 x, y, rot_angle = self["xyzobs.mm.value"].select(sel).parts()
                 px, py, frame = self["xyzobs.px.value"].select(sel).parts()
                 s1 = expt.detector[i_panel].get_lab_coord(
@@ -1315,21 +1318,20 @@ Found %s"""
                 frame_tof_vals = get_frame_tof_vals(frame, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
-                tofs = cctbx.array_family.flex.double(len(s1))
                 s0s = cctbx.array_family.flex.vec3_double(len(s1))
-                unit_s0s = cctbx.array_family.flex.vec3_double(len(s1), unit_s0)
+                xyz_mm_value = cctbx.array_family.flex.vec3_double(len(s1))
+
                 for j in range(len(s1)):
                     s1n = np.linalg.norm(s1[j]) * 10 ** -3
                     wavelengths[j] = get_tof_wavelength_in_ang(
                         L0_in_m + s1n, frame_tof_vals[j]
                     )
-                    tofs[j] = frame_tof_vals[j] * 10 ** 6
                     s0s[j] = get_tof_s0(unit_s0, wavelengths[j])
+                    xyz_mm_value[i] = np.asarray((x[i], y[i], frame_tof_vals[i]))
 
                 self["wavelength"].set_selected(sel, wavelengths)
-                self["tof"].set_selected(sel, tofs)
                 self["s0"].set_selected(sel, s0s)
-                self["unit_s0"].set_selected(sel, unit_s0s)
+                self["xyzobs.mm.value"].set_selected(sel, xyz_mm_value)
 
         def add_monochromatic_data(sel_expt):
 
