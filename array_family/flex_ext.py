@@ -1443,7 +1443,6 @@ Found %s"""
                     x, y, rot_angle = self["xyzcal.mm"].select(sel).parts()
                 else:
                     x, y, rot_angle = self["xyzobs.mm.value"].select(sel).parts()
-                    px, py, pz = self["xyzobs.px.value"].select(sel).parts()
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
