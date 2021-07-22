@@ -1,3 +1,6 @@
+from dxtbx.model.sequence import Scan
+
+
 def centroid_px_to_mm(detector, scan, position, variance, sd_error):
     """Convenience function to calculate centroid in mm/rad from px"""
 
@@ -10,7 +13,7 @@ def centroid_px_to_mm_panel(panel, scan, position, variance, sd_error):
     """Convenience function to calculate centroid in mm/rad from px"""
     # Get the pixel to millimeter function
     pixel_size = panel.get_pixel_size()
-    if scan is None:
+    if not isinstance(scan, Scan):
         oscillation = (0, 0)
     else:
         oscillation = scan.get_oscillation(deg=False)
@@ -22,7 +25,7 @@ def centroid_px_to_mm_panel(panel, scan, position, variance, sd_error):
         x, y, z = position
         xy_mm = panel.pixel_to_millimeter((x, y))
 
-        if scan is None:
+        if not isinstance(scan, Scan):
             z_rad = 0
         else:
             z_rad = scan.get_angle_from_array_index(z, deg=False)
@@ -41,7 +44,7 @@ def centroid_px_to_mm_panel(panel, scan, position, variance, sd_error):
         x, y, z = position.parts()
         xy_mm = panel.pixel_to_millimeter(flex.vec2_double(x, y))
 
-        if scan is None:
+        if not isinstance(scan, Scan):
             z_rad = flex.double(z.size(), 0)
         else:
             z_rad = scan.get_angle_from_array_index(z, deg=False)

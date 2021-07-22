@@ -774,6 +774,10 @@ class SpotFinder:
         # Check for overloads
         reflections.is_overloaded(experiments)
 
+        # If any of the experiments are ToF experiments, add wavelength data
+        if experiments.contains_tof_experiments():
+            reflections.add_beam_data(experiments)
+
         # Return the reflections
         return reflections
 
