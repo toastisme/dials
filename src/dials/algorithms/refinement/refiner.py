@@ -1025,10 +1025,10 @@ class Refiner:
             if goniometer is None:
                 continue
             logger.debug(ordinal_number(i) + " " + str(goniometer))
-        for i, scan in enumerate(self._experiments.scans()):
-            if scan is None:
+        for i, sequence in enumerate(self._experiments.sequences()):
+            if sequence is None:
                 continue
-            logger.debug(ordinal_number(i) + " " + str(scan))
+            logger.debug(ordinal_number(i) + " " + str(sequence))
         for i, crystal in enumerate(self._experiments.crystals()):
             logger.debug(ordinal_number(i) + " " + str(crystal))
 
@@ -1056,10 +1056,10 @@ class Refiner:
             if goniometer is None:
                 continue
             logger.debug(ordinal_number(i) + " " + str(goniometer))
-        for i, scan in enumerate(self._experiments.scans()):
-            if scan is None:
+        for i, sequence in enumerate(self._experiments.sequences()):
+            if sequence is None:
                 continue
-            logger.debug(ordinal_number(i) + " " + str(scan))
+            logger.debug(ordinal_number(i) + " " + str(sequence))
         for i, crystal in enumerate(self._experiments.crystals()):
             logger.debug(ordinal_number(i) + " " + str(crystal))
 
