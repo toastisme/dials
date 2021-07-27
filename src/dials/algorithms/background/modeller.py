@@ -312,7 +312,7 @@ class BackgroundModeller:
             len(self.experiments.beams()),
             len(self.experiments.detectors()),
             len(self.experiments.goniometers()),
-            len(self.experiments.scans()),
+            len(self.experiments.sequences()),
             len(self.experiments.crystals()),
             len(self.experiments.imagesets()),
         )

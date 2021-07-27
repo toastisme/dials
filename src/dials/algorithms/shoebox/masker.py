@@ -75,7 +75,7 @@ class Masker3DProfile(MaskerBase):
             self._experiment.beam,
             self._experiment.detector,
             self._experiment.goniometer,
-            self._experiment.scan,
+            self._experiment.sequence,
         )
 
         # Return the reflections

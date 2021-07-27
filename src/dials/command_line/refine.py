@@ -423,7 +423,7 @@ def run(args=None, phil=working_phil):
 
     # Write scan-varying parameters to file, if there were any
     if params.output.parameter_table:
-        scans = experiments.scans()
+        scans = experiments.sequences()
         if len(scans) > 1:
             logger.info(
                 "Writing a scan-varying parameter table is only supported "

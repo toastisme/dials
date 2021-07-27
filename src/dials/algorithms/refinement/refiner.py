@@ -948,12 +948,12 @@ class Refiner:
     def print_panel_rmsd_table(self):
         """print useful output about refinement steps in the form of a simple table"""
 
-        if len(self._experiments.scans()) > 1:
+        if len(self._experiments.sequences()) > 1:
             logger.warning(
                 "Multiple scans present. Only the first scan will be used "
                 "to determine the image width for reporting RMSDs"
             )
-        scan = self._experiments.scans()[0]
+        scan = self._experiments.sequences()[0]
         try:
             images_per_rad = 1.0 / abs(scan.get_oscillation(deg=False)[1])
         except AttributeError:

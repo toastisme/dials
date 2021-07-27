@@ -832,7 +832,7 @@ class _:
                     expr.beam,
                     expr.detector,
                     expr.goniometer,
-                    expr.scan,
+                    expr.sequence,
                     sigma_b_multiplier=sigma_b_multiplier,
                 ),
             )
@@ -856,7 +856,7 @@ class _:
                     expr.beam,
                     expr.detector,
                     expr.goniometer,
-                    expr.scan,
+                    expr.sequence,
                 ),
             )
         return self["partiality"]
@@ -875,7 +875,7 @@ class _:
                 expr.beam,
                 expr.detector,
                 expr.goniometer,
-                expr.scan,
+                expr.sequence,
                 image_volume=image_volume,
             )
             if result is not None:

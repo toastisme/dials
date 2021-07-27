@@ -25,7 +25,7 @@ class IndexerKnownOrientation(Indexer):
                     beam=expt.beam,
                     detector=expt.detector,
                     goniometer=expt.goniometer,
-                    scan=expt.sequence,
+                    sequence=expt.sequence,
                     crystal=cm,
                     identifier=expt.identifier,
                 )
