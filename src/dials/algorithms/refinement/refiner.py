@@ -141,7 +141,7 @@ def _copy_experiments_for_refining(experiments):
 
         # TOF hack
         # print("TEST performing ToF hack")
-        experiments[0].beam.set_wavelength(1)
+        # experiments[0].beam.set_wavelength(1)
 
         for model in ["beam", "goniometer", "detector", "crystal"]:
             original = getattr(experiment, model)
