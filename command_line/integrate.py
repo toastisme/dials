@@ -483,7 +483,7 @@ def run_integration(params, experiments, reference=None):
     # Predict the reflections
     logger.info("\n".join(("", "=" * 80, "")))
     logger.info(heading("Predicting reflections"))
-    if reference.contains_valid_tof_data:
+    if reference.contains_valid_tof_data():
         predicted = flex.reflection_table.tof_from_predictions_multi(
             experiments[0], reference
         )
