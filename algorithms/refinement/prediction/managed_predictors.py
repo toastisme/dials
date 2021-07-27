@@ -85,8 +85,8 @@ class ExperimentsPredictor:
                 self._predict_one_tof_experiment(e, refs)
             else:
                 self._predict_one_experiment(e, refs)
-        # write predictions back to overall reflections
-        reflections.set_selected(sel, refs)
+            # write predictions back to overall reflections
+            reflections.set_selected(sel, refs)
 
         reflections = self._post_prediction(reflections)
 
