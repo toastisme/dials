@@ -437,7 +437,7 @@ class Script:
 
         if ref_scan is not None:
             try:
-                ref_scan = flat_exps[ref_scan].scan
+                ref_scan = flat_exps[ref_scan].sequence
             except IndexError:
                 sys.exit(f"{ref_scan} is not a valid experiment ID")
 

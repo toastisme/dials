@@ -382,7 +382,7 @@ def split_for_scan_range(experiments, reference, scan_range):
                 e2.crystal = slice_crystal(e1.crystal, (index_start, index_end))
                 e2.profile = e1.profile
                 e2.imageset = new_iset
-                e2.scan = new_scan
+                e2.sequence = new_scan
                 new_reference_all[i]["id"] = flex.int(
                     len(new_reference_all[i]), len(new_experiments)
                 )

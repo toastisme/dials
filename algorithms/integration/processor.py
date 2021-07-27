@@ -741,7 +741,10 @@ class _Manager:
 
         groups = itertools.groupby(
             range(len(self.experiments)),
-            lambda x: (id(self.experiments[x].imageset), id(self.experiments[x].scan)),
+            lambda x: (
+                id(self.experiments[x].imageset),
+                id(self.experiments[x].sequence),
+            ),
         )
         self.jobs = JobList()
         for key, indices in groups:
@@ -749,7 +752,7 @@ class _Manager:
             i0 = indices[0]
             i1 = indices[-1] + 1
             expr = self.experiments[i0]
-            scan = expr.scan
+            scan = expr.sequence
             imgs = expr.imageset
             array_range = (0, len(imgs))
             if scan is not None:
@@ -928,7 +931,7 @@ class _Manager:
                 group = job.index()
                 expr = job.expr()
                 f0, f1 = job.frames()
-                scan = self.experiments[expr[0]].scan
+                scan = self.experiments[expr[0]].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 n = self.manager.num_reflections(i)

@@ -687,7 +687,7 @@ class Indexer:
                         expt.detector = refined_expt.detector
                         expt.beam = refined_expt.beam
                         expt.goniometer = refined_expt.goniometer
-                        expt.sequence = refined_expt.scan
+                        expt.sequence = refined_expt.sequence
                         refined_expt.imageset = expt.imageset
 
                 if not (
