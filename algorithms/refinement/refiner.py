@@ -387,6 +387,7 @@ class RefinerFactory:
 
         # Create model parameterisations
         logger.debug("Building prediction equation parameterisation")
+        """
         if reflections.contains_valid_tof_data():
             pred_param = build_prediction_parameterisation(
                 params.refinement.parameterisation,
@@ -396,9 +397,10 @@ class RefinerFactory:
                 reflections,
             )
         else:
-            pred_param = build_prediction_parameterisation(
-                params.refinement.parameterisation, experiments, refman, do_stills
-            )
+        """
+        pred_param = build_prediction_parameterisation(
+            params.refinement.parameterisation, experiments, refman, do_stills
+        )
 
         # Build a constraints manager, if requested
         cmf = ConstraintManagerFactory(params, pred_param)

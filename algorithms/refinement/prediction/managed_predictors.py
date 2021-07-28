@@ -81,10 +81,12 @@ class ExperimentsPredictor:
             sel = reflections["id"] == iexp
             refs = reflections.select(sel)
 
+            """
             if reflections.contains_valid_tof_data():
                 self._predict_one_tof_experiment(e, refs)
             else:
-                self._predict_one_experiment(e, refs)
+            """
+            self._predict_one_experiment(e, refs)
             # write predictions back to overall reflections
             reflections.set_selected(sel, refs)
 
@@ -191,12 +193,14 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
     spherical_relp_model = False
 
     def _predict_one_experiment(self, experiment, reflections):
+        """
         if reflections.contains_valid_tof_data():
             self._predict_one_tof_experiment(experiment, reflections)
         else:
-            predictor = st(experiment, spherical_relp=self.spherical_relp_model)
-            UB = experiment.crystal.get_A()
-            predictor.for_reflection_table(reflections, UB)
+        """
+        predictor = st(experiment, spherical_relp=self.spherical_relp_model)
+        UB = experiment.crystal.get_A()
+        predictor.for_reflection_table(reflections, UB)
 
     def _predict_one_tof_experiment(self, experiment, reflections):
         updated_fields = [

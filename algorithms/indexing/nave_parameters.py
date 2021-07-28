@@ -49,7 +49,7 @@ class NaveParameters:
             miller_indices = self.reflections["miller_index"].select(
                 self.reflections["id"] == iid
             )
-
+            """
             if self.reflections.contains_valid_tof_data():
                 import scitbx_array_family_flex_ext
 
@@ -67,10 +67,11 @@ class NaveParameters:
                     )[0]
 
             else:
-                # FIXME XXX revise this formula so as to use a different wavelength potentially for each reflection
-                two_thetas = crystal.get_unit_cell().two_theta(
-                    miller_indices, beam.get_wavelength(), deg=True
-                )
+            """
+            # FIXME XXX revise this formula so as to use a different wavelength potentially for each reflection
+            two_thetas = crystal.get_unit_cell().two_theta(
+                miller_indices, beam.get_wavelength(), deg=True
+            )
             dspacings = crystal.get_unit_cell().d(miller_indices)
 
             # First -- try to get a reasonable envelope for the observed excursions.
@@ -190,15 +191,15 @@ class NaveParameters:
                 crystal.get_domain_size_ang() / model_expansion_factor
             )
 
-            if not self.reflections.contains_valid_tof_data():
-                if (
-                    self.ewald_proximal_volume(iid)
-                    > self.params.indexing.stills.ewald_proximal_volume_max
-                ):
-                    raise DialsIndexError(
-                        "Ewald proximity volume too high, %f"
-                        % self.ewald_proximal_volume(iid)
-                    )
+            # if not self.reflections.contains_valid_tof_data():
+            if (
+                self.ewald_proximal_volume(iid)
+                > self.params.indexing.stills.ewald_proximal_volume_max
+            ):
+                raise DialsIndexError(
+                    "Ewald proximity volume too high, %f"
+                    % self.ewald_proximal_volume(iid)
+                )
 
             all_crystals.append(crystal)
         return all_crystals
