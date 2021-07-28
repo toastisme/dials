@@ -247,8 +247,10 @@ def run(args=None, phil=working_phil):
     # Save experiments
     logger.info("Saving refined experiments to %s", params.output.experiments)
     assert indexed_experiments.is_consistent()
+    """
     if indexed_reflections.contains_valid_tof_data():
         indexed_experiments[0].beam.set_wavelength(1)
+    """
     indexed_experiments.as_file(params.output.experiments)
 
     # Save reflections

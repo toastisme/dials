@@ -796,10 +796,12 @@ def build_prediction_parameterisation(
     analysis = _centroid_analysis(options, experiments, reflection_manager)
 
     # Parameterise each unique model
+    """
     if reflections is not None and reflections.contains_valid_tof_data():
         beam_params = []
     else:
-        beam_params = _parameterise_beams(options, experiments, analysis)
+    """
+    beam_params = _parameterise_beams(options, experiments, analysis)
     xl_ori_params, xl_uc_params = _parameterise_crystals(options, experiments, analysis)
     det_params = _parameterise_detectors(options, experiments, analysis)
     gon_params = _parameterise_goniometers(options, experiments, analysis)

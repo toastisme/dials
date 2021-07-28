@@ -1506,6 +1506,7 @@ Found %s"""
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
 
+                """
                 if self.contains_valid_tof_data():
                     import numpy as np
 
@@ -1517,8 +1518,9 @@ Found %s"""
                             np.array(s1[s1_idx]) - np.array(expt.beam.get_unit_s0())
                         ) / tof_wavelengths[s1_idx]
                 else:
-                    s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
-                    S = s1 - expt.beam.get_s0()
+                """
+                s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
+                S = s1 - expt.beam.get_s0()
                 self["s1"].set_selected(sel, s1)
 
                 if expt.goniometer is not None:
