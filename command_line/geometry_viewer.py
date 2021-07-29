@@ -120,7 +120,7 @@ class render_3d:
             return
 
         points = gonio_masker.extrema_at_scan_angle(
-            gonio.get_angles()[gonio.get_scan_axis()]
+            gonio.get_angles()[gonio.get_sequence_axis()]
         )
         points.insert(0, (0, 0, 0))
 

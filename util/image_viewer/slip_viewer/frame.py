@@ -40,8 +40,8 @@ class chooser_wrapper:
     def get_detector(self):
         return self.image_set.get_detector()
 
-    def get_scan(self):
-        return self.image_set.get_scan()
+    def get_sequence(self):
+        return self.image_set.get_sequence()
 
     def get_beam(self):
         return self.image_set.get_beam()

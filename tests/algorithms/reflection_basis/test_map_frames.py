@@ -24,7 +24,7 @@ def test_map_frames_forward(dials_data):
     beam = sequence.get_beam()
     detector = sequence.get_detector()
     gonio = sequence.get_goniometer()
-    scan = sequence.get_scan()
+    scan = sequence.get_sequence()
 
     # Set the delta_divergence/mosaicity
     n_sigma = 3
@@ -114,7 +114,7 @@ def test_map_frames_reverse(dials_data):
     beam = sequence.get_beam()
     detector = sequence.get_detector()
     gonio = sequence.get_goniometer()
-    scan = sequence.get_scan()
+    scan = sequence.get_sequence()
 
     # Set the delta_divergence/mosaicity
     n_sigma = 3
@@ -210,7 +210,7 @@ def test_map_forward_reverse(dials_data):
     beam = sequence.get_beam()
     detector = sequence.get_detector()
     gonio = sequence.get_goniometer()
-    scan = sequence.get_scan()
+    scan = sequence.get_sequence()
 
     # Set the delta_divergence/mosaicity
     n_sigma = 3

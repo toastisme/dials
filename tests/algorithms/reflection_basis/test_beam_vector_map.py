@@ -23,7 +23,7 @@ def sequence_and_model(dials_data):
     storage_class.beam = storage_class.sequence.get_beam()
     storage_class.detector = storage_class.sequence.get_detector()
     storage_class.gonio = storage_class.sequence.get_goniometer()
-    storage_class.scan = storage_class.sequence.get_scan()
+    storage_class.sequence = storage_class.sequence.get_sequence()
 
     return storage_class
 
