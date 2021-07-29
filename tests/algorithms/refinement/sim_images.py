@@ -6,10 +6,10 @@ import math
 
 from cctbx.eltbx import henke
 from dxtbx.model import (
-    BeamFactory,
     Crystal,
     DetectorFactory,
     GoniometerFactory,
+    MonochromaticBeamFactory,
     SequenceFactory,
 )
 from iotbx import pdb
@@ -49,7 +49,7 @@ class Simulation:
         )
 
         # Set up beam
-        self.beam = BeamFactory().simple(wavelength=1)
+        self.beam = MonochromaticBeamFactory.make_simple_beam(wavelength=1)
 
         # Set up scan
         sequence_width = 90.0
