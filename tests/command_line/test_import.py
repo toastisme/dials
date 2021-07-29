@@ -197,7 +197,7 @@ def test_override_geometry(dials_data, tmpdir):
     beam = imgset.get_beam()
     detector = imgset.get_detector()
     goniometer = imgset.get_goniometer()
-    scan = imgset.get_scan()
+    scan = imgset.get_sequence()
 
     assert beam.get_wavelength() == 2
     assert beam.get_sample_to_source_direction() == (-1, 0, 0)

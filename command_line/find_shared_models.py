@@ -83,12 +83,12 @@ class Script:
 
         # Sort the sequences by timestamps
         logger.info("Sorting sequences based on timestamp")
-        sequences = sorted(sequences, key=lambda x: x.get_scan().get_epochs()[0])
+        sequences = sorted(sequences, key=lambda x: x.get_sequence().get_epochs()[0])
 
         # Count the number of datasets from each day
         counter = Counter()
         for s in sequences:
-            timestamp = s.get_scan().get_epochs()[0]
+            timestamp = s.get_sequence().get_epochs()[0]
             timestamp = datetime.datetime.fromtimestamp(timestamp)
             timestamp = timestamp.strftime("%Y-%m-%d")
             counter[timestamp] += 1
@@ -128,7 +128,7 @@ class Script:
         # Print a table of possibly shared models
         rows = [["Sequence", "ID", "Beam", "Detector", "Goniometer", "Date", "Time"]]
         for i in range(len(sequences)):
-            timestamp = sequences[i].get_scan().get_epochs()[0]
+            timestamp = sequences[i].get_sequence().get_epochs()[0]
             timestamp = datetime.datetime.fromtimestamp(timestamp)
             date_str = timestamp.strftime("%Y-%m-%d")
             time_str = timestamp.strftime("%H:%M:%S")
