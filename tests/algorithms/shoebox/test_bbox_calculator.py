@@ -26,7 +26,7 @@ def setup(dials_data):
     fixture["beam"] = sequence.get_beam()
     fixture["detector"] = sequence.get_detector()
     fixture["gonio"] = sequence.get_goniometer()
-    fixture["scan"] = sequence.get_scan()
+    fixture["scan"] = sequence.get_sequence()
 
     # Set the delta_divergence/mosaicity
     n_sigma = 5

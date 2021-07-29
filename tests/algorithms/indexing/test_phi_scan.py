@@ -113,7 +113,7 @@ def test_run(dials_regression, tmpdir):
                 beam=imageset_old.get_beam(),
                 detector=imageset_old.get_detector(),
                 goniometer=gonio_old,
-                scan=imageset_old.get_scan(),
+                sequence=imageset_old.get_sequence(),
                 crystal=result_old.experiments[0].crystal,
                 imageset=None,
             )
@@ -125,7 +125,7 @@ def test_run(dials_regression, tmpdir):
                 beam=imageset_new.get_beam(),
                 detector=imageset_new.get_detector(),
                 goniometer=gonio_new,
-                scan=imageset_new.get_scan(),
+                sequence=imageset_new.get_sequence(),
                 crystal=result_new.experiments[0].crystal,
                 imageset=None,
             )

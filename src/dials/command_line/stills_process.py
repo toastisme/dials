@@ -329,7 +329,7 @@ def do_import(filename, load_models=True):
                 imageset=imageset[i : i + 1],
                 detector=experiment.detector,
                 beam=experiment.beam,
-                scan=experiment.sequence,
+                sequence=experiment.sequence,
                 goniometer=experiment.goniometer,
                 crystal=experiment.crystal,
             )

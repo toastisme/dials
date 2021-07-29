@@ -28,6 +28,14 @@ def sequence_and_model(dials_data):
         scan=sequence.get_scan(),
     )
 
+    # Get the models
+    storage_class.beam = storage_class.sequence.get_beam()
+    storage_class.detector = storage_class.sequence.get_detector()
+    storage_class.gonio = storage_class.sequence.get_goniometer()
+    storage_class.sequence = storage_class.sequence.get_sequence()
+
+    return storage_class
+
 
 def test_at_corners(sequence_and_model):
     assert len(sequence_and_model.detector) == 1

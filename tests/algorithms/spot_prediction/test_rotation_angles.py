@@ -29,7 +29,7 @@ def test(dials_regression, tmp_path):
     models = dxtbx.load(gxparm_filename)
     beam = models.get_beam()
     gonio = models.get_goniometer()
-    scan = models.get_scan()
+    scan = models.get_sequence()
 
     # Get the crystal parameters
     cfc = coordinate_frame_converter(gxparm_filename)

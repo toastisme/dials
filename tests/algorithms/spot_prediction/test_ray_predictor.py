@@ -37,7 +37,7 @@ class RayPredictor:
         self.beam = models.get_beam()
         self.gonio = models.get_goniometer()
         self.detector = models.get_detector()
-        self.scan = models.get_scan()
+        self.scan = models.get_sequence()
 
         # Get crystal parameters
         self.space_group_type = ioutil.get_space_group_type_from_xparm(
