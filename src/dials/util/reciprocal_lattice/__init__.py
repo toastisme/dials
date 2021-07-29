@@ -232,6 +232,7 @@ class Render3d:
                 reflections = reflections.select(p <= self.settings.partiality_max)
             else:
                 self.settings.partiality_max = flex.max(p)
+        """
         if (
             self.settings.filter_by_panel is not None
             and len(self.settings.filter_by_panel) > 0
@@ -240,6 +241,7 @@ class Render3d:
             for i in list(map(int, self.settings.filter_by_panel)):
                 panel_sel |= reflections["panel"] == i
             reflections = reflections.select(panel_sel)
+        """
         points = reflections["rlp"] * 100
         self.viewer.set_points(points)
         self.viewer.set_points_data(reflections)
