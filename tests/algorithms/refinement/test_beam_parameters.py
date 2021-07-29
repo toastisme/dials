@@ -7,7 +7,7 @@ from scitbx import matrix
 
 
 def test_beam_parameters():
-    from dxtbx.model import BeamFactory
+    from dxtbx.model import MonochromaticBeamFactory
 
     from dials.algorithms.refinement.parameterisation.beam_parameters import (
         BeamParameterisation,
@@ -18,8 +18,9 @@ def test_beam_parameters():
     )
 
     # make a random beam vector and parameterise it
-    bf = BeamFactory()
-    s0 = bf.make_monochromatic_beam(matrix.col.random(3, 0.5, 1.5), wavelength=1.2)
+    s0 = MonochromaticBeamFactory.make_beam(
+        matrix.col.random(3, 0.5, 1.5), wavelength=1.2
+    )
     s0p = BeamParameterisation(s0)
 
     # Let's do some basic tests. First, can we change parameter values and
@@ -34,7 +35,7 @@ def test_beam_parameters():
     for i in range(attempts):
 
         # make a random beam vector and parameterise it
-        s0 = bf.make_monochromatic_beam(
+        s0 = MonochromaticBeamFactory.make_beam(
             matrix.col.random(3, 0.5, 1.5), wavelength=random.uniform(0.8, 1.5)
         )
         s0p = BeamParameterisation(s0)

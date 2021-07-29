@@ -338,9 +338,9 @@ class ManualGeometryUpdater:
 
         from dxtbx.imageset import ImageSetFactory, RotImageSequence
         from dxtbx.model import (
-            BeamFactory,
             DetectorFactory,
             GoniometerFactory,
+            MonochromaticBeamFactory,
             SequenceFactory,
         )
 
@@ -353,7 +353,9 @@ class ManualGeometryUpdater:
             if self.params.geometry.convert_stills_to_sequences:
                 imageset = self.convert_stills_to_sequence(imageset)
         if isinstance(imageset, RotImageSequence):
-            beam = BeamFactory.from_phil(self.params.geometry, imageset.get_beam())
+            beam = MonochromaticBeamFactory.from_phil(
+                self.params.geometry, imageset.get_beam()
+            )
             detector = DetectorFactory.from_phil(
                 self.params.geometry, imageset.get_detector(), beam
             )
@@ -380,7 +382,9 @@ class ManualGeometryUpdater:
                 imageset.set_sequence(sequence)
         else:
             for i in range(len(imageset)):
-                beam = BeamFactory.from_phil(self.params.geometry, imageset.get_beam(i))
+                beam = MonochromaticBeamFactory.from_phil(
+                    self.params.geometry, imageset.get_beam(i)
+                )
                 detector = DetectorFactory.from_phil(
                     self.params.geometry, imageset.get_detector(i), beam
                 )

@@ -9,10 +9,10 @@ from cctbx.sgtbx import bravais_types
 from dxtbx.format import Format
 from dxtbx.imageset import ImageSetData, RotImageSequence
 from dxtbx.model import (
-    BeamFactory,
     Crystal,
     DetectorFactory,
     GoniometerFactory,
+    MonochromaticBeamFactory,
     SequenceFactory,
 )
 from dxtbx.model.experiment_list import Experiment, ExperimentList
@@ -70,7 +70,7 @@ def crystal_factory():
 
 @pytest.fixture
 def experiment():
-    beam = BeamFactory.make_monochromatic_beam(
+    beam = MonochromaticBeamFactory.make_beam(
         wavelength=0.97625, sample_to_source=(0, 0, 1)
     )
 
