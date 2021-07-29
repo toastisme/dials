@@ -5,7 +5,12 @@ from __future__ import annotations
 
 import random
 
-from dxtbx.model import BeamFactory, Crystal, DetectorFactory, GoniometerFactory
+from dxtbx.model import (
+    Crystal,
+    DetectorFactory,
+    GoniometerFactory,
+    MonochromaticBeamFactory,
+)
 from libtbx.phil import command_line, parse
 from scitbx import matrix
 
@@ -108,7 +113,7 @@ class Extract:
 
             beam_dir = matrix.col(self._params.beam.direction.exactly)
 
-        self.beam = BeamFactory.make_monochromatic_beam(
+        self.beam = MonochromaticBeamFactory.make_beam(
             unit_s0=beam_dir, wavelength=wavelength
         )
 

@@ -4,7 +4,7 @@ import random
 import textwrap
 from math import cos, pi, sin, sqrt
 
-from dxtbx.model import BeamFactory, Detector, DetectorFactory, Panel
+from dxtbx.model import Detector, DetectorFactory, MonochromaticBeamFactory, Panel
 from libtbx.test_utils import approx_equal
 from scitbx import matrix
 
@@ -119,7 +119,7 @@ def test():
     )
 
     dp = DetectorParameterisationSinglePanel(detector)
-    beam = BeamFactory().make_monochromatic_beam(
+    beam = MonochromaticBeamFactory.make_beam(
         sample_to_source=-1 * (matrix.col((0, 0, -110)) + 10 * d1 + 10 * d2),
         wavelength=1.0,
     )
@@ -267,7 +267,7 @@ def test():
         + shift1 * matrix.col(det[0].get_fast_axis())
         + shift2 * matrix.col(det[0].get_slow_axis())
     )
-    beam = BeamFactory().make_monochromatic_beam(
+    beam = MonochromaticBeamFactory.make_beam(
         sample_to_source=-1.0 * beam_centre, wavelength=1.0
     )
 

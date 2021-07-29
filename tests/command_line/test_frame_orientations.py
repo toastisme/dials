@@ -10,10 +10,15 @@ def test_extract_experiment_data():
     test extraction of data from scan-varying models"""
 
     # Set up an Experiment with idealised geometry
-    from dxtbx.model import BeamFactory, Crystal, GoniometerFactory, SequenceFactory
+    from dxtbx.model import (
+        Crystal,
+        GoniometerFactory,
+        MonochromaticBeamFactory,
+        SequenceFactory,
+    )
     from dxtbx.model.experiment_list import Experiment
 
-    beam = BeamFactory.make_monochromatic_beam(unit_s0=(0, 0, -1), wavelength=1.0)
+    beam = MonochromaticBeamFactory.make_beam(unit_s0=(0, 0, -1), wavelength=1.0)
     goniometer = GoniometerFactory.known_axis((1, 0, 0))
     a = (100, 0, 0)
     b = (0, 90, 0)
