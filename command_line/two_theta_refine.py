@@ -163,7 +163,7 @@ class Script:
                 Experiment(
                     beam=exp.beam,
                     detector=exp.detector,
-                    scan=exp.sequence,
+                    sequence=exp.sequence,
                     goniometer=exp.goniometer,
                     crystal=ref_crystal,
                     imageset=exp.imageset,
