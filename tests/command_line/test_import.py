@@ -554,7 +554,7 @@ def test_with_convert_sequences_to_stills(dials_data, tmpdir):
         assert exp.identifier != ""
 
     # should be no goniometers
-    assert experiments.scans() == [None]
+    assert experiments.sequences() == [None]
     assert experiments.goniometers() == [None]
 
     # should be same number of imagesets as images

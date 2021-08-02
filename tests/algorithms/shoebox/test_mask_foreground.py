@@ -22,7 +22,7 @@ def test(dials_data):
     beam = experiment[0].beam
     detector = experiment[0].detector
     goniometer = experiment[0].goniometer
-    scan = experiment[0].scan
+    scan = experiment[0].sequence
     delta_b = experiment[0].profile.delta_b()
     delta_m = experiment[0].profile.delta_m()
 
@@ -163,7 +163,7 @@ def generate_reflections(detector, beam, scan, experiment, num):
     rlist["bbox"] = rlist.compute_bbox(experiment)
     index = []
     image_size = experiment[0].detector[0].get_image_size()
-    array_range = experiment[0].scan.get_array_range()
+    array_range = experiment[0].sequence.get_array_range()
     bbox = rlist["bbox"]
     for i in range(len(rlist)):
         x0, x1, y0, y1, z0, z1 = bbox[i]
