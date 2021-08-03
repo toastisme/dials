@@ -9,7 +9,7 @@ from typing import Iterable, Tuple
 
 import libtbx
 from dxtbx.format.image import ImageBool
-from dxtbx.imageset import ImageSequence, ImageSet
+from dxtbx.imageset import ImageSet, RotImageSequence, TOFImageSequence
 from dxtbx.model import ExperimentList
 
 from dials.array_family import flex
@@ -61,7 +61,7 @@ class ExtractPixelsFromImage:
         :param index: The index of the image
         """
         # Get the frame number
-        if isinstance(self.imageset, ImageSequence):
+        if isinstance(self.imageset, RotImageSequence):
             frame = self.imageset.get_array_range()[0] + index
         else:
             ind = self.imageset.indices()
@@ -263,8 +263,10 @@ def pixel_list_to_shoeboxes(
     shoeboxes = flex.shoebox()
     spotsizes = flex.size_t()
     hotpixels = tuple(flex.size_t() for i in range(len(imageset.get_detector())))
-    if isinstance(imageset, ImageSequence):
-        twod = imageset.get_scan().is_still()
+    if isinstance(imageset, RotImageSequence):
+        twod = imageset.get_sequence().is_still()
+    elif isinstance(imageset, TOFImageSequence):
+        twod = False
     else:
         twod = True
     for i, (p, hp) in enumerate(zip(pixel_labeller, hotpixels)):
@@ -311,6 +313,8 @@ def shoeboxes_to_reflection_table(
     # Create the observations
     observed = flex.observation(shoeboxes.panels(), centroid, intensity)
 
+    # observed = correct_centroid_positions(observed, shoeboxes)
+
     # Filter the reflections and select only the desired spots
     flags = filter_spots(
         None, sweep=imageset, observations=observed, shoeboxes=shoeboxes
@@ -320,6 +324,28 @@ def shoeboxes_to_reflection_table(
 
     # Return as a reflection list
     return flex.reflection_table(observed, shoeboxes)
+
+
+def correct_centroid_positions(observed, shoeboxes):
+    panel_numbers = sorted({i.panel for i in shoeboxes})
+    max_intensities = []
+    for i in panel_numbers:
+        max_intensities.append(
+            max([sum(j.values()) for j in shoeboxes if j.panel == i])
+        )
+
+    intensities = [sum(i.values()) for i in shoeboxes]
+    peak_coordinates = shoeboxes.peak_coordinates()
+    for count, i in enumerate(shoeboxes):
+        centroid_frame = observed[count].centroid.frame
+        peak_frame = peak_coordinates[count][2]
+        r = intensities[count] / max_intensities[i.panel]
+        m_p = r ** 4
+        m_c = 1 - r
+        M = m_p + m_c
+        new_centroid_frame = ((m_p * peak_frame) + (m_c * centroid_frame)) / M
+        observed[count].centroid.frame = new_centroid_frame
+    return observed
 
 
 def pixel_list_to_reflection_table(
@@ -338,6 +364,7 @@ def pixel_list_to_reflection_table(
         max_spot_size=max_spot_size,
         write_hot_pixel_mask=write_hot_pixel_mask,
     )
+
     # Setup the reflection table converter
     return (
         shoeboxes_to_reflection_table(imageset, shoeboxes, filter_spots=filter_spots),
@@ -421,33 +448,29 @@ class ExtractSpots:
             test_chunksize -= 1
         return chunksize
 
-    def _find_spots(self, imageset):
-        """
-        Find the spots in the imageset
+    def _get_multiprocessing_params(self, num_tasks):
 
-        :param imageset: The imageset to process
-        :return: The list of spot shoeboxes
-        """
         # Change the number of processors if necessary
         mp_nproc = self.mp_nproc
         mp_njobs = self.mp_njobs
         if mp_nproc is libtbx.Auto:
             mp_nproc = available_cores()
             logger.info(f"Setting nproc={mp_nproc}")
-        if mp_nproc * mp_njobs > len(imageset):
-            mp_nproc = min(mp_nproc, len(imageset))
-            mp_njobs = int(math.ceil(len(imageset) / mp_nproc))
+
+        if mp_nproc * mp_njobs > num_tasks:
+            mp_nproc = min(mp_nproc, num_tasks)
+            mp_njobs = int(math.ceil(num_tasks / mp_nproc))
 
         mp_method = self.mp_method
         mp_chunksize = self.mp_chunksize
 
         if mp_chunksize is libtbx.Auto:
             mp_chunksize = self._compute_chunksize(
-                len(imageset), mp_njobs * mp_nproc, self.min_chunksize
+                num_tasks, mp_njobs * mp_nproc, self.min_chunksize
             )
             logger.info("Setting chunksize=%i", mp_chunksize)
 
-        len_by_nproc = int(math.floor(len(imageset) / (mp_njobs * mp_nproc)))
+        len_by_nproc = int(math.floor(num_tasks / (mp_njobs * mp_nproc)))
         if mp_chunksize > len_by_nproc:
             mp_chunksize = len_by_nproc
         if mp_chunksize == 0:
@@ -456,6 +479,20 @@ class ExtractSpots:
         assert mp_njobs > 0, "Invalid number of jobs"
         assert mp_njobs == 1 or mp_method is not None, "Invalid cluster method"
         assert mp_chunksize > 0, "Invalid chunk size"
+
+        return mp_nproc, mp_njobs, mp_chunksize, mp_method
+
+    def _find_spots(self, imageset):
+        """
+        Find the spots in the imageset
+
+        :param imageset: The imageset to process
+        :return: The list of spot shoeboxes
+        """
+
+        mp_nproc, mp_njobs, mp_chunksize, mp_method = self._get_multiprocessing_params(
+            len(imageset)
+        )
 
         # The extract pixels function
         function = ExtractPixelsFromImage(
@@ -696,8 +733,8 @@ class SpotFinder:
             for i, experiment in enumerate(experiments):
                 if experiment.imageset is not imageset:
                     continue
-                if not self.is_stills and experiment.scan:
-                    z0, z1 = experiment.scan.get_array_range()
+                if not self.is_stills and experiment.sequence:
+                    z0, z1 = experiment.sequence.get_array_range()
                     z = table["xyzobs.px.value"].parts()[2]
                     table["id"].set_selected((z > z0) & (z < z1), i)
                     if experiment.identifier:
@@ -737,16 +774,15 @@ class SpotFinder:
         # Check for overloads
         reflections.is_overloaded(experiments)
 
+        # If any of the experiments are ToF experiments, add wavelength data
+        if experiments.contains_tof_experiments():
+            reflections.add_beam_data(experiments)
+
         # Return the reflections
         return reflections
 
-    def _find_spots_in_imageset(self, imageset):
-        """
-        Do the spot finding.
+    def _get_spot_finding_algorithm(self, imageset):
 
-        :param imageset: The imageset to process
-        :return: The observed spots
-        """
         # The input mask
         mask = self.mask_generator(imageset)
         if self.mask is not None:
@@ -771,8 +807,20 @@ class SpotFinder:
             write_hot_pixel_mask=self.write_hot_mask,
         )
 
+        return extract_spots
+
+    def _find_spots_in_imageset(self, imageset):
+        """
+        Do the spot finding.
+
+        :param imageset: The imageset to process
+        :return: The observed spots
+        """
+
+        extract_spots = self._get_spot_finding_algorithm(imageset)
+
         # Get the max scan range
-        if isinstance(imageset, ImageSequence):
+        if ImageSet.is_sequence(imageset):
             max_scan_range = imageset.get_array_range()
         else:
             max_scan_range = (0, len(imageset))

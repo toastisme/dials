@@ -163,8 +163,8 @@ class UnmergedMTZWriter(MTZWriterBase):
 
         i0 = image_range[0]
         for i in range(n_batches):
-            if experiment.scan:
-                phi_start[i], phi_range[i] = experiment.scan.get_image_oscillation(
+            if experiment.sequence:
+                phi_start[i], phi_range[i] = experiment.sequence.get_image_oscillation(
                     i + i0
                 )
 
@@ -174,7 +174,7 @@ class UnmergedMTZWriter(MTZWriterBase):
             # refinement was used
             if not force_static_model and experiment.crystal.num_scan_points > 0:
                 # Get the index of the image in the sequence e.g. first => 0, second => 1
-                image_index = i + i0 - experiment.scan.get_image_range()[0]
+                image_index = i + i0 - experiment.sequence.get_image_range()[0]
                 _unit_cell = experiment.crystal.get_unit_cell_at_scan_point(image_index)
                 _U = matrix.sqr(experiment.crystal.get_U_at_scan_point(image_index))
             else:
@@ -472,16 +472,17 @@ def export_mtz(
 
     # get batch offsets and image ranges - even for scanless experiments
     batch_offsets = [
-        expt.scan.get_batch_offset()
+        expt.sequence.get_batch_offset()
         for expt in experiment_list
-        if expt.scan is not None
+        if expt.sequence is not None
     ]
     unique_offsets = set(batch_offsets)
     if len(set(unique_offsets)) <= 1:
         logger.debug("Calculating new batches")
         batch_offsets = calculate_batch_offsets(experiment_list)
         batch_starts = [
-            e.scan.get_image_range()[0] if e.scan else 0 for e in experiment_list
+            e.sequence.get_image_range()[0] if e.sequence else 0
+            for e in experiment_list
         ]
         effective_offsets = [o + s for o, s in zip(batch_offsets, batch_starts)]
         unique_offsets = set(effective_offsets)
@@ -549,8 +550,8 @@ def export_mtz(
 
         # Calculate whether we have a ROT value for this experiment, and set the column
         _, _, z = experiment.data["xyzcal.px"].parts()
-        if experiment.scan:
-            experiment.data["ROT"] = experiment.scan.get_angle_from_array_index(z)
+        if experiment.sequence:
+            experiment.data["ROT"] = experiment.sequence.get_angle_from_array_index(z)
         else:
             experiment.data["ROT"] = z
 

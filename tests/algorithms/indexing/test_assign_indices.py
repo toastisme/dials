@@ -7,13 +7,13 @@ import pytest
 from cctbx import crystal, sgtbx
 from cctbx.sgtbx import bravais_types
 from dxtbx.format import Format
-from dxtbx.imageset import ImageSequence, ImageSetData
+from dxtbx.imageset import ImageSetData, RotImageSequence
 from dxtbx.model import (
-    BeamFactory,
     Crystal,
     DetectorFactory,
     GoniometerFactory,
-    ScanFactory,
+    MonochromaticBeamFactory,
+    SequenceFactory,
 )
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from dxtbx.serialize import load
@@ -70,7 +70,9 @@ def crystal_factory():
 
 @pytest.fixture
 def experiment():
-    beam = BeamFactory.make_beam(wavelength=0.97625, sample_to_source=(0, 0, 1))
+    beam = MonochromaticBeamFactory.make_beam(
+        wavelength=0.97625, sample_to_source=(0, 0, 1)
+    )
 
     detector = DetectorFactory.simple(
         sensor="PAD",
@@ -85,7 +87,7 @@ def experiment():
 
     goniometer = GoniometerFactory.single_axis()
 
-    scan = ScanFactory.make_scan(
+    scan = SequenceFactory.make_scan(
         image_range=(1, 20),
         exposure_times=0.067,
         oscillation=(82, 0.15),
@@ -95,12 +97,16 @@ def experiment():
     isetdata = ImageSetData(
         reader=Format.Reader(None, ["path"] * len(scan)), masker=None
     )
-    iset = ImageSequence(
-        isetdata, beam=beam, detector=detector, goniometer=goniometer, scan=scan
+    iset = RotImageSequence(
+        isetdata, beam=beam, detector=detector, goniometer=goniometer, sequence=scan
     )
 
     return Experiment(
-        imageset=iset, beam=beam, detector=detector, goniometer=goniometer, scan=scan
+        imageset=iset,
+        beam=beam,
+        detector=detector,
+        goniometer=goniometer,
+        sequence=scan,
     )
 
 
@@ -252,7 +258,7 @@ def test_local_multiple_rotations(dials_data):
         check_format=False,
     )
     # Override the scan range to ensure we have 4 full rotations
-    experiments[0].scan.set_image_range((1, 1440))
+    experiments[0].sequence.set_image_range((1, 1440))
 
     # Generate some predicted reflections
     reflections = flex.reflection_table.from_predictions(experiments[0], dmin=4)
@@ -277,7 +283,7 @@ def test_local_multiple_rotations(dials_data):
     assert (reflections["miller_index"] == predicted_miller_indices).count(False) == 0
 
     # Modify the scan oscillation such that we are out by 1 degree per rotation
-    experiments[0].scan.set_oscillation((0, 1 - 1 / 360), deg=True)
+    experiments[0].sequence.set_oscillation((0, 1 - 1 / 360), deg=True)
 
     # Reset miller indices and re-map to reciprocal space
     reflections["miller_index"] = flex.miller_index(len(reflections), (0, 0, 0))

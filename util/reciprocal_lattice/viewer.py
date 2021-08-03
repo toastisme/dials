@@ -38,6 +38,8 @@ autospin = False
   .type = bool
 model_view_matrix = None
   .type = floats(size=16)
+filter_by_panel = None
+  .type = int
 """,
     process_includes=True,
 )
@@ -100,6 +102,7 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
             self.settings.marker_size = marker_size
         self.settings_panel.marker_size_ctrl.SetValue(self.settings.marker_size)
         self.settings_panel.add_experiments_buttons()
+        self.set_detector_panel_numbers()
 
     def OnActive(self, event):
         if self.IsShown() and type(self.viewer).__name__ != "_wxPyDeadObject":
@@ -171,10 +174,23 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
                 self.settings.partiality_max
             )
 
+    def set_detector_panel_numbers(self):
+        panel_numbers = sorted(list(set(self.reflections["panel"])))
+        panel_numbers = list(map(str, panel_numbers))
+        self.settings_panel.filter_by_panel_ctrl.SetItems(panel_numbers)
+
     def update_settings(self, *args, **kwds):
         detector = self.experiments[0].detector
         beam = self.experiments[0].beam
+        import random
 
+        import numpy as np
+
+        s0 = np.array(
+            (-random.randint(0, 50), -random.randint(0, 50), -random.randint(0, 50))
+        )
+        s0 = s0 / np.linalg.norm(s0)
+        # beam.set_sample_to_source_direction(s0)
         try:
             panel_id, beam_centre = detector.get_ray_intersection(beam.get_s0())
         except RuntimeError:
@@ -183,6 +199,7 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
         else:
             if self.settings.beam_centre != beam_centre:
                 self.set_beam_centre(beam_centre)
+        import random
 
         self.map_points_to_reciprocal_space()
         self.set_points()
@@ -299,6 +316,14 @@ class SettingsWindow(wxtbx.utils.SettingsPanel):
         self.Bind(
             floatspin.EVT_FLOATSPIN, self.OnChangeSettings, self.partiality_max_ctrl
         )
+
+        self.filter_by_panel_ctrl = wx.CheckListBox(parent=self, choices=["1"])
+        box = wx.BoxSizer(wx.HORIZONTAL)
+        self.panel_sizer.Add(box)
+        label = wx.StaticText(self, -1, "Filter by panel")
+        box.Add(label, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        box.Add(self.filter_by_panel_ctrl, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        self.filter_by_panel_ctrl.Bind(wx.EVT_CHECKLISTBOX, self.OnChangeSettings)
 
         ctrls = self.create_controls(
             setting="show_rotation_axis", label="Show rotation axis"
@@ -437,6 +462,7 @@ class SettingsWindow(wxtbx.utils.SettingsPanel):
         self.settings.reverse_phi = self.reverse_phi_ctrl.GetValue()
         self.settings.crystal_frame = self.crystal_frame_ctrl.GetValue()
         self.settings.marker_size = self.marker_size_ctrl.GetValue()
+        self.settings.filter_by_panel = self.filter_by_panel_ctrl.GetCheckedStrings()
         for i, display in enumerate(("all", "indexed", "unindexed", "integrated")):
             if self.btn.values[i]:
                 self.settings.display = display

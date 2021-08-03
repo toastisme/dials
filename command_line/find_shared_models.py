@@ -2,7 +2,7 @@ import datetime
 import logging
 from collections import Counter
 
-from dxtbx.imageset import ImageSequence
+from dxtbx.imageset import RotImageSequence
 from libtbx.phil import parse
 
 from dials.util import log, show_mail_handle_errors, tabulate
@@ -77,18 +77,18 @@ class Script:
         # Get the list of sequences
         sequences = []
         for experiment in experiments:
-            if isinstance(experiment.imageset, ImageSequence):
+            if isinstance(experiment.imageset, RotImageSequence):
                 sequences.append(experiment.imageset)
         logger.info("Number of sequences = %d", len(sequences))
 
         # Sort the sequences by timestamps
         logger.info("Sorting sequences based on timestamp")
-        sequences = sorted(sequences, key=lambda x: x.get_scan().get_epochs()[0])
+        sequences = sorted(sequences, key=lambda x: x.get_sequence().get_epochs()[0])
 
         # Count the number of datasets from each day
         counter = Counter()
         for s in sequences:
-            timestamp = s.get_scan().get_epochs()[0]
+            timestamp = s.get_sequence().get_epochs()[0]
             timestamp = datetime.datetime.fromtimestamp(timestamp)
             timestamp = timestamp.strftime("%Y-%m-%d")
             counter[timestamp] += 1
@@ -128,7 +128,7 @@ class Script:
         # Print a table of possibly shared models
         rows = [["Sequence", "ID", "Beam", "Detector", "Goniometer", "Date", "Time"]]
         for i in range(len(sequences)):
-            timestamp = sequences[i].get_scan().get_epochs()[0]
+            timestamp = sequences[i].get_sequence().get_epochs()[0]
             timestamp = datetime.datetime.fromtimestamp(timestamp)
             date_str = timestamp.strftime("%Y-%m-%d")
             time_str = timestamp.strftime("%H:%M:%S")

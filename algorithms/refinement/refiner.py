@@ -136,6 +136,11 @@ def _copy_experiments_for_refining(experiments):
         new_exp = copy.copy(experiment)
 
         # Ensure every 'refined' attribute is uniquely copied
+
+        # TOF hack
+        # print("TEST performing ToF hack")
+        # experiments[0].beam.set_wavelength(1)
+
         for model in ["beam", "goniometer", "detector", "crystal"]:
             original = getattr(experiment, model)
             if id(original) not in id_memo:
@@ -178,9 +183,9 @@ def _trim_scans_to_observations(experiments, reflections):
             exp_z = obs_z.select(isel)
         else:
             exp_phi = obs_phi.select(isel)
-            exp_z = exp.scan.get_array_index_from_angle(exp_phi, deg=False)
+            exp_z = exp.sequence.get_array_index_from_angle(exp_phi, deg=False)
 
-        start, stop = exp.scan.get_array_range()
+        start, stop = exp.sequence.get_array_range()
         min_exp_z = flex.min(exp_z)
         max_exp_z = flex.max(exp_z)
 
@@ -195,7 +200,7 @@ def _trim_scans_to_observations(experiments, reflections):
         else:
             obs_start = int(min_exp_z)
             obs_stop = int(math.ceil(max_exp_z))
-            half_deg_in_images = int(math.ceil(0.5 / exp.scan.get_oscillation()[1]))
+            half_deg_in_images = int(math.ceil(0.5 / exp.sequence.get_oscillation()[1]))
             obs_start -= half_deg_in_images
             obs_stop += half_deg_in_images
 
@@ -212,13 +217,13 @@ def _trim_scans_to_observations(experiments, reflections):
             )
 
             # Ensure the scan is unique to this experiment and set trimmed limits
-            exp.scan = copy.deepcopy(exp.scan)
+            exp.sequence = copy.deepcopy(exp.sequence)
             new_oscillation = (
-                exp.scan.get_angle_from_image_index(im_start),
-                exp.scan.get_oscillation()[1],
+                exp.sequence.get_angle_from_image_index(im_start),
+                exp.sequence.get_oscillation()[1],
             )
-            exp.scan.set_image_range((im_start, im_stop))
-            exp.scan.set_oscillation(new_oscillation)
+            exp.sequence.set_image_range((im_start, im_stop))
+            exp.sequence.set_oscillation(new_oscillation)
 
     return experiments
 
@@ -243,6 +248,9 @@ class RefinerFactory:
             "flags",
             "shoebox",
             "delpsical.weights",
+            "tof_wavelength",
+            "tof_s0",
+            "tof_unit_s0",
         ]
         # NB xyzobs.px.value & xyzcal.px required by SauterPoon outlier rejector
         # NB delpsical.weights is used by ExternalDelPsiWeightingStrategy
@@ -283,17 +291,17 @@ class RefinerFactory:
         single_as_still = params.refinement.parameterisation.treat_single_image_as_still
         exps_are_stills = []
         for exp in experiments:
-            if exp.scan is None:
+            if exp.sequence is None:
                 exps_are_stills.append(True)
-            elif exp.scan.get_num_images() == 1:
+            elif exp.sequence.get_num_images() == 1:
                 if single_as_still:
                     exps_are_stills.append(True)
-                elif exp.scan.is_still():
+                elif exp.sequence.is_still():
                     exps_are_stills.append(True)
                 else:
                     exps_are_stills.append(False)
             else:
-                if exp.scan.get_oscillation()[1] <= 0.0:
+                if exp.sequence.get_oscillation()[1] <= 0.0:
                     raise DialsRefineConfigError("Cannot refine a zero-width scan")
                 exps_are_stills.append(False)
 
@@ -379,6 +387,17 @@ class RefinerFactory:
 
         # Create model parameterisations
         logger.debug("Building prediction equation parameterisation")
+        """
+        if reflections.contains_valid_tof_data():
+            pred_param = build_prediction_parameterisation(
+                params.refinement.parameterisation,
+                experiments,
+                refman,
+                do_stills,
+                reflections,
+            )
+        else:
+        """
         pred_param = build_prediction_parameterisation(
             params.refinement.parameterisation, experiments, refman, do_stills
         )
@@ -897,7 +916,7 @@ class Refiner:
                 continue
             px_per_mm = [1.0 / e for e in px_size]
 
-            scan = exp.scan
+            scan = exp.sequence
             try:
                 images_per_rad = 1.0 / abs(scan.get_oscillation(deg=False)[1])
             except (AttributeError, ZeroDivisionError):
@@ -929,12 +948,12 @@ class Refiner:
     def print_panel_rmsd_table(self):
         """print useful output about refinement steps in the form of a simple table"""
 
-        if len(self._experiments.scans()) > 1:
+        if len(self._experiments.sequences()) > 1:
             logger.warning(
                 "Multiple scans present. Only the first scan will be used "
                 "to determine the image width for reporting RMSDs"
             )
-        scan = self._experiments.scans()[0]
+        scan = self._experiments.sequences()[0]
         try:
             images_per_rad = 1.0 / abs(scan.get_oscillation(deg=False)[1])
         except AttributeError:
@@ -998,18 +1017,18 @@ class Refiner:
         ####################################
 
         logger.debug("\nExperimental models before refinement:")
-        for i, beam in enumerate(self._experiments.beams()):
-            logger.debug(ordinal_number(i) + " " + str(beam))
+        # for i, beam in enumerate(self._experiments.beams()):
+        #    logger.debug(ordinal_number(i) + " " + str(beam))
         for i, detector in enumerate(self._experiments.detectors()):
             logger.debug(ordinal_number(i) + " " + str(detector))
         for i, goniometer in enumerate(self._experiments.goniometers()):
             if goniometer is None:
                 continue
             logger.debug(ordinal_number(i) + " " + str(goniometer))
-        for i, scan in enumerate(self._experiments.scans()):
-            if scan is None:
+        for i, sequence in enumerate(self._experiments.sequences()):
+            if sequence is None:
                 continue
-            logger.debug(ordinal_number(i) + " " + str(scan))
+            logger.debug(ordinal_number(i) + " " + str(sequence))
         for i, crystal in enumerate(self._experiments.crystals()):
             logger.debug(ordinal_number(i) + " " + str(crystal))
 
@@ -1029,18 +1048,18 @@ class Refiner:
         self._update_models()
 
         logger.debug("\nExperimental models after refinement:")
-        for i, beam in enumerate(self._experiments.beams()):
-            logger.debug(ordinal_number(i) + " " + str(beam))
+        # for i, beam in enumerate(self._experiments.beams()):
+        #    logger.debug(ordinal_number(i) + " " + str(beam))
         for i, detector in enumerate(self._experiments.detectors()):
             logger.debug(ordinal_number(i) + " " + str(detector))
         for i, goniometer in enumerate(self._experiments.goniometers()):
             if goniometer is None:
                 continue
             logger.debug(ordinal_number(i) + " " + str(goniometer))
-        for i, scan in enumerate(self._experiments.scans()):
-            if scan is None:
+        for i, sequence in enumerate(self._experiments.sequences()):
+            if sequence is None:
                 continue
-            logger.debug(ordinal_number(i) + " " + str(scan))
+            logger.debug(ordinal_number(i) + " " + str(sequence))
         for i, crystal in enumerate(self._experiments.crystals()):
             logger.debug(ordinal_number(i) + " " + str(crystal))
 
@@ -1099,7 +1118,7 @@ class ScanVaryingRefiner(Refiner):
 
     def _update_models(self):
         for iexp, exp in enumerate(self._experiments):
-            ar_range = exp.scan.get_array_range()
+            ar_range = exp.sequence.get_array_range()
             obs_image_numbers = list(range(ar_range[0], ar_range[1] + 1))
 
             # write scan-varying s0 vectors back to beam models

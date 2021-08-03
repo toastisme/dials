@@ -92,8 +92,8 @@ def run_single(experiments1, filename):
             )
 
         # Check the scan
-        s1 = exp1.scan
-        s2 = exp2.scan
+        s1 = exp1.sequence
+        s2 = exp2.sequence
         if s1 is None:
             assert s2 is None
         else:
@@ -138,7 +138,7 @@ def run_single(experiments1, filename):
                 id(exp1.beam),
                 id(exp1.detector),
                 id(exp1.goniometer),
-                id(exp1.scan),
+                id(exp1.sequence),
                 id(exp1.crystal),
             )
         )
@@ -148,7 +148,7 @@ def run_single(experiments1, filename):
                 id(exp2.beam),
                 id(exp2.detector),
                 id(exp2.goniometer),
-                id(exp2.scan),
+                id(exp2.sequence),
                 id(exp2.crystal),
             )
         )

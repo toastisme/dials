@@ -20,7 +20,7 @@
 
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dxtbx/model/crystal.h>
 
 #include <dials/model/data/mask_code.h>
@@ -42,7 +42,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::Beam;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -72,7 +72,7 @@ namespace dials { namespace algorithms {
      * @param delta_b The beam divergence
      * @param delta_m The mosaicity
      */
-    GaussianRSMaskCalculator(const BeamBase &beam,
+    GaussianRSMaskCalculator(const MonochromaticBeam &beam,
                              const Detector &detector,
                              const Goniometer &gonio,
                              const Scan &scan,

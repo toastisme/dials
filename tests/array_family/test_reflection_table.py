@@ -1415,7 +1415,7 @@ def test_map_centroids_to_reciprocal_space(dials_regression):
 
     # pretend this is a still and hence no scan or goniometer
     expts[0].goniometer = None
-    expts[0].scan = None
+    expts[0].sequence = None
     refl1.centroid_px_to_mm(expts)
     refl1.map_centroids_to_reciprocal_space(expts)
 
@@ -1547,3 +1547,31 @@ def test_match_mismatched_sizes():
 
     for _a, _b in zip(a_["xyz"], b_["xyz"]):
         assert _a == pytest.approx(_b)
+
+
+def test_contains_valid_tof_data():
+
+    # Test empty table
+    table = flex.reflection_table()
+    assert table.contains_valid_tof_data() is False
+
+    # Test table with only tof_wavelength with invalid values
+    tof_wavelength = flex.double(2)
+    tof_s0 = flex.vec3_double(2)
+    table["tof_wavelength"] = tof_wavelength
+    assert table.contains_valid_tof_data() is False
+
+    # TEST table with only tof_wavelength with valid values
+    table["tof_wavelength"][0] = 0.1
+    table["tof_wavelength"][1] = 0.2
+    assert table.contains_valid_tof_data() is False
+
+    # Test table with tof_wavelength and tof_s0, but tof_s0 has
+    # invalid values
+    table["tof_s0"] = tof_s0
+    assert table.contains_valid_tof_data() is False
+
+    # Test table with valid values for tof_wavelength and tof_s0
+    table["tof_s0"][0] = (0, 0, 1)
+    table["tof_s0"][1] = (0, 0, 1)
+    assert table.contains_valid_tof_data() is True

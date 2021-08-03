@@ -91,13 +91,13 @@ def sequence_to_stills(experiments, reflections, params):
             experiment.goniometer.get_setting_rotation()
         )
         goniometer_axis = matrix.col(experiment.goniometer.get_rotation_axis())
-        step = experiment.scan.get_oscillation()[1]
+        step = experiment.sequence.get_oscillation()[1]
 
         refls = reflections.select(reflections["id"] == expt_id)
         _, _, _, _, z1, z2 = refls["bbox"].parts()
 
         # Create an experiment for each scanpoint
-        for i_scan_point in range(*experiment.scan.get_array_range()):
+        for i_scan_point in range(*experiment.sequence.get_array_range()):
             if params.max_scan_points and i_scan_point >= params.max_scan_points:
                 break
             # The A matrix is the goniometer setting matrix for this scan point
@@ -109,7 +109,7 @@ def sequence_to_stills(experiments, reflections, params):
             # by a further half oscillation step.
             A = (
                 goniometer_axis.axis_and_angle_as_r3_rotation_matrix(
-                    angle=experiment.scan.get_angle_from_array_index(i_scan_point)
+                    angle=experiment.sequence.get_angle_from_array_index(i_scan_point)
                     + (step / 2),
                     deg=True,
                 )

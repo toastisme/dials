@@ -25,6 +25,7 @@
 #include <scitbx/vec3.h>
 #include <scitbx/vec2.h>
 #include <cctbx/miller.h>
+#include <dxtbx/model/beam.h>
 
 namespace dials { namespace af { namespace boost_python {
 

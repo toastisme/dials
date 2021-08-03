@@ -50,7 +50,7 @@ class ProfileModelFactory:
                     expr.beam,
                     expr.detector,
                     expr.goniometer,
-                    expr.scan,
+                    expr.sequence,
                 )
         else:
             for expr in experiments:
@@ -61,7 +61,7 @@ class ProfileModelFactory:
                     expr.beam,
                     expr.detector,
                     expr.goniometer,
-                    expr.scan,
+                    expr.sequence,
                     expr.profile,
                 )
         return experiments

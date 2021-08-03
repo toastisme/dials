@@ -18,7 +18,7 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
 #include <dxtbx/model/goniometer.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
 #include <dials/algorithms/profile_model/gaussian_rs/coordinate_system.h>
 #include <ctime>
@@ -27,7 +27,7 @@
 namespace dials { namespace algorithms {
 
   using dials::model::Foreground;
-  using dxtbx::model::BeamBase;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -41,7 +41,7 @@ namespace dials { namespace algorithms {
    * space.
    */
   int simulate_reciprocal_space_gaussian(
-    const BeamBase &beam,
+    const MonochromaticBeam &beam,
     const Detector &detector,
     const Goniometer &goniometer,
     const Scan &scan,
@@ -108,7 +108,7 @@ namespace dials { namespace algorithms {
    * space. Estimate the expected intensity within the masked region.
    */
   int integrate_reciprocal_space_gaussian(
-    const BeamBase &beam,
+    const MonochromaticBeam &beam,
     const Detector &detector,
     const Goniometer &goniometer,
     const Scan &scan,

@@ -42,7 +42,7 @@ def generate_reflections(experiments):
     indices = index_generator.to_array()
 
     # Predict rays within the sequence range
-    scan = experiments[0].scan
+    scan = experiments[0].sequence
     sequence_range = scan.get_oscillation_range(deg=False)
     ray_predictor = ScansRayPredictor(experiments, sequence_range)
     obs_refs = ray_predictor(indices)
@@ -97,9 +97,9 @@ def test_fd_derivatives():
     mybeam = models.beam
 
     # Build a mock scan for a 72 degree sequence
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     myscan = sf.make_scan(
         image_range=(1, 720),
         exposure_times=0.1,
@@ -122,7 +122,7 @@ def test_fd_derivatives():
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal,
             imageset=None,
         )
@@ -222,9 +222,9 @@ def test_refinement(dials_regression):
     goniometer = GoniometerFactory.known_axis((1.0, 0.0, 0.0))
 
     # Build a mock scan for a 180 degree sequence
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(1, 1800),
         exposure_times=0.1,
@@ -244,7 +244,7 @@ def test_refinement(dials_regression):
             beam=beam,
             detector=detector,
             goniometer=goniometer,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             imageset=None,
         )

@@ -12,7 +12,7 @@ def predict_reflections(sequence, crystal):
     beam = sequence.get_beam()
     detector = sequence.get_detector()
     gonio = sequence.get_goniometer()
-    scan = sequence.get_scan()
+    scan = sequence.get_sequence()
 
     sigma_b = beam.get_sigma_divergence(deg=True)
     sigma_m = crystal.get_mosaicity(deg=True)
@@ -24,7 +24,7 @@ def predict_reflections(sequence, crystal):
             beam=beam,
             detector=detector,
             goniometer=gonio,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             profile=Model(None, 3, sigma_b, sigma_m, deg=True),
         )

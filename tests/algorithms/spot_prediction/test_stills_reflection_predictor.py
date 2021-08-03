@@ -8,10 +8,16 @@ from scitbx import matrix
 class Model:
     def __init__(self, test_nave_model=False):
         # Set up experimental models with regular geometry
-        from dxtbx.model import BeamFactory, DetectorFactory, GoniometerFactory
+        from dxtbx.model import (
+            DetectorFactory,
+            GoniometerFactory,
+            MonochromaticBeamFactory,
+        )
 
         # Beam along the Z axis
-        self.beam = BeamFactory.make_beam(unit_s0=matrix.col((0, 0, 1)), wavelength=1.0)
+        self.beam = MonochromaticBeamFactory.make_beam(
+            unit_s0=matrix.col((0, 0, 1)), wavelength=1.0
+        )
 
         # Goniometer (used only for index generation) along X axis
         self.goniometer = GoniometerFactory.known_axis(matrix.col((1, 0, 0)))
@@ -58,7 +64,7 @@ class Model:
             beam=self.beam,
             detector=self.detector,
             goniometer=None,
-            scan=None,
+            sequence=None,
             crystal=self.crystal,
             imageset=None,
         )

@@ -37,9 +37,9 @@ def create_experiments(image_start=1):
     beam = models.beam
 
     # Build a mock scan for a 72 degree sequence
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(image_start, image_start + 720 - 1),
         exposure_times=0.1,
@@ -58,7 +58,7 @@ def create_experiments(image_start=1):
             beam=beam,
             detector=detector,
             goniometer=goniometer,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             imageset=None,
         )
@@ -90,7 +90,7 @@ def generate_reflections(experiments):
     indices = index_generator.to_array()
 
     # Predict rays within the sequence range
-    scan = experiments[0].scan
+    scan = experiments[0].sequence
     sequence_range = scan.get_oscillation_range(deg=False)
     ray_predictor = ScansRayPredictor(experiments, sequence_range)
     obs_refs = ray_predictor(indices)
@@ -121,14 +121,14 @@ def test_per_width_and_per_image_are_equivalent():
     phi_obs = reflections["xyzobs.mm.value"].parts()[2] * 180.0 / pi
     z_cal = reflections["xyzcal.px"].parts()[2]
     for phi, z in zip(phi_obs, z_cal):
-        z2 = experiments[0].scan.get_array_index_from_angle(phi, deg=True)
+        z2 = experiments[0].sequence.get_array_index_from_angle(phi, deg=True)
         assert z == pytest.approx(z2)
 
     # Set blocks with per_width
     from copy import deepcopy
 
     block_calculator = BlockCalculator(experiments, deepcopy(reflections))
-    im_width = experiments[0].scan.get_oscillation(deg=False)[1]
+    im_width = experiments[0].sequence.get_oscillation(deg=False)[1]
     r_pw = block_calculator.per_width(im_width, deg=False)
 
     # Set blocks with per_image
@@ -148,19 +148,19 @@ def test_per_width_and_per_image_are_equivalent():
     assert len(reflections100) == len(reflections)
     for a, b in zip(reflections.rows(), reflections100.rows()):
         assert a["xyzcal.mm"] == b["xyzcal.mm"]
-    assert experiments[0].scan.get_oscillation(deg=False)[1] == im_width
+    assert experiments[0].sequence.get_oscillation(deg=False)[1] == im_width
     reflections = reflections100
 
     # Check scan is consistent with the reflections
     phi_obs = reflections["xyzobs.mm.value"].parts()[2] * 180.0 / pi
     z_cal = reflections["xyzcal.px"].parts()[2]
     for phi, z in zip(phi_obs, z_cal):
-        z2 = experiments[0].scan.get_array_index_from_angle(phi, deg=True)
+        z2 = experiments[0].sequence.get_array_index_from_angle(phi, deg=True)
         assert z == pytest.approx(z2)
 
     # Set blocks with per_width
     block_calculator = BlockCalculator(experiments, deepcopy(reflections))
-    assert experiments[0].scan.get_oscillation(deg=False)[1] == im_width
+    assert experiments[0].sequence.get_oscillation(deg=False)[1] == im_width
     r_pw_ = block_calculator.per_width(im_width, deg=False)
 
     # Block centres should have all increased by 99.0

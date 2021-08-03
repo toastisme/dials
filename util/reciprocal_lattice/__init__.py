@@ -59,7 +59,10 @@ class Render3d:
     def load_models(self, experiments, reflections):
         self.experiments = experiments
         self.reflections_input = reflections
-        if self.experiments[0].goniometer is not None:
+        if (
+            self.experiments[0].goniometer is not None
+            and "tof_wavelength" not in reflections
+        ):
             self.viewer.set_rotation_axis(
                 self.experiments[0].goniometer.get_rotation_axis()
             )
@@ -220,6 +223,16 @@ class Render3d:
                 reflections = reflections.select(p <= self.settings.partiality_max)
             else:
                 self.settings.partiality_max = flex.max(p)
+        """
+        if (
+            self.settings.filter_by_panel is not None
+            and len(self.settings.filter_by_panel) > 0
+        ):
+            panel_sel = reflections["panel"] == 42
+            for i in list(map(int, self.settings.filter_by_panel)):
+                panel_sel |= reflections["panel"] == i
+            reflections = reflections.select(panel_sel)
+        """
         points = reflections["rlp"] * 100
         self.viewer.set_points(points)
         self.viewer.set_points_data(reflections)

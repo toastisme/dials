@@ -16,7 +16,7 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
 #include <dxtbx/model/goniometer.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/algorithms/profile_model/modeller/sampler_interface.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
 #include <scitbx/constants.h>
@@ -24,7 +24,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::BeamBase;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Panel;
@@ -45,7 +45,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialise the sampler
      */
-    EwaldSphereSampler(const boost::shared_ptr<BeamBase> beam,
+    EwaldSphereSampler(const boost::shared_ptr<MonochromaticBeam> beam,
                        const Detector &detector,
                        const Goniometer &goniometer,
                        const Scan &scan,
@@ -314,7 +314,7 @@ namespace dials { namespace algorithms {
       return coord_[index];
     }
 
-    boost::shared_ptr<BeamBase> beam() const {
+    boost::shared_ptr<MonochromaticBeam> beam() const {
       return beam_;
     }
 
@@ -340,7 +340,7 @@ namespace dials { namespace algorithms {
       return par_sum + iy + iz * tot_sum;
     }
 
-    boost::shared_ptr<BeamBase> beam_;
+    boost::shared_ptr<MonochromaticBeam> beam_;
     Detector detector_;
     Goniometer goniometer_;
     Scan scan_;

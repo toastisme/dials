@@ -431,7 +431,7 @@ class IntegrationJob:
         nice = select_ice.count(True)
         nint = select_int.count(True)
         ntot = len(self.reflections)
-        frame0, frame1 = imageset.get_scan().get_array_range()
+        frame0, frame1 = imageset.get_sequence().get_array_range()
 
         # Write some output
         logger.info(" Beginning integration job %d", self.index)
@@ -671,7 +671,7 @@ class IntegrationManager:
                 )
                 block_size = max_block_size
         else:
-            scan = self.experiments[0].scan
+            scan = self.experiments[0].sequence
             if block.units == "radians":
                 phi0, dphi = scan.get_oscillation(deg=False)
                 block_size = int(math.ceil(block.size / dphi))
@@ -732,7 +732,7 @@ class IntegrationManager:
             ]
             for i in range(len(self)):
                 f0, f1 = self.manager.job(i)
-                scan = self.experiments[0].scan
+                scan = self.experiments[0].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 n = self.manager.num_reflections(i)
@@ -879,7 +879,7 @@ class ReferenceCalculatorJob:
         nice = select_ice.count(True)
         nint = select_int.count(True)
         ntot = len(self.reflections)
-        frame0, frame1 = imageset.get_scan().get_array_range()
+        frame0, frame1 = imageset.get_sequence().get_array_range()
 
         # Write some output
         logger.info(" Beginning integration job %d", self.index)
@@ -1142,7 +1142,7 @@ class ReferenceCalculatorManager:
                 )
                 block_size = max_block_size
         else:
-            scan = self.experiments[0].scan
+            scan = self.experiments[0].sequence
             if block.units == "radians":
                 phi0, dphi = scan.get_oscillation(deg=False)
                 block_size = int(math.ceil(block.size / dphi))
@@ -1200,7 +1200,7 @@ class ReferenceCalculatorManager:
             ]
             for i in range(len(self)):
                 f0, f1 = self.manager.job(i)
-                scan = self.experiments[0].scan
+                scan = self.experiments[0].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 n = self.manager.num_reflections(i)

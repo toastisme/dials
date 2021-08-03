@@ -15,7 +15,7 @@ class Data:
         self.experiments[0].imageset.set_beam(self.experiments[0].beam)
         self.experiments[0].imageset.set_detector(self.experiments[0].detector)
         self.experiments[0].imageset.set_goniometer(self.experiments[0].goniometer)
-        self.experiments[0].imageset.set_scan(self.experiments[0].scan)
+        self.experiments[0].imageset.set_sequence(self.experiments[0].sequence)
 
         reflection_filename = os.path.join(
             dials_regression, "prediction_test_data", "expected_reflections.pickle"

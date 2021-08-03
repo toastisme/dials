@@ -49,7 +49,25 @@ class NaveParameters:
             miller_indices = self.reflections["miller_index"].select(
                 self.reflections["id"] == iid
             )
+            """
+            if self.reflections.contains_valid_tof_data():
+                import scitbx_array_family_flex_ext
 
+                import cctbx.array_family.flex
+
+                wavelengths = self.reflections["tof_wavelength"].select(
+                    self.reflections["id"] == iid
+                )
+                two_thetas = scitbx_array_family_flex_ext.double(len(wavelengths))
+                for i in range(len(miller_indices)):
+                    miller_index = cctbx.array_family.flex.miller_index(1)
+                    miller_index[0] = miller_indices[i]
+                    two_thetas[i] = crystal.get_unit_cell().two_theta(
+                        miller_index, wavelengths[i], deg=True
+                    )[0]
+
+            else:
+            """
             # FIXME XXX revise this formula so as to use a different wavelength potentially for each reflection
             two_thetas = crystal.get_unit_cell().two_theta(
                 miller_indices, beam.get_wavelength(), deg=True
@@ -173,6 +191,7 @@ class NaveParameters:
                 crystal.get_domain_size_ang() / model_expansion_factor
             )
 
+            # if not self.reflections.contains_valid_tof_data():
             if (
                 self.ewald_proximal_volume(iid)
                 > self.params.indexing.stills.ewald_proximal_volume_max
@@ -184,6 +203,19 @@ class NaveParameters:
 
             all_crystals.append(crystal)
         return all_crystals
+
+    def tof_ewald_proximal_volume(self, expt_id=0):
+        assert (
+            self.reflections.contains_valid_tof_data()
+        ), "Reflection table does not contain valid tof data"
+        ewald_proximal_volumes = []
+        sel_expt = self.reflections["id"] == expt_id
+        wavelengths = self.reflections["tof_wavelength"].select(sel_expt)
+        for i in wavelengths:
+            self.experiments[expt_id].beam.set_wavelength(i)
+            ewald_proximal_volumes.append(self.ewald_proximal_volume(expt_id))
+        self.experiments[expt_id].beam.set_wavelength(0)
+        return ewald_proximal_volumes
 
     def ewald_proximal_volume(self, expt_id=0):
         """computes the volume of reciprocal space (actually, half the volume, in this implementation) in which

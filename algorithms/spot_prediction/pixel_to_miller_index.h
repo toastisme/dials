@@ -14,13 +14,13 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
 #include <dxtbx/model/goniometer.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dxtbx/model/crystal.h>
 #include <dials/error.h>
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::BeamBase;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::CrystalBase;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
@@ -37,7 +37,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialize with models
      */
-    PixelToMillerIndex(const BeamBase &beam,
+    PixelToMillerIndex(const MonochromaticBeam &beam,
                        const Detector &detector,
                        const Goniometer &goniometer,
                        const Scan &scan,
@@ -53,7 +53,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialize with models
      */
-    PixelToMillerIndex(const BeamBase &beam,
+    PixelToMillerIndex(const MonochromaticBeam &beam,
                        const Detector &detector,
                        const CrystalBase &crystal)
         : detector_(detector),

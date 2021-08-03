@@ -17,7 +17,7 @@
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/goniometer.h>
 #include <dxtbx/model/detector.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/model/data/shoebox.h>
 #include <dials/model/data/image_volume.h>
 #include <dials/algorithms/profile_model/gaussian_rs/coordinate_system.h>
@@ -36,7 +36,7 @@ namespace dials {
   using dials::model::Overlapped;
   using dials::model::Shoebox;
   using dials::model::Valid;
-  using dxtbx::model::BeamBase;
+  using dxtbx::model::MonochromaticBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Panel;
@@ -85,7 +85,7 @@ namespace dials {
      * @param delta_b nsigma * sigma_divergence
      * @param delta_m nsigma * mosaicity
      */
-    MaskCalculator3D(const BeamBase &beam,
+    MaskCalculator3D(const MonochromaticBeam &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
                      const Scan &scan,
@@ -115,7 +115,7 @@ namespace dials {
      * @param delta_b nsigma * sigma_divergence
      * @param delta_m nsigma * mosaicity
      */
-    MaskCalculator3D(const BeamBase &beam,
+    MaskCalculator3D(const MonochromaticBeam &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
                      const Scan &scan,
@@ -515,7 +515,7 @@ namespace dials {
      * @param delta_b nsigma * sigma_divergence
      * @param delta_m nsigma * mosaicity
      */
-    MaskCalculator2D(const BeamBase &beam,
+    MaskCalculator2D(const MonochromaticBeam &beam,
                      const Detector &detector,
                      double delta_b,
                      double delta_m)

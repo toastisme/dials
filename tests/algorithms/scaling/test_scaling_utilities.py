@@ -326,7 +326,7 @@ def test_equality_of_two_harmonic_table_methods(dials_data):
 
     reflection_table["phi"] = (
         reflection_table["xyzobs.px.value"].parts()[2]
-        * experiment.scan.get_oscillation()[1]
+        * experiment.sequence.get_oscillation()[1]
     )
     reflection_table = calc_crystal_frame_vectors(reflection_table, experiment)
     theta_phi_0 = calc_theta_phi(reflection_table["s0c"])  # array of tuples in radians

@@ -249,9 +249,9 @@ def test():
     mybeam = models.beam
 
     # Build a mock scan for a 3 degree sequence
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
 
-    sf = ScanFactory()
+    sf = SequenceFactory()
     myscan = sf.make_scan(
         image_range=(1, 1),
         exposure_times=0.1,
@@ -274,7 +274,7 @@ def test():
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal,
             imageset=None,
         )

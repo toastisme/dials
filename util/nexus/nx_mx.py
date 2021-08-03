@@ -34,13 +34,13 @@ def convert_to_nexus_beam_direction(experiments):
         exp.beam_id = id(exp.beam)
         exp.detector_id = id(exp.detector)
         exp.goniometer_id = id(exp.goniometer)
-        exp.scan_id = id(exp.scan)
+        exp.scan_id = id(exp.sequence)
         exp.crystal_id = id(exp.crystal)
         exp2 = Dummy()
         exp2.beam_id = id(exp.beam)
         exp2.detector_id = id(exp.detector)
         exp2.goniometer_id = id(exp.goniometer)
-        exp2.scan_id = id(exp.scan)
+        exp2.scan_id = id(exp.sequence)
         exp2.crystal_id = id(exp.crystal)
         experiments2.append(exp2)
 
@@ -49,7 +49,7 @@ def convert_to_nexus_beam_direction(experiments):
         exp2.beam = deepcopy(exp.beam)
         exp2.detector = deepcopy(exp.detector)
         exp2.goniometer = deepcopy(exp.goniometer)
-        exp2.scan = deepcopy(exp.scan)
+        exp2.sequence = deepcopy(exp.sequence)
         exp2.crystal = deepcopy(exp.crystal)
         exp2.imageset = exp.imageset
     experiments = experiments2
@@ -485,7 +485,7 @@ def dump_details(entry):
 
 
 def load_beam(entry):
-    from dxtbx.model import Beam
+    from dxtbx.model import MonochromaticBeam
 
     EPS = 1e-7
 
@@ -498,7 +498,7 @@ def load_beam(entry):
     assert n.dot(matrix.col((0, 0, -1))) < EPS
 
     # Return the beam model
-    return Beam((0, 0, -1), wavelength, 0, 0, n, p, 0, 1)
+    return MonochromaticBeam((0, 0, -1), wavelength, 0, 0, n, p, 0, 1)
 
 
 def load_detector(entry):
@@ -708,7 +708,7 @@ def load_crystal(entry):
 
 
 def dump(entry, experiments, params):
-    from dxtbx.imageset import ImageSequence
+    from dxtbx.imageset import RotImageSequence
 
     print("Dumping NXmx")
 
@@ -745,7 +745,7 @@ def dump(entry, experiments, params):
         nx_dials["index"].attrs["detector"] = experiment.detector_id
         if experiment.goniometer is not None:
             nx_dials["index"].attrs["goniometer"] = experiment.goniometer_id
-        if experiment.scan is not None:
+        if experiment.sequence is not None:
             nx_dials["index"].attrs["scan"] = experiment.scan_id
         nx_dials["index"].attrs["sample"] = experiment.crystal_id
 
@@ -761,15 +761,19 @@ def dump(entry, experiments, params):
         # Create the imageset template
         if experiment.imageset is None:
             nx_dials["template"] = ""
-            if experiment.scan is not None:
-                nx_dials["template"].attrs["range"] = experiment.scan.get_image_range()
+            if experiment.sequence is not None:
+                nx_dials["template"].attrs[
+                    "range"
+                ] = experiment.sequence.get_image_range()
         else:
             from os.path import abspath
 
-            if isinstance(experiment.imageset, ImageSequence):
+            if isinstance(experiment.imageset, RotImageSequence):
                 template = abspath(experiment.imageset.get_template())
                 nx_dials["template"] = template
-                nx_dials["template"].attrs["range"] = experiment.scan.get_image_range()
+                nx_dials["template"].attrs[
+                    "range"
+                ] = experiment.sequence.get_image_range()
             else:
                 template = [
                     abspath(experiment.imageset.get_path(i))
@@ -791,10 +795,10 @@ def dump(entry, experiments, params):
             experiment.detector,
             experiment.beam,
             experiment.imageset,
-            experiment.scan,
+            experiment.sequence,
         )
-        dump_goniometer(nxmx, experiment.goniometer, experiment.scan)
-        dump_crystal(nxmx, experiment.crystal, experiment.scan)
+        dump_goniometer(nxmx, experiment.goniometer, experiment.sequence)
+        dump_crystal(nxmx, experiment.crystal, experiment.sequence)
 
         # Add instrument name and source
         nx_instrument = get_nx_instrument(nxmx, "instrument")
@@ -903,14 +907,14 @@ def load(entry, exp_index):
         experiment.beam = load_beam(nxmx)
         experiment.detector = load_detector(nxmx)
         experiment.goniometer = load_goniometer(nxmx)
-        experiment.scan = load_scan(nxmx)
+        experiment.sequence = load_scan(nxmx)
         experiment.crystal = load_crystal(nxmx)
 
         # Set the image range
-        if image_range is not None and experiment.scan is not None:
+        if image_range is not None and experiment.sequence is not None:
             num = image_range[1] - image_range[0] + 1
-            assert num == len(experiment.scan)
-            experiment.scan.set_image_range([int(x) for x in image_range])
+            assert num == len(experiment.sequence)
+            experiment.sequence.set_image_range([int(x) for x in image_range])
 
         # Return the experiment list
         experiment_list.append(experiment)

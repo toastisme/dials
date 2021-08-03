@@ -15,7 +15,7 @@ def test(dials_data):
         experiments[0].beam,
         experiments[0].detector,
         experiments[0].goniometer,
-        experiments[0].scan,
+        experiments[0].sequence,
         experiments[0].crystal,
     )
 

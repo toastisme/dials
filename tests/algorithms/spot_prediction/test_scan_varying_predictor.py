@@ -7,7 +7,7 @@ predictor.
 import math
 
 from cctbx.sgtbx import space_group, space_group_symbols
-from dxtbx.model import ScanFactory
+from dxtbx.model import SequenceFactory
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from libtbx.phil import parse
 from libtbx.test_utils import approx_equal
@@ -40,7 +40,7 @@ def setup_models(args):
     beam = models.beam
 
     # Build a mock scan for a 180 degree sequence
-    sf = ScanFactory()
+    sf = SequenceFactory()
     scan = sf.make_scan(
         image_range=(1, 180),
         exposure_times=0.1,
@@ -59,7 +59,7 @@ def setup_models(args):
             beam=beam,
             detector=detector,
             goniometer=goniometer,
-            scan=scan,
+            sequence=scan,
             crystal=crystal,
             imageset=None,
         )
@@ -74,7 +74,7 @@ def ref_gen_static(experiments):
     beam = experiments[0].beam
     crystal = experiments[0].crystal
     detector = experiments[0].detector
-    scan = experiments[0].scan
+    scan = experiments[0].sequence
 
     # All indices to the detector max resolution
     dmin = detector.get_max_resolution(beam.get_s0())
@@ -107,7 +107,7 @@ def ref_gen_varying(experiments):
     beam = experiments[0].beam
     crystal = experiments[0].crystal
     detector = experiments[0].detector
-    scan = experiments[0].scan
+    scan = experiments[0].sequence
 
     # We need a UB matrix at the beginning of every image, and at the end of the
     # last image. These are all the same - we want to compare the scan-varying

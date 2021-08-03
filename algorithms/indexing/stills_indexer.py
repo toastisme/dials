@@ -380,7 +380,7 @@ class StillsIndexer(Indexer):
                     expt.detector = refined_expt.detector
                     expt.beam = refined_expt.beam
                     expt.goniometer = refined_expt.goniometer
-                    expt.scan = refined_expt.scan
+                    expt.sequence = refined_expt.sequence
                     refined_expt.imageset = expt.imageset
 
             if not (
@@ -445,7 +445,7 @@ class StillsIndexer(Indexer):
                     beam=imageset.get_beam(),
                     detector=imageset.get_detector(),
                     goniometer=imageset.get_goniometer(),
-                    scan=imageset.get_scan(),
+                    sequence=imageset.get_sequence(),
                     crystal=crystal,
                 )
             )
@@ -512,6 +512,7 @@ class StillsIndexer(Indexer):
                         reflections=indexed,
                         graph_verbose=False,
                     )
+
                     ref_experiments = R.get_experiments()
 
                     # try to improve the outcome with a second round of outlier rejection post-initial refinement:
@@ -541,6 +542,16 @@ class StillsIndexer(Indexer):
                         reflections=indexed,
                         graph_verbose=False,
                     )
+
+                    """
+                    if indexed.contains_valid_tof_data():
+                        R._experiments[0].beam.set_wavelength(1)
+                        ref_experiments = R.get_experiments()
+                        R._experiments[0].beam.set_wavelength(0)
+                        ref_experiments[0].beam.set_wavelength(0)
+
+                    else:
+                    """
                     ref_experiments = R.get_experiments()
 
                     nv = NaveParameters(
@@ -587,6 +598,21 @@ class StillsIndexer(Indexer):
                         "$$$ stills_indexer::choose_best_orientation_matrix, candidate %d done",
                         icm,
                     )
+                    """
+                    if nv.reflections.contains_valid_tof_data():
+                        candidates.append(
+                            CandidateInfo(
+                                crystal=crystal_model,
+                                green_curve_area=nv.green_curve_area,
+                                ewald_proximal_volume=nv.tof_ewald_proximal_volume(),
+                                n_indexed=len(indexed),
+                                rmsd=rmsd,
+                                indexed=indexed,
+                                experiments=ref_experiments,
+                            )
+                        )
+                    else:
+                    """
                     candidates.append(
                         CandidateInfo(
                             crystal=crystal_model,
@@ -719,6 +745,16 @@ class StillsIndexer(Indexer):
             reflections=reflections,
             graph_verbose=False,
         )
+
+        """
+        if reflections.contains_valid_tof_data():
+            R._experiments[0].beam.set_wavelength(1)
+            ref_experiments = R.get_experiments()
+            R._experiments[0].beam.set_wavelength(0)
+            ref_experiments[0].beam.set_wavelength(0)
+
+        else:
+        """
         ref_experiments = R.get_experiments()
 
         # try to improve the outcome with a second round of outlier rejection post-initial refinement:
@@ -744,6 +780,15 @@ class StillsIndexer(Indexer):
             reflections=reflections,
             graph_verbose=False,
         )
+        """
+        if reflections.contains_valid_tof_data():
+            R._experiments[0].beam.set_wavelength(1)
+            ref_experiments = R.get_experiments()
+            R._experiments[0].beam.set_wavelength(0)
+            ref_experiments[0].beam.set_wavelength(0)
+
+        else:
+        """
         ref_experiments = R.get_experiments()
 
         nv = NaveParameters(

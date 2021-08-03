@@ -50,7 +50,7 @@ def run(args=None):
         imageset.set_detector(imageset_new.get_detector())
         imageset.set_beam(imageset_new.get_beam())
         imageset.set_goniometer(imageset_new.get_goniometer())
-        imageset.set_scan(imageset_new.get_scan())
+        imageset.set_sequence(imageset_new.get_sequence())
 
     if len(experiments):
         print(f"Saving modified experiments to {params.output.experiments}")

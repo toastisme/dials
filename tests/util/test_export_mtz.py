@@ -46,9 +46,9 @@ class TestBatchRangeCalculations:
             assert len(image_range) == 2
             self.scaling_model = None
             if scan:
-                self.scan = TestBatchRangeCalculations.MockScan(image_range)
+                self.sequence = TestBatchRangeCalculations.MockScan(image_range)
             else:
-                self.scan = []
+                self.sequence = []
 
     def _run_ranges(self, ranges):
         """Convenience method to run the routine with a minimal experiment, and return the result as ranges of batch number"""

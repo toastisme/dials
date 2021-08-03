@@ -1189,7 +1189,7 @@ class Integrator:
             len(self.experiments.beams()),
             len(self.experiments.detectors()),
             len(self.experiments.goniometers()),
-            len(self.experiments.scans()),
+            len(self.experiments.sequences()),
             len(self.experiments.crystals()),
             len(self.experiments.imagesets()),
         )
@@ -1231,8 +1231,8 @@ class Integrator:
                         if experiment.imageset == imageset:
                             subset.extend(reflections.select(reflections["id"] == j))
                 try:
-                    if imageset.get_scan():
-                        frame0, frame1 = imageset.get_scan().get_array_range()
+                    if imageset.get_sequence():
+                        frame0, frame1 = imageset.get_sequence().get_array_range()
                     else:
                         raise RuntimeError
                 except RuntimeError:  # catch DXTBX_ASSERT if no scan in imageset
@@ -1363,7 +1363,7 @@ Splitting reflection table into %s subsets for processing
                 group = job.index()
                 expr = job.expr()
                 f0, f1 = job.frames()
-                scan = self._experiments[expr[0]].scan
+                scan = self._experiments[expr[0]].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 rows.append(
@@ -1510,7 +1510,7 @@ class Integrator3DThreaded:
             len(self.experiments.beams()),
             len(self.experiments.detectors()),
             len(self.experiments.goniometers()),
-            len(self.experiments.scans()),
+            len(self.experiments.sequences()),
             len(self.experiments.crystals()),
             len(self.experiments.imagesets()),
         )
@@ -1596,7 +1596,7 @@ class Integrator3DThreaded:
                 group = job.index()
                 expr = job.expr()
                 f0, f1 = job.frames()
-                scan = self._experiments[expr[0]].scan
+                scan = self._experiments[expr[0]].sequence
                 p0 = scan.get_angle_from_array_index(f0)
                 p1 = scan.get_angle_from_array_index(f1)
                 rows.append(
@@ -1667,7 +1667,7 @@ def create_integrator(params, experiments, reflections):
     # Remove scan if stills
     if experiments.all_stills():
         for experiment in experiments:
-            experiment.scan = None
+            experiment.sequence = None
 
     # Return an instantiation of the class
     return IntegratorClass(experiments, reflections, params)

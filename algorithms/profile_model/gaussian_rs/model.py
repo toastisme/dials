@@ -207,7 +207,7 @@ class Model(ProfileModelExt):
         beam,
         detector,
         goniometer=None,
-        scan=None,
+        sequence=None,
         profile=None,
     ):
         """
@@ -224,11 +224,25 @@ class Model(ProfileModelExt):
         """
         if reflections is not None:
             model = cls.create_from_reflections(
-                params, reflections, crystal, beam, detector, goniometer, scan, profile
+                params,
+                reflections,
+                crystal,
+                beam,
+                detector,
+                goniometer,
+                sequence,
+                profile,
             )
         else:
             model = cls.create_from_parameters(
-                params, reflections, crystal, beam, detector, goniometer, scan, profile
+                params,
+                reflections,
+                crystal,
+                beam,
+                detector,
+                goniometer,
+                sequence,
+                profile,
             )
         return model
 
@@ -241,7 +255,7 @@ class Model(ProfileModelExt):
         beam,
         detector,
         goniometer=None,
-        scan=None,
+        sequence=None,
         profile=None,
     ):
         """
@@ -289,7 +303,7 @@ class Model(ProfileModelExt):
         beam,
         detector,
         goniometer=None,
-        scan=None,
+        sequence=None,
         profile=None,
     ):
         """
@@ -311,8 +325,8 @@ class Model(ProfileModelExt):
 
         # Check the number of spots
         if not len(reflections) >= params.gaussian_rs.min_spots.overall:
-            if scan is not None:
-                num_degrees = scan.get_num_images() * scan.get_oscillation()[1]
+            if sequence is not None:
+                num_degrees = sequence.get_num_images() * sequence.get_oscillation()[1]
                 spots_per_degree = len(reflections) / num_degrees
                 if not spots_per_degree >= params.gaussian_rs.min_spots.per_degree:
                     raise RuntimeError(
@@ -388,7 +402,7 @@ class Model(ProfileModelExt):
             beam,
             detector,
             goniometer,
-            scan,
+            sequence,
             params.gaussian_rs.filter.min_zeta,
             algorithm=params.gaussian_rs.sigma_m_algorithm,
             centroid_definition=params.gaussian_rs.centroid_definition,
@@ -437,7 +451,7 @@ class Model(ProfileModelExt):
                 beam=beam,
                 detector=detector,
                 goniometer=goniometer,
-                scan=scan,
+                sequence=scan,
             ),
             dmin=dmin,
             dmax=dmax,
@@ -596,14 +610,14 @@ class Model(ProfileModelExt):
 
             # Return if no scan or gonio
             if (
-                experiment.scan is None
+                experiment.sequence is None
                 or experiment.goniometer is None
-                or experiment.scan.is_still()
+                or experiment.sequence.is_still()
             ):
                 return None
 
             # Compute the scan step
-            phi0, phi1 = experiment.scan.get_oscillation_range(deg=True)
+            phi0, phi1 = experiment.sequence.get_oscillation_range(deg=True)
             assert phi1 > phi0
             phi_range = phi1 - phi0
             num_scan_points = int(
@@ -633,7 +647,7 @@ class Model(ProfileModelExt):
                 experiment.beam,
                 experiment.detector,
                 experiment.goniometer,
-                experiment.scan,
+                experiment.sequence,
                 sigma_b,
                 sigma_m,
                 self.n_sigma() * 1.5,

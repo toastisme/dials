@@ -27,7 +27,7 @@ namespace dials { namespace algorithms { namespace boost_python {
 
   void export_pixel_labeller() {
     class_<PixelLabeller>("PixelLabeller", no_init)
-      .def(init<BeamBase &, Detector>())
+      .def(init<MonochromaticBeam &, Detector>())
       .def("label", &PixelLabeller::label)
       .def("label", label);
     ;

@@ -22,7 +22,7 @@ class Data:
         assert len(self.experiments) == 1
         assert (
             self.experiments[0].crystal.num_scan_points
-            == self.experiments[0].scan.get_num_images() + 1
+            == self.experiments[0].sequence.get_num_images() + 1
         )
 
     def run(self):
@@ -75,7 +75,7 @@ def test_regression(data):
     # s0 = self.experiments[0].beam.get_s0()
     # dmin = self.experiments[0].detector.get_max_resolution(s0)
     # margin = 1
-    # scan = self.experiments[0].scan
+    # scan = self.experiments[0].sequence
     # crystal = self.experiments[0].crystal
     # frame_0 = scan.get_array_range()[0]
     # step = 1
@@ -115,7 +115,7 @@ def test_regression(data):
     # s0 = self.experiments[0].beam.get_s0()
     # dmin = self.experiments[0].detector.get_max_resolution(s0)
     # margin = 1
-    # scan = self.experiments[0].scan
+    # scan = self.experiments[0].sequence
     # crystal = self.experiments[0].crystal
     # frame_0 = scan.get_array_range()[0]
     # step = 1
@@ -162,7 +162,7 @@ def test_regression(data):
     # s0 = self.experiments[0].beam.get_s0()
     # dmin = self.experiments[0].detector.get_max_resolution(s0)
     # margin = 1
-    # scan = self.experiments[0].scan
+    # scan = self.experiments[0].sequence
     # crystal = self.experiments[0].crystal
     # frame_0 = scan.get_array_range()[0]
     # step = 1
@@ -209,7 +209,7 @@ def test_scan_varying_results_are_close_to_static_prediction_when_model_is_stati
 
     # Get static predictor results
 
-    scan = static_test.experiments[0].scan
+    scan = static_test.experiments[0].sequence
     crystal = static_test.experiments[0].crystal
     beam = static_test.experiments[0].beam
     goniometer = static_test.experiments[0].goniometer

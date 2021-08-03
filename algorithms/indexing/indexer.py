@@ -6,7 +6,7 @@ import pkg_resources
 import iotbx.phil
 import libtbx
 from cctbx import sgtbx
-from dxtbx.model import ExperimentList, ImageSequence
+from dxtbx.model import ExperimentList, RotImageSequence, TOFImageSequence
 
 import dials.util
 from dials.algorithms.indexing import (
@@ -339,8 +339,11 @@ class Indexer:
                 # can only share a beam if we share a goniometer?
                 if expt.beam.is_similar_to(self.experiments[0].beam):
                     expt.beam = self.experiments[0].beam
-                if self.params.combine_scans and expt.scan == self.experiments[0].scan:
-                    expt.scan = self.experiments[0].scan
+                if (
+                    self.params.combine_scans
+                    and expt.sequence == self.experiments[0].sequence
+                ):
+                    expt.sequence = self.experiments[0].sequence
 
         if "flags" in self.reflections:
             strong_sel = self.reflections.get_flags(self.reflections.flags.strong)
@@ -378,7 +381,7 @@ class Indexer:
             has_stills = False
             has_sequences = False
             for expt in experiments:
-                if isinstance(expt.imageset, ImageSequence):
+                if isinstance(expt.imageset, RotImageSequence):
                     has_sequences = True
                 else:
                     has_stills = True
@@ -416,7 +419,10 @@ class Indexer:
                     # specific to rotations vs. stills, so here reset any ImageSequences to stills.
                     # Note, dials.stills_process resets ImageSequences to ImageSets already,
                     # and it's not free (the ImageSet cache is dropped), only do it if needed
-                    if isinstance(experiment.imageset, ImageSequence):
+                    if type(experiment.imageset) in [
+                        RotImageSequence,
+                        TOFImageSequence,
+                    ]:
                         experiment.imageset = ImageSet(
                             experiment.imageset.data(), experiment.imageset.indices()
                         )
@@ -425,9 +431,9 @@ class Indexer:
                     # else:
                     #   imageset = ImageSet(imagesequence.reader(), imagesequence.indices())
                     #   imageset._models = imagesequence._models
-                    experiment.imageset.set_scan(None)
+                    experiment.imageset.set_sequence(None)
                     experiment.imageset.set_goniometer(None)
-                    experiment.scan = None
+                    experiment.sequence = None
                     experiment.goniometer = None
 
             IndexerType = None
@@ -436,7 +442,6 @@ class Indexer:
             ):
                 if params.indexing.method == entry_point.name:
                     if use_stills_indexer:
-                        # do something
                         from dials.algorithms.indexing.stills_indexer import (
                             StillsIndexerBasisVectorSearch as IndexerType,
                         )
@@ -682,7 +687,7 @@ class Indexer:
                         expt.detector = refined_expt.detector
                         expt.beam = refined_expt.beam
                         expt.goniometer = refined_expt.goniometer
-                        expt.scan = refined_expt.scan
+                        expt.sequence = refined_expt.sequence
                         refined_expt.imageset = expt.imageset
 
                 if not (
@@ -826,8 +831,8 @@ class Indexer:
                     sel, panel.millimeter_to_pixel(xy_cal_mm.select(sel))
                 )
             x_px, y_px = xy_cal_px.parts()
-            if expt.scan is not None:
-                z_px = expt.scan.get_array_index_from_angle(z_rad, deg=False)
+            if expt.sequence is not None:
+                z_px = expt.sequence.get_array_index_from_angle(z_rad, deg=False)
             else:
                 # must be a still image, z centroid not meaningful
                 z_px = z_rad

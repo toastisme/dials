@@ -387,14 +387,14 @@ def run(args=None, phil=working_phil):
         crystal_has_scan = {}
         for j, e in enumerate(experiments):
             if e.crystal in crystal_has_scan:
-                if e.scan is not crystal_has_scan[e.crystal]:
+                if e.sequence is not crystal_has_scan[e.crystal]:
                     logger.info(
                         "Duplicating crystal model for scan-varying refinement of experiment %d",
                         j,
                     )
                     e.crystal = copy.deepcopy(e.crystal)
             else:
-                crystal_has_scan[e.crystal] = e.scan
+                crystal_has_scan[e.crystal] = e.sequence
 
     # Run refinement
     experiments, reflections, refiner, history = run_dials_refine(
@@ -415,7 +415,7 @@ def run(args=None, phil=working_phil):
 
     # Write scan-varying parameters to file, if there were any
     if params.output.parameter_table:
-        scans = experiments.scans()
+        scans = experiments.sequences()
         if len(scans) > 1:
             logger.info(
                 "Writing a scan-varying parameter table is only supported "

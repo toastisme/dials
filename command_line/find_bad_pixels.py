@@ -139,7 +139,7 @@ def run(args=None):
         detector = experiment.detector[0]
         nfast, nslow = detector.get_image_size()
 
-        first, last = experiment.scan.get_image_range()
+        first, last = experiment.sequence.get_image_range()
         images = range(first, last + 1)
 
         # TODO tidy up the logic here - it is _correct_ but a bit ...

@@ -236,7 +236,7 @@ class Target:
 
             # trim reflections outside the scan range
             phi = reflections["xyzobs.mm.value"].parts()[2]
-            phi_min, phi_max = exp.scan.get_oscillation_range(deg=False)
+            phi_min, phi_max = exp.sequence.get_oscillation_range(deg=False)
             passed = (phi >= phi_min) & (phi <= phi_max)
             to_keep.set_selected(sel, passed)
 
@@ -573,8 +573,8 @@ class LeastSquaresPositionalResidualWithRmsdCutoff(Target):
         # Set up the RMSD achieved criterion. For simplicity, we take models from
         # the first Experiment only. If this is not appropriate for refinement over
         # all experiments then absolute cutoffs should be used instead.
-        if experiments[0].scan:
-            image_width_rad = abs(experiments[0].scan.get_oscillation(deg=False)[1])
+        if experiments[0].sequence:
+            image_width_rad = abs(experiments[0].sequence.get_oscillation(deg=False)[1])
         else:
             image_width_rad = None
         detector = experiments[0].detector

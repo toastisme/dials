@@ -6,11 +6,11 @@ import math
 
 from cctbx.eltbx import henke
 from dxtbx.model import (
-    BeamFactory,
     Crystal,
     DetectorFactory,
     GoniometerFactory,
-    ScanFactory,
+    MonochromaticBeamFactory,
+    SequenceFactory,
 )
 from iotbx import pdb
 from scitbx import matrix
@@ -49,7 +49,7 @@ class Simulation:
         )
 
         # Set up beam
-        self.beam = BeamFactory().simple(wavelength=1)
+        self.beam = MonochromaticBeamFactory.make_simple_beam(wavelength=1)
 
         # Set up scan
         sequence_width = 90.0
@@ -61,7 +61,7 @@ class Simulation:
         image_range = (1, nframes)
         exposure_times = 0.0
         epochs = [0] * nframes
-        self.scan = ScanFactory().make_scan(
+        self.scan = SequenceFactory().make_scan(
             image_range, exposure_times, oscillation, epochs, deg=True
         )
 

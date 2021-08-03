@@ -54,7 +54,7 @@ class ReflectionPredictor:
         :param margin: The margin of hkl to predict
         :param force_static: force scan varying prediction to be static
         """
-        from dxtbx.imageset import ImageSequence
+        from dxtbx.imageset import RotImageSequence
 
         from dials.algorithms.spot_prediction import (
             ScanStaticReflectionPredictor,
@@ -85,11 +85,11 @@ class ReflectionPredictor:
             )
 
         # Select the predictor class
-        if isinstance(experiment.imageset, ImageSequence):
+        if isinstance(experiment.imageset, RotImageSequence):
             xl_nsp = experiment.crystal.num_scan_points
             bm_nsp = experiment.beam.num_scan_points
             gn_nsp = experiment.goniometer.num_scan_points
-            nim = experiment.scan.get_num_images()
+            nim = experiment.sequence.get_num_images()
 
             sv_compatible = (xl_nsp == nim + 1) or (bm_nsp == nim + 1)
             if not force_static and sv_compatible:
@@ -149,7 +149,7 @@ class ReflectionPredictor:
 
                 # Choose index generation method based on number of images
                 # https://github.com/dials/dials/issues/585
-                if experiment.scan.get_num_images() > 50:
+                if experiment.sequence.get_num_images() > 50:
                     predict_method = predictor.for_ub_old_index_generator
                 else:
                     predict_method = predictor.for_ub

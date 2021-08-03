@@ -22,7 +22,7 @@ def test(args=[]):
     from cctbx.uctbx import unit_cell
 
     # We will set up a mock scan and a mock experiment list
-    from dxtbx.model import ScanFactory
+    from dxtbx.model import SequenceFactory
     from dxtbx.model.experiment_list import Experiment, ExperimentList
     from libtbx.phil import parse
     from libtbx.test_utils import approx_equal
@@ -84,7 +84,7 @@ def test(args=[]):
     mybeam = models.beam
 
     # Build a mock scan for a 180 degree sequence
-    sf = ScanFactory()
+    sf = SequenceFactory()
     myscan = sf.make_scan(
         image_range=(1, 1800),
         exposure_times=0.1,
@@ -104,7 +104,7 @@ def test(args=[]):
             beam=mybeam,
             detector=mydetector,
             goniometer=mygonio,
-            scan=myscan,
+            sequence=myscan,
             crystal=mycrystal,
             imageset=None,
         )

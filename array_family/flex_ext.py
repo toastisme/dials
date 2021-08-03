@@ -19,6 +19,7 @@ import boost_adaptbx.boost.python
 import cctbx.array_family.flex
 import cctbx.miller
 import libtbx.smart_open
+from dxtbx.model import Experiment, ExperimentList
 from scitbx import matrix
 
 import dials.extensions.glm_background_ext
@@ -80,7 +81,7 @@ class _:
                 experiment.beam,
                 experiment.detector,
                 experiment.goniometer,
-                experiment.scan,
+                experiment.sequence,
                 dmin=dmin,
                 dmax=dmax,
                 margin=margin,
@@ -100,6 +101,45 @@ class _:
             padding=padding,
         )
         return predict()
+
+    @staticmethod
+    def tof_from_predictions_multi(experiment, reflections, dmin=None, dmax=None):
+        result = dials_array_family_flex_ext.reflection_table()
+        current_wavelength = experiment.beam.get_wavelength()
+        current_s0 = experiment.beam.get_s0()
+        fmt_cls = experiment.imageset.get_format_class()
+        fmt_cls_inst = fmt_cls(experiment.imageset.paths()[0])
+        wavelengths = fmt_cls_inst.get_wavelength_channels_in_ang()
+
+        for idx, i in enumerate(wavelengths):
+            # for i in range(len(reflections)):
+            # experiment.beam.set_wavelength(reflections[i]["tof_wavelength"])
+            experiment.beam.set_wavelength(i)
+            rlist = dials_array_family_flex_ext.reflection_table.from_predictions(
+                experiment,
+                dmin=dmin,
+                dmax=dmax,
+            )
+            rlist["tof_wavelength"] = cctbx.array_family.flex.double(rlist.nrows(), i)
+            for j in range(len(rlist)):
+                # xyzcal_px[j] =  (rlist[j]["xyzcal.px"][0], rlist[j]["xyzcal.px"][1], idx+1)
+                rlist["xyzcal.px"][j] = (
+                    rlist[j]["xyzcal.px"][0],
+                    rlist[j]["xyzcal.px"][1],
+                    idx + 1,
+                )
+                # rlist[j]["xyzcal.px"] = cctbx.array_family.flex.vec3_double(1,(rlist[j]["xyzcal.px"][0], rlist[j]["xyzcal.px"][1], idx))
+            # rlist["tof_wavelength"] = cctbx.array_family.flex.double(rlist.nrows(), reflections[i]["tof_wavelength"])
+            rlist["tof_s0"] = cctbx.array_family.flex.vec3_double(
+                rlist.nrows(), experiment.beam.get_s0()
+            )
+            # rlist["xyzcal.px"] = xyzcal_px
+
+            result.extend(rlist)
+        result["id"] = cctbx.array_family.flex.int(len(result), 0)
+        experiment.beam.set_wavelength(current_wavelength)
+        experiment.beam.set_s0(current_s0)
+        return result
 
     @staticmethod
     def from_predictions_multi(
@@ -562,7 +602,7 @@ class _:
         distance = cctbx.array_family.flex.sqrt(
             cctbx.array_family.flex.pow2(x1 - x2)
             + cctbx.array_family.flex.pow2(y1 - y2)
-            + cctbx.array_family.flex.pow2(z1 - z2)
+            + cctbx.array_family.flex.pow2(z1 - z1)
         )
         mask = distance < 2
         logger.info(" %d reflections matched", len(o2))
@@ -735,7 +775,7 @@ class _:
                     expr.beam,
                     expr.detector,
                     expr.goniometer,
-                    expr.scan,
+                    expr.sequence,
                     sigma_b_multiplier=sigma_b_multiplier,
                 ),
             )
@@ -759,7 +799,7 @@ class _:
                     expr.beam,
                     expr.detector,
                     expr.goniometer,
-                    expr.scan,
+                    expr.sequence,
                 ),
             )
         return self["partiality"]
@@ -778,7 +818,7 @@ class _:
                 expr.beam,
                 expr.detector,
                 expr.goniometer,
-                expr.scan,
+                expr.sequence,
                 image_volume=image_volume,
             )
             if result is not None:
@@ -838,9 +878,8 @@ class _:
             self, image_volume=image_volume
         )
 
-    def compute_summed_intensity(
-        self, image_volume: dials.model.data.MultiPanelImageVolume = None
-    ) -> None:
+    def compute_summed_intensity(self, image_volume=None):
+        # type: (dials.model.data.MultiPanelImageVolume) -> None
         """
         Compute intensity via summation integration.
         """
@@ -977,6 +1016,16 @@ class _:
         self.set_flags(ninvbg > 0, self.flags.background_includes_bad_pixels)
         self.set_flags(ninvfg > 0, self.flags.foreground_includes_bad_pixels)
         return (ntotal - nvalid) > 0
+
+    def contains_valid_tof_data(self):
+        if "tof_wavelength" not in self or "tof_s0" not in self:
+            return False
+        for i in range(len(self)):
+            if self["tof_wavelength"][i] < 1e-8:
+                return False
+            if abs(sum(self["tof_s0"][i])) < 1e-8:
+                return False
+        return True
 
     def find_overlaps(self, experiments=None, border=0):
         """
@@ -1211,13 +1260,157 @@ Found %s"""
                 sel = sel_expt & (panel_numbers == i_panel)
                 centroid_position, centroid_variance, _ = centroid_px_to_mm_panel(
                     expt.detector[i_panel],
-                    expt.scan,
+                    expt.sequence,
                     self["xyzobs.px.value"].select(sel),
                     self["xyzobs.px.variance"].select(sel),
                     cctbx.array_family.flex.vec3_double(sel.count(True), (1, 1, 1)),
                 )
                 self["xyzobs.mm.value"].set_selected(sel, centroid_position)
                 self["xyzobs.mm.variance"].set_selected(sel, centroid_variance)
+
+    def add_beam_data(self, experiments):
+
+        """
+        Adds wavelength, tof, s0, and unit_s0 columns to self.
+        All experiments with a TOFImageSequence have values set from their time-of-flight.
+        All monochromatic experiments just take values from the MonochromaticBeam object,
+        with a tof value of -1.
+        """
+
+        import numpy as np
+        from scipy import interpolate
+        from scipy.constants import Planck, m_n
+
+        def get_tof_s0(s0_direction, tof_wavelength):
+            return s0_direction * 1.0 / tof_wavelength
+
+        def get_tof_curve_coefficients(tof_vals):
+            x = [i + 1 for i in range(len(tof_vals))]
+            return interpolate.splrep(x, tof_vals)
+
+        def get_frame_tof_vals(frames, tof_curve_coeffs):
+            frame_tof_vals = []
+            for i in range(len(frames)):
+                frame_tof_vals.append(interpolate.splev(frames[i], tof_curve_coeffs))
+            return frame_tof_vals
+
+        def get_tof_wavelength_in_ang(L, tof):
+            return ((Planck * tof) / (m_n * L)) * 10 ** 10
+
+        def add_tof_data(sel_expt):
+
+            L0_in_m = expt.beam.get_sample_to_moderator_distance()
+            unit_s0 = np.asarray(expt.beam.get_unit_s0())
+            tof_in_s = expt.sequence.get_tof_in_seconds()
+            # Cubic spline for estimating ToF between frames
+            tof_curve_coeffs = get_tof_curve_coefficients(tof_in_s)
+
+            for i_panel in range(len(expt.detector)):
+
+                sel = sel_expt & (panel_numbers == i_panel)
+                # rot_angle is a zero vector here, set from centroid_px_to_mm
+                # This component is used to store the ToF
+                x, y, rot_angle = self["xyzobs.mm.value"].select(sel).parts()
+                px, py, frame = self["xyzobs.px.value"].select(sel).parts()
+                s1 = expt.detector[i_panel].get_lab_coord(
+                    cctbx.array_family.flex.vec2_double(x, y)
+                )
+                frame_tof_vals = get_frame_tof_vals(frame, tof_curve_coeffs)
+
+                wavelengths = cctbx.array_family.flex.double(len(s1))
+                s0s = cctbx.array_family.flex.vec3_double(len(s1))
+                xyz_mm_value = cctbx.array_family.flex.vec3_double(len(s1))
+
+                for j in range(len(s1)):
+                    s1n = np.linalg.norm(s1[j]) * 10 ** -3
+                    wavelengths[j] = get_tof_wavelength_in_ang(
+                        L0_in_m + s1n, frame_tof_vals[j]
+                    )
+                    s0s[j] = get_tof_s0(unit_s0, wavelengths[j])
+                    xyz_mm_value[i] = np.asarray((x[i], y[i], frame_tof_vals[i]))
+
+                self["wavelength"].set_selected(sel, wavelengths)
+                self["s0"].set_selected(sel, s0s)
+                self["xyzobs.mm.value"].set_selected(sel, xyz_mm_value)
+
+        def add_monochromatic_data(sel_expt):
+
+            unit_s0 = expt.beam.get_unit_s0()
+            wavelength = expt.beam.get_wavelength()
+            s0 = expt.beam.get_s0()
+            tof = -1
+            num_reflections = len(self.select(sel_expt))
+
+            wavelengths = cctbx.array_family.flex.double(num_reflections, wavelength)
+            tofs = cctbx.array_family.flex.double(len(num_reflections), tof)
+            s0s = cctbx.array_family.flex.vec3_double(len(num_reflections), s0)
+            unit_s0s = cctbx.array_family.flex.vec3_double(
+                len(num_reflections), unit_s0
+            )
+
+            self["wavelength"].set_selected(sel_expt, wavelengths)
+            self["tof"].set_selected(sel_expt, tofs)
+            self["s0"].set_selected(sel_expt, s0s)
+            self["unit_s0"].set_selected(sel_expt, unit_s0s)
+
+        self.centroid_px_to_mm(experiments)
+        panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
+        self["wavelength"] = cctbx.array_family.flex.double(self.nrows())
+        self["tof"] = cctbx.array_family.flex.double(self.nrows())
+        self["s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
+        self["unit_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
+
+        for i, expt in enumerate(experiments):
+            if "imageset_id" in self:
+                sel_expt = self["imageset_id"] == i
+            else:
+                sel_expt = self["id"] == i
+
+            if expt.is_tof_experiment():
+                add_tof_data(sel_expt)
+            else:
+                add_monochromatic_data(sel_expt)
+
+    def tof_sequence_to_stills(self, experiment):
+
+        """
+        Returns an ExperimentList consisting of separate Experiment instances
+        for each reflection, with Beam instances set to the wavelength of each
+        reflection.
+        """
+
+        assert (
+            "tof_wavelength" in self
+        ), "Reflection table does not contain ToF wavelengths."
+        from dxtbx_imageset_ext import ImageSet
+
+        from scitbx.array_family import flex
+
+        experiment_list = ExperimentList()
+        for i in range(len(self)):
+            beam = copy.copy(experiment.beam)
+            beam.set_wavelength(self["tof_wavelength"][i])
+            px, py, frame = self["xyzobs.px.value"][i]
+            single_file_indices = [int(frame)]
+            single_file_indices = flex.size_t(single_file_indices)
+            imageset = ImageSet(experiment.imageset.data(), single_file_indices)
+            imageset.set_sequence(None)
+            imageset.set_goniometer(None)
+            imageset.set_beam(beam)
+            new_experiment = Experiment(
+                beam=beam,
+                detector=experiment.imageset.get_detector(),
+                goniometer=None,
+                sequence=None,
+                crystal=None,
+                identifier=str(i),
+                imageset=imageset,
+            )
+            experiment_list.append(new_experiment)
+            self["id"][i] = i
+            if "imageset_id" in self:
+                self["imageset_id"][i] = i
+        return experiment_list
 
     def map_centroids_to_reciprocal_space(
         self, experiments, calculated=False, crystal_frame=False
@@ -1253,9 +1446,24 @@ Found %s"""
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
+
+                """
+                if self.contains_valid_tof_data():
+                    import numpy as np
+
+                    tof_wavelengths = self["tof_wavelength"].select(sel)
+                    S = cctbx.array_family.flex.vec3_double(len(s1))
+                    s1 = s1 / s1.norms()
+                    for s1_idx in range(len(s1)):
+                        S[s1_idx] = (
+                            np.array(s1[s1_idx]) - np.array(expt.beam.get_unit_s0())
+                        ) / tof_wavelengths[s1_idx]
+                else:
+                """
                 s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
-                self["s1"].set_selected(sel, s1)
                 S = s1 - expt.beam.get_s0()
+                self["s1"].set_selected(sel, s1)
+
                 if expt.goniometer is not None:
                     setting_rotation = matrix.sqr(
                         expt.goniometer.get_setting_rotation()

@@ -36,7 +36,7 @@ class SpotPredictor:
         self.beam = models.get_beam()
         self.gonio = models.get_goniometer()
         self.detector = models.get_detector()
-        self.scan = models.get_scan()
+        self.scan = models.get_sequence()
 
         assert len(self.detector) == 1
 

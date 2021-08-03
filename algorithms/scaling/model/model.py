@@ -546,8 +546,8 @@ class DoseDecay(ScalingModelBase):
         configdict = OrderedDict({"corrections": []})
         parameters_dict = {}
 
-        osc_range = experiment.scan.get_oscillation_range()
-        one_osc_width = experiment.scan.get_oscillation()[1]
+        osc_range = experiment.sequence.get_oscillation_range()
+        one_osc_width = experiment.sequence.get_oscillation()[1]
         configdict.update({"valid_osc_range": osc_range})
         if params.share.decay:
             configdict.update({"shared": ["decay"]})
@@ -774,8 +774,8 @@ class PhysicalScalingModel(ScalingModelBase):
         configdict = OrderedDict({"corrections": []})
         parameters_dict = {}
 
-        osc_range = experiment.scan.get_oscillation_range()
-        one_osc_width = experiment.scan.get_oscillation()[1]
+        osc_range = experiment.sequence.get_oscillation_range()
+        one_osc_width = experiment.sequence.get_oscillation()[1]
         configdict.update({"valid_osc_range": osc_range})
 
         abs_osc_range = abs(osc_range[1] - osc_range[0])
@@ -1089,8 +1089,8 @@ class ArrayScalingModel(ScalingModelBase):
         reflections = reflection_table.select(reflection_table["d"] > 0.0)
         configdict = OrderedDict({"corrections": []})
         # First initialise things common to more than one correction.
-        one_osc_width = experiment.scan.get_oscillation()[1]
-        osc_range = experiment.scan.get_oscillation_range()
+        one_osc_width = experiment.sequence.get_oscillation()[1]
+        osc_range = experiment.sequence.get_oscillation_range()
         configdict.update({"valid_osc_range": osc_range})
         n_time_param, time_norm_fac, time_rot_int = initialise_smooth_input(
             osc_range, one_osc_width, params.decay_interval

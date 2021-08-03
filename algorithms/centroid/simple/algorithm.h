@@ -13,7 +13,7 @@
 
 #include <boost/optional.hpp>
 #include <dxtbx/model/detector.h>
-#include <dxtbx/model/scan.h>
+#include <dxtbx/model/sequence.h>
 #include <dials/model/data/image_volume.h>
 #include <dials/array_family/reflection_table.h>
 

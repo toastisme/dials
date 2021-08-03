@@ -22,7 +22,7 @@ def generated_exp(n=1):
     for i in range(n):
         experiments.append(
             Experiment(
-                scan=Scan(image_range=[1, 25], oscillation=[0.0, 1.0]),
+                sequence=Scan(image_range=[1, 25], oscillation=[0.0, 1.0]),
                 crystal=Crystal.from_dict(exp_dict),
                 identifier=str(i),
             )
@@ -109,7 +109,9 @@ def test_exclusion_in_CCHalfFromDials():
         expts = script.experiments
 
         assert list(expts.identifiers()) == ["1"]
-        assert expts[0].scan.get_valid_image_ranges(expts.identifiers()[0]) == [(1, 10)]
+        assert expts[0].sequence.get_valid_image_ranges(expts.identifiers()[0]) == [
+            (1, 10)
+        ]
         assert script.results_summary["dataset_removal"][
             "experiment_ids_fully_removed"
         ] == [0]

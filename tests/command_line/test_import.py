@@ -197,7 +197,7 @@ def test_override_geometry(dials_data, tmpdir):
     beam = imgset.get_beam()
     detector = imgset.get_detector()
     goniometer = imgset.get_goniometer()
-    scan = imgset.get_scan()
+    scan = imgset.get_sequence()
 
     assert beam.get_wavelength() == 2
     assert beam.get_sample_to_source_direction() == (-1, 0, 0)
@@ -424,7 +424,7 @@ def test_template_with_missing_image_outside_of_image_range(
                 "imported_%i_%i.expt" % image_range
             )
         )
-        assert expts[0].scan.get_image_range() == image_range
+        assert expts[0].sequence.get_image_range() == image_range
 
 
 def test_import_still_sequence_as_experiments(dials_data, tmpdir):
@@ -448,7 +448,7 @@ def test_import_still_sequence_as_experiments(dials_data, tmpdir):
     assert len(iset) == 1
 
     # verify scans, goniometers kept too
-    assert all(exp.scan.get_oscillation() == (0.0, 0.0) for exp in imported_exp)
+    assert all(exp.sequence.get_oscillation() == (0.0, 0.0) for exp in imported_exp)
     assert all(exp.goniometer is not None for exp in imported_exp)
 
 
@@ -474,7 +474,7 @@ def test_import_still_sequence_as_experiments_subset(dials_data, tmpdir):
     assert len(iset) == 1
 
     # verify scans, goniometers kept too
-    assert all(exp.scan.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
+    assert all(exp.sequence.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
     assert all(exp.goniometer is not None for exp in imported_exp)
 
 
@@ -508,7 +508,7 @@ def test_import_still_sequence_as_expts_subset_by_range(dials_data, tmp_path):
     assert list(iset)[0].get_image_identifier(0) == image_files[2].strpath
 
     # verify scans, goniometers kept too
-    assert all(exp.scan.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
+    assert all(exp.sequence.get_oscillation() == (10.0, 0.0) for exp in imported_exp)
     assert all(exp.goniometer is not None for exp in imported_exp)
 
 
@@ -554,7 +554,7 @@ def test_with_convert_sequences_to_stills(dials_data, tmpdir):
         assert exp.identifier != ""
 
     # should be no goniometers
-    assert experiments.scans() == [None]
+    assert experiments.sequences() == [None]
     assert experiments.goniometers() == [None]
 
     # should be same number of imagesets as images
