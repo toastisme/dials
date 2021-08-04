@@ -19,7 +19,6 @@ import boost_adaptbx.boost.python
 import cctbx.array_family.flex
 import cctbx.miller
 import libtbx.smart_open
-from dxtbx.model import Experiment, ExperimentList
 from scitbx import matrix
 
 import dials.extensions.glm_background_ext
@@ -1017,13 +1016,17 @@ class _:
         self.set_flags(ninvfg > 0, self.flags.foreground_includes_bad_pixels)
         return (ntotal - nvalid) > 0
 
-    def contains_valid_tof_data(self):
-        if "tof_wavelength" not in self or "tof_s0" not in self:
+    def contains_beam_data(self):
+
+        import numpy as np
+
+        if "wavelength" not in self or "s0" not in self:
             return False
         for i in range(len(self)):
-            if self["tof_wavelength"][i] < 1e-8:
+            if self["wavelength"][i] < 1e-8:
                 return False
-            if abs(sum(self["tof_s0"][i])) < 1e-8:
+            s0_val = np.array(self["s0"][i])
+            if sum(s0_val * s0_val) ** 0.5 < 1e-8:
                 return False
         return True
 
@@ -1371,47 +1374,6 @@ Found %s"""
             else:
                 add_monochromatic_data(sel_expt)
 
-    def tof_sequence_to_stills(self, experiment):
-
-        """
-        Returns an ExperimentList consisting of separate Experiment instances
-        for each reflection, with Beam instances set to the wavelength of each
-        reflection.
-        """
-
-        assert (
-            "tof_wavelength" in self
-        ), "Reflection table does not contain ToF wavelengths."
-        from dxtbx_imageset_ext import ImageSet
-
-        from scitbx.array_family import flex
-
-        experiment_list = ExperimentList()
-        for i in range(len(self)):
-            beam = copy.copy(experiment.beam)
-            beam.set_wavelength(self["tof_wavelength"][i])
-            px, py, frame = self["xyzobs.px.value"][i]
-            single_file_indices = [int(frame)]
-            single_file_indices = flex.size_t(single_file_indices)
-            imageset = ImageSet(experiment.imageset.data(), single_file_indices)
-            imageset.set_sequence(None)
-            imageset.set_goniometer(None)
-            imageset.set_beam(beam)
-            new_experiment = Experiment(
-                beam=beam,
-                detector=experiment.imageset.get_detector(),
-                goniometer=None,
-                sequence=None,
-                crystal=None,
-                identifier=str(i),
-                imageset=imageset,
-            )
-            experiment_list.append(new_experiment)
-            self["id"][i] = i
-            if "imageset_id" in self:
-                self["imageset_id"][i] = i
-        return experiment_list
-
     def map_centroids_to_reciprocal_space(
         self, experiments, calculated=False, crystal_frame=False
     ):
@@ -1447,21 +1409,20 @@ Found %s"""
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
 
-                """
-                if self.contains_valid_tof_data():
+                if self.contains_beam_data():
                     import numpy as np
 
-                    tof_wavelengths = self["tof_wavelength"].select(sel)
+                    wavelengths = self["wavelength"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
                     s1 = s1 / s1.norms()
                     for s1_idx in range(len(s1)):
                         S[s1_idx] = (
                             np.array(s1[s1_idx]) - np.array(expt.beam.get_unit_s0())
-                        ) / tof_wavelengths[s1_idx]
+                        ) / wavelengths[s1_idx]
                 else:
-                """
-                s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
-                S = s1 - expt.beam.get_s0()
+
+                    s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
+                    S = s1 - expt.beam.get_s0()
                 self["s1"].set_selected(sel, s1)
 
                 if expt.goniometer is not None:
