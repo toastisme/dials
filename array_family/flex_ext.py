@@ -1017,13 +1017,13 @@ class _:
         self.set_flags(ninvfg > 0, self.flags.foreground_includes_bad_pixels)
         return (ntotal - nvalid) > 0
 
-    def contains_valid_tof_data(self):
-        if "tof_wavelength" not in self or "tof_s0" not in self:
+    def contains_beam_data(self):
+        if "wavelength" not in self or "s0" not in self:
             return False
         for i in range(len(self)):
-            if self["tof_wavelength"][i] < 1e-8:
+            if self["wavelength"][i] < 1e-8:
                 return False
-            if abs(sum(self["tof_s0"][i])) < 1e-8:
+            if abs(sum(self["s0"][i])) < 1e-8:
                 return False
         return True
 
@@ -1447,21 +1447,19 @@ Found %s"""
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
 
-                """
-                if self.contains_valid_tof_data():
+                if self.contains_beam_data():
                     import numpy as np
 
-                    tof_wavelengths = self["tof_wavelength"].select(sel)
+                    wavelengths = self["wavelength"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
                     s1 = s1 / s1.norms()
                     for s1_idx in range(len(s1)):
                         S[s1_idx] = (
                             np.array(s1[s1_idx]) - np.array(expt.beam.get_unit_s0())
-                        ) / tof_wavelengths[s1_idx]
+                        ) / wavelengths[s1_idx]
                 else:
-                """
-                s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
-                S = s1 - expt.beam.get_s0()
+                    s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
+                    S = s1 - expt.beam.get_s0()
                 self["s1"].set_selected(sel, s1)
 
                 if expt.goniometer is not None:
