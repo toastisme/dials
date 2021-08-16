@@ -175,7 +175,7 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
             )
 
     def set_detector_panel_numbers(self):
-        panel_numbers = sorted(list(set(self.reflections["panel"])))
+        panel_numbers = sorted(set(self.reflections["panel"]))
         panel_numbers = list(map(str, panel_numbers))
         self.settings_panel.filter_by_panel_ctrl.SetItems(panel_numbers)
 
@@ -192,7 +192,7 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
         s0 = s0 / np.linalg.norm(s0)
         # beam.set_sample_to_source_direction(s0)
         try:
-            panel_id, beam_centre = detector.get_ray_intersection(beam.get_s0())
+            panel_id, beam_centre = detector.get_ray_intersection(beam.get_unit_s0())
         except RuntimeError:
             # beam centre calculation fails if the beam falls between panels
             pass
