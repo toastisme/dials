@@ -44,6 +44,11 @@ try:
 except ImportError:
     pass
 
+import matplotlib
+import matplotlib.font_manager as matplotlib_font_manager
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+from matplotlib.figure import Figure
+
 SpotfinderData = collections.namedtuple(
     "SpotfinderData",
     [
@@ -79,6 +84,48 @@ def create_load_image_event(destination, filename):
     wx.PostEvent(destination, LoadImageEvent(myEVT_LOADIMG, -1, filename))
 
 
+class PixelLinePlot(wx.Frame):
+    def __init__(self, parent, experiment):
+
+        from dxtbx.model.sequence import Scan, TOFSequence
+
+        wx.Frame.__init__(self, parent=parent)
+        self.font = "/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf"
+        prob = matplotlib_font_manager.FontProperties(fname=self.font)
+        matplotlib.rcParams["font.family"] = prob.get_name()
+        self.figure = Figure(figsize=(10, 0.5), facecolor="#FFE4E4")
+        self.axes = self.figure.add_subplot(111)
+        self.canvas = FigureCanvas(self, -1, self.figure)
+        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.sizer.Add(self.canvas, 1, wx.EXPAND)
+        self.SetSizer(self.sizer)
+
+        if isinstance(experiment.sequence, TOFSequence):
+            self.axes.set_xlabel("ToF (usec)")
+        elif isinstance(experiment.sequence, Scan):
+            self.axes.set_xlabel(r"2$\theta$")
+        self.axes.set_ylabel("Intensity (AU)")
+
+        self.axes.set_ylim(0, 1000)
+        self.axes.patch.set_facecolor("#FFE4E4")
+
+        self.experiment = experiment
+
+    def draw(self, panel_idx, coords):
+
+        px = int(coords[0])
+        py = int(coords[1])
+        x, spectra = self.experiment.imageset.get_pixel_spectra(panel_idx, px, py)
+        self.axes.cla()
+        self.axes.plot(x, spectra, c="black")
+        self.axes.set_ylim(0, 1000)
+        self.axes.set_title(f"panel {panel_idx} at ({px}, {py})")
+        # self.axes.set_xlabel("ToF (usec)")
+        # self.axes.set_ylabel("Intensity (AU)")
+        self.axes.patch.set_facecolor("#FFE4E4")
+        self.canvas.draw()
+
+
 class SpotFrame(XrayFrame):
     def __init__(self, *args, **kwds):
         self.experiments = kwds.pop("experiments")
@@ -101,6 +148,9 @@ class SpotFrame(XrayFrame):
             for experiment in experiment_list:
                 detector = experiment.detector
                 if not detector:
+                    self.params.projection = None
+                    continue
+                if detector.has_projection_2d:
                     self.params.projection = None
                     continue
                 if len(detector) == 24 and detector[0].get_image_size() == (2463, 195):
@@ -209,6 +259,16 @@ class SpotFrame(XrayFrame):
 
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUIMask, id=self._id_mask)
         self.Bind(EVT_ZEROMQ_EVENT, self.OnZeroMQEvent)
+
+    def setup_line_plot(self, fmt_instance):
+        assert len(self.experiments) == 1
+        assert self.experiments[0].is_single_tof_experiment()
+        fmt_cls = self.experiments[0][0].imageset.get_format_class()
+        fmt_instance = fmt_cls(self.experiments[0][0].imageset.get_template())
+        tof_graph = PixelLinePlot(self, fmt_instance)
+        tof_graph.SetSize(1024, 450)
+        tof_graph.SetPosition((0, self.GetSize()[0] - 500))
+        return tof_graph
 
     def setup_toolbar(self):
         btn = self.toolbar.AddTool(
@@ -1391,7 +1451,7 @@ class SpotFrame(XrayFrame):
         vector_data = []
         vector_text_data = []
         detector = self.pyslip.tiles.raw_image.get_detector()
-        scan = self.pyslip.tiles.raw_image.get_scan()
+        scan = self.pyslip.tiles.raw_image.get_sequence()
         to_degrees = 180 / math.pi
         # self.prediction_colours = ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c",
         # "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
