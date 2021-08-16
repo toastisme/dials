@@ -108,15 +108,19 @@ def get_flex_image_multipanel(
     npanels = 0
     for panel in detector:
         try:
-            beam_center += scitbx.matrix.col(panel.get_beam_centre_lab(beam.get_s0()))
+            beam_center += scitbx.matrix.col(
+                panel.get_beam_centre_lab(beam.get_unit_s0())
+            )
             npanels += 1
         except RuntimeError:  # catch DXTBX_ASSERT for no intersection
             pass
-    beam_center /= npanels / 1e-3
+    if npanels > 0:
+        beam_center /= npanels / 1e-3
 
     # XXX If a point is contained in two panels simultaneously, it will
     # be assigned to the panel defined first.  XXX Use a Z-buffer
     # instead?
+
     for i, panel in enumerate(detector):
         # Determine the pixel size for the panel (in meters), as pixel
         # sizes need not be identical.
@@ -130,6 +134,11 @@ def get_flex_image_multipanel(
             panel.get_pixel_size()[0] * 1e-3,
             panel.get_pixel_size()[1] * 1e-3,
         )
+
+        if panel.has_projection_2d():
+            panel_r, panel_t = panel.get_projection_2d()
+            my_flex_image.add_transformation_and_translation(panel_r, panel_t)
+            continue
 
         if len(detector) == 24 and detector[0].get_image_size() == (2463, 195):
             # XXX hardcoded panel height and row gap
@@ -660,7 +669,7 @@ class _Tiles:
         beam = self.raw_image.get_beam()
         if detector is None or beam is None:
             return None
-        beam = beam.get_s0()
+        beam = beam.get_unit_s0()
 
         if readout is None:
             return None
