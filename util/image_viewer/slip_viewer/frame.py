@@ -217,6 +217,11 @@ class XrayFrame(XFBaseClass):
                 elif readout >= 0:
                     posn_str += " Readout %d: %s." % (readout, coords_str)
 
+                    """
+                    if self.tof_graph is not None:
+                        self.tof_graph.draw(readout, coords)
+                    """
+
                 possible_intensity = None
                 fi = self.pyslip.tiles.raw_image
                 detector = fi.get_detector()
@@ -359,7 +364,7 @@ class XrayFrame(XFBaseClass):
         # FIXME assumes all detector elements use the same millimeter-to-pixel convention
         try:
             # determine if the beam intersects one of the panels
-            panel_id, (x_mm, y_mm) = detector.get_ray_intersection(beam.get_s0())
+            panel_id, (x_mm, y_mm) = detector.get_ray_intersection(beam.get_unit_s0())
         except RuntimeError as e:
             if not ("DXTBX_ASSERT(" in str(e) and ") failure" in str(e)):
                 # unknown exception from dxtbx
@@ -369,11 +374,13 @@ class XrayFrame(XFBaseClass):
             lowest_res = 0
             for p_id, panel in enumerate(detector):
                 w, h = panel.get_image_size()
-                res = panel.get_resolution_at_pixel(beam.get_s0(), (w // 2, h // 2))
+                res = panel.get_resolution_at_pixel(
+                    beam.get_unit_s0(), (w // 2, h // 2)
+                )
                 if res > lowest_res:
                     panel_id = p_id
                     lowest_res = res
-            x_mm, y_mm = detector[panel_id].get_beam_centre(beam.get_s0())
+            x_mm, y_mm = detector[panel_id].get_beam_centre(beam.get_unit_s0())
 
         beam_pixel_fast, beam_pixel_slow = detector[panel_id].millimeter_to_pixel(
             (x_mm, y_mm)
