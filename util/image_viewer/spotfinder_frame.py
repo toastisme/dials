@@ -1389,7 +1389,7 @@ class SpotFrame(XrayFrame):
         vector_data = []
         vector_text_data = []
         detector = self.pyslip.tiles.raw_image.get_detector()
-        scan = self.pyslip.tiles.raw_image.get_scan()
+        scan = self.pyslip.tiles.raw_image.get_sequence()
         to_degrees = 180 / math.pi
         # self.prediction_colours = ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c",
         # "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
