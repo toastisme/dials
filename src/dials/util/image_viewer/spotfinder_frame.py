@@ -1644,6 +1644,26 @@ class SpotFrame(XrayFrame):
         max_pix_data = []
         predictions_data = []
         miller_indices_data = []
+        vector_data = []
+        vector_text_data = []
+        detector = self.pyslip.tiles.raw_image.get_detector()
+        scan = self.pyslip.tiles.raw_image.get_sequence()
+        to_degrees = 180 / math.pi
+        # self.prediction_colours = ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c",
+        # "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
+        # "#cab2d6"] * 10
+        # alternative colour scheme
+        self.prediction_colours = [
+            "#e41a1c",
+            "#377eb8",
+            "#4daf4a",
+            "#984ea3",
+            "#ff7f00",
+            "#ffff33",
+            "#a65628",
+            "#f781bf",
+            "#999999",
+        ] * 10
 
         for ref_list_id, ref_list in enumerate(self.reflections):
             if self.viewing_stills and ref_list_id != i_frame:
