@@ -3,6 +3,8 @@ import itertools
 import math
 
 import wx
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+from matplotlib.figure import Figure
 from wx.lib.intctrl import IntCtrl
 
 from cctbx import crystal, uctbx
@@ -77,6 +79,42 @@ class LoadImageEvent(wx.PyCommandEvent):
 
 def create_load_image_event(destination, filename):
     wx.PostEvent(destination, LoadImageEvent(myEVT_LOADIMG, -1, filename))
+
+
+class PixelLinePlot(wx.Frame):
+    def __init__(self, parent, **kwargs):
+        wx.Frame.__init__(self, parent=parent)
+        self.properties = self.get_properties(**kwargs)
+        self.figure = Figure(figsize=(self.properties["figsize"]))
+        self.axes = self.figure.add_subplot(111)
+        self.canvas = FigureCanvas(self, -1, self.figure)
+        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.sizer.Add(self.canvas, 1, wx.EXPAND)
+        self.SetSizer(self.sizer)
+        self.axes.set_xlabel(self.properties["xlabel"])
+        self.axes.set_ylabel(self.properties["ylabel"])
+        self.axes.patch.set_facecolor(self.properties["facecolor"])
+
+    def get_properties(self, **kwargs):
+
+        default_values = {
+            "facecolor": "#FFE4E4",
+            "linecolor": "black",
+            "figsize": (10, 0.5),
+            "xlabel": "ToF (usec)",
+            "ylabel": "Intensity (AU)",
+        }
+        graph_properties = dict(default_values)
+        return graph_properties.update(kwargs)
+
+    def draw(self, panel_idx, coords):
+        px = int(coords[0])
+        py = int(coords[1])
+        x, spectra = self.experiment.imageset.get_pixel_spectra(panel_idx, px, py)
+        self.axes.cla()
+        self.axes.plot(x, spectra, c=self.properties["linecolor"])
+        self.axes.set_title(f"panel {panel_idx} at ({px}, {py})")
+        self.canvas.draw()
 
 
 class SpotFrame(XrayFrame):
@@ -207,6 +245,11 @@ class SpotFrame(XrayFrame):
 
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUIMask, id=self._id_mask)
         self.Bind(EVT_ZEROMQ_EVENT, self.OnZeroMQEvent)
+
+    def setup_pixel_line_plot(self, **kwargs):
+        self.pixel_line_plot = PixelLinePlot(self, kwargs=kwargs)
+        self.pixel_line_plot.SetSize(1024, 450)
+        self.pixel_line_plot.SetPosition((0, self.GetSize()[0] - 500))
 
     def setup_toolbar(self):
         btn = self.toolbar.AddTool(
@@ -1812,6 +1855,7 @@ class SpotSettingsPanel(wx.Panel):
         self.settings.show_shoebox = self.params.show_shoebox
         self.settings.show_indexed = self.params.show_indexed
         self.settings.show_integrated = self.params.show_integrated
+        self.settings.show_pixel_line_plot = False
         self.settings.show_predictions = self.params.show_predictions
         self.settings.show_miller_indices = self.params.show_miller_indices
         self.settings.fontsize = 10
@@ -1995,6 +2039,11 @@ class SpotSettingsPanel(wx.Panel):
         self.integrated = wx.CheckBox(self, -1, "Integrated only")
         self.integrated.SetValue(self.settings.show_integrated)
         grid.Add(self.integrated, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+
+        # Toggle pixel line plot
+        self.pixel_line_plot = wx.CheckBox(self, -1, "Show pixel line plot")
+        self.pixel_line_plot.SetValue(self.settings.show_pixel_line_plot)
+        grid.Add(self.pixel_line_plot, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
 
         grid = wx.FlexGridSizer(cols=2, rows=1, vgap=0, hgap=0)
         self.clear_all_button = wx.Button(self, -1, "Clear all")
