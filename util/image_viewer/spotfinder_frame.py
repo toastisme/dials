@@ -82,10 +82,13 @@ def create_load_image_event(destination, filename):
 
 
 class PixelLinePlot(wx.Frame):
-    def __init__(self, parent, **kwargs):
+    def __init__(self, parent, experiment, **kwargs):
         wx.Frame.__init__(self, parent=parent)
+        self.experiment = experiment
         self.properties = self.get_properties(**kwargs)
-        self.figure = Figure(figsize=(self.properties["figsize"]))
+        self.figure = Figure(
+            figsize=(self.properties["figsize"]), facecolor=self.properties["facecolor"]
+        )
         self.axes = self.figure.add_subplot(111)
         self.canvas = FigureCanvas(self, -1, self.figure)
         self.sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -94,26 +97,46 @@ class PixelLinePlot(wx.Frame):
         self.axes.set_xlabel(self.properties["xlabel"])
         self.axes.set_ylabel(self.properties["ylabel"])
         self.axes.patch.set_facecolor(self.properties["facecolor"])
+        self.Show()
 
     def get_properties(self, **kwargs):
 
         default_values = {
             "facecolor": "#FFE4E4",
             "linecolor": "black",
+            "bboxcolor": "blue",
             "figsize": (10, 0.5),
             "xlabel": "ToF (usec)",
             "ylabel": "Intensity (AU)",
         }
         graph_properties = dict(default_values)
-        return graph_properties.update(kwargs)
+        graph_properties.update(kwargs)
+        return graph_properties
 
-    def draw(self, panel_idx, coords):
+    def draw(self, panel_idx, coords, bboxes=None):
         px = int(coords[0])
         py = int(coords[1])
         x, spectra = self.experiment.imageset.get_pixel_spectra(panel_idx, px, py)
         self.axes.cla()
         self.axes.plot(x, spectra, c=self.properties["linecolor"])
+        if bboxes:
+            for bbox in bboxes:
+                x0 = x[bbox[0]]
+                x1 = x[bbox[1]]
+                y0 = min(spectra[bbox[0] : bbox[1]])
+                y1 = max(spectra[bbox[0] : bbox[1]])
+                self.axes.plot(
+                    [x0, x0, x1, x1],
+                    [y0, y1, y1, y0],
+                    lw=1,
+                    c=self.properties["bboxcolor"],
+                )
+                # rect = patches.Rectangle((x0, y0), width, height, lw=2, edgecolor="r", facecolor="none")
+                # self.axes.add_patch(rect)
         self.axes.set_title(f"panel {panel_idx} at ({px}, {py})")
+        self.axes.set_xlabel(self.properties["xlabel"])
+        self.axes.set_ylabel(self.properties["ylabel"])
+        self.axes.patch.set_facecolor(self.properties["facecolor"])
         self.canvas.draw()
 
 
@@ -213,6 +236,8 @@ class SpotFrame(XrayFrame):
         self.mask_image_viewer = None
         self._mask_frame = None
 
+        self.pixel_line_plot = self.get_pixel_line_plot()
+
         self.display_foreground_circles_patch = False  # hard code this option, for now
 
         self._kabsch_debug_list_hash = 0
@@ -246,10 +271,11 @@ class SpotFrame(XrayFrame):
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUIMask, id=self._id_mask)
         self.Bind(EVT_ZEROMQ_EVENT, self.OnZeroMQEvent)
 
-    def setup_pixel_line_plot(self, **kwargs):
-        self.pixel_line_plot = PixelLinePlot(self, kwargs=kwargs)
-        self.pixel_line_plot.SetSize(1024, 450)
-        self.pixel_line_plot.SetPosition((0, self.GetSize()[0] - 500))
+    def get_pixel_line_plot(self, **kwargs):
+        pixel_line_plot = PixelLinePlot(self, self.experiments[0][0], kwargs=kwargs)
+        pixel_line_plot.SetSize(1024, 450)
+        pixel_line_plot.SetPosition((0, self.GetSize()[0] - 500))
+        return pixel_line_plot
 
     def setup_toolbar(self):
         btn = self.toolbar.AddTool(
