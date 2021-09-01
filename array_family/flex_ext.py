@@ -1030,6 +1030,23 @@ class _:
                 return False
         return True
 
+    coord = [int, int]
+
+    def get_pixel_bbox_positions(self, panel: int, pixel_pos: coord) -> list:
+        """
+        Finds any bounding boxes within px and py on panel and returns their pz positions
+        """
+        sel = self["panel"] == panel
+        x0, x1, y0, y1, z0, z1 = self["bbox"].select(sel).parts()
+        py = int(pixel_pos[0])
+        px = int(pixel_pos[1])
+        bbox_pos = []
+        for i in range(len(x0)):
+            if px >= x0[i] and px <= x1[i]:
+                if py >= y0[i] and py <= y1[i]:
+                    bbox_pos.append([z0[i], z1[i]])
+        return bbox_pos
+
     def find_overlaps(self, experiments=None, border=0):
         """
         Check for overlapping reflections.
