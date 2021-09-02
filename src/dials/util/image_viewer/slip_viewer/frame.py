@@ -217,10 +217,6 @@ class XrayFrame(XFBaseClass):
                 if len(coords) == 2:
                     posn_str += " Readout: " + coords_str + "."
                 elif readout >= 0:
-                    bboxes = self.reflections[0].get_pixel_bbox_positions(
-                        readout, coords
-                    )
-                    self.pixel_line_plot.draw(readout, coords, bboxes)
                     posn_str += " Readout %d: %s." % (readout, coords_str)
 
                 possible_intensity = None
