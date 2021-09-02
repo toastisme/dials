@@ -84,6 +84,7 @@ def create_load_image_event(destination, filename):
 class PixelLinePlot(wx.Frame):
     def __init__(self, parent, experiment, **kwargs):
         wx.Frame.__init__(self, parent=parent)
+        self.base_zoom_level = 2.0
         self.experiment = experiment
         self.properties = self.get_properties(**kwargs)
         self.figure = Figure(
@@ -96,8 +97,66 @@ class PixelLinePlot(wx.Frame):
         self.SetSizer(self.sizer)
         self.axes.set_xlabel(self.properties["xlabel"])
         self.axes.set_ylabel(self.properties["ylabel"])
+        self.axes.set_ylim(self.properties["default_ylim"])
+        self.axes.set_xlim(self.properties["default_xlim"])
+        self.x_range = None
+        self.y_range = None
         self.axes.patch.set_facecolor(self.properties["facecolor"])
         self.Show()
+        self.figure.canvas.mpl_connect("scroll_event", self.zoom_handler)
+
+    def zoom_handler(self, event, x_only=True):
+
+        if self.x_range is None or self.y_range is None:
+            return
+
+        cur_xlim = self.axes.get_xlim()
+        cur_ylim = self.axes.get_ylim()
+
+        xdata = event.xdata
+        ydata = event.ydata
+
+        if event.button == "down":
+            # zoom in
+            scale_factor = 1 / self.base_zoom_level
+        elif event.button == "up":
+            # zoom out
+            scale_factor = self.base_zoom_level
+        else:
+            scale_factor = 1
+
+        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
+        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
+
+        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
+        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
+
+        new_xmin = xdata - new_width * (1 - relx)
+        if new_xmin < self.x_range[0]:
+            new_xmin = self.x_range[0]
+        new_xmax = xdata + new_width * (relx)
+        if new_xmax > self.x_range[1]:
+            new_xmax = self.x_range[1]
+
+        if new_xmax - new_xmin < self.properties["min_delta_x_range"]:
+            return
+
+        if x_only:
+            self.axes.set_xlim([new_xmin, new_xmax])
+            self.canvas.draw()
+            return
+
+        new_ymin = ydata - new_height * (1 - rely)
+        if new_ymin < self.y_range[0]:
+            new_ymin = self.y_range[0]
+        new_ymax = ydata + new_height * (rely)
+        if new_ymax > self.y_range[1]:
+            new_ymax = self.y_range[1]
+
+        if new_ymax - new_ymin < self.properties["min_delta_y_range"]:
+            return
+
+        self.axes.set_ylim([new_ymin, new_ymax])
 
     def get_properties(self, **kwargs):
 
@@ -111,6 +170,10 @@ class PixelLinePlot(wx.Frame):
             "figsize": (10, 0.5),
             "xlabel": "ToF (usec)",
             "ylabel": "Intensity (AU)",
+            "min_delta_y_range": 1,
+            "min_delta_x_range": 500,
+            "default_xlim": (0, 17500),
+            "default_ylim": (0, 1000),
         }
         graph_properties = dict(default_values)
         graph_properties.update(kwargs)
@@ -120,6 +183,8 @@ class PixelLinePlot(wx.Frame):
         px = int(coords[0])
         py = int(coords[1])
         x, spectra = self.experiment.imageset.get_pixel_spectra(panel_idx, px, py)
+        self.x_range = (min(x), max(x))
+        self.y_range = (min(spectra), max(spectra))
         self.axes.cla()
         self.axes.plot(x, spectra, c=self.properties["linecolor"])
         if bboxes:
@@ -149,6 +214,11 @@ class PixelLinePlot(wx.Frame):
         self.axes.set_title(f"panel {panel_idx} at ({px}, {py})")
         self.axes.set_xlabel(self.properties["xlabel"])
         self.axes.set_ylabel(self.properties["ylabel"])
+        self.axes.set_xlim(self.x_range)
+        if self.y_range[1] < self.properties["default_ylim"][1]:
+            self.axes.set_ylim(self.properties["default_ylim"])
+        else:
+            self.axes.set_ylim(self.y_range)
         self.axes.patch.set_facecolor(self.properties["facecolor"])
         self.canvas.draw()
 
