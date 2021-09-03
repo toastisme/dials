@@ -8,6 +8,7 @@ import types
 import wx
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 from matplotlib.figure import Figure
+from wx.core import EVT_LEFT_DOWN
 from wx.lib.intctrl import IntCtrl
 
 from cctbx import crystal, uctbx
@@ -146,6 +147,9 @@ class PixelLinePlot(wx.Frame):
 
         xdata = event.xdata
         ydata = event.ydata
+
+        if xdata is None or ydata is None:
+            return
 
         if event.button == "down":
             # zoom in
@@ -551,6 +555,16 @@ class SpotFrame(XrayFrame):
             self.params.stack_images = value
             self.reload_image()
 
+    def OnLeftClick(self, event):
+        if self.pixel_line_plot and self.current_image_coords:
+            panel, coords = self.current_image_coords
+            self.pixel_line_plot.draw(panel, coords)
+            bboxes, centroids = self.reflections[0].get_pixel_bbox_centroid_positions(
+                panel, coords
+            )
+            self.pixel_line_plot.draw(panel, coords, bboxes, centroids)
+        event.Skip()
+
     def GetBoxCorners(self, layer, p1, p2):
         """Get list of points inside box.
 
@@ -715,81 +729,6 @@ class SpotFrame(XrayFrame):
                     )
                 )
 
-    def handle_position_event(self, event):
-        """Handle a pySlip POSITION event."""
-
-        posn_str = ""
-        if event.position:
-            (lon, lat) = event.position
-            fast_picture, slow_picture = self.pyslip.tiles.lon_lat_to_picture_fast_slow(
-                lon, lat
-            )
-
-            posn_str = "Picture:  slow={:.3f} / fast={:.3f} pixels.".format(
-                slow_picture,
-                fast_picture,
-            )
-            coords = self.pyslip.tiles.get_flex_pixel_coordinates(lon, lat)
-            if len(coords) >= 2:
-                if len(coords) == 3:
-                    readout = int(round(coords[2]))
-                else:
-                    readout = -1
-
-                coords_str = f"slow={coords[0]:.3f} / fast={coords[1]:.3f} pixels"
-                if len(coords) == 2:
-                    posn_str += " Readout: " + coords_str + "."
-                elif readout >= 0:
-                    bboxes, centroids = self.reflections[
-                        0
-                    ].get_pixel_bbox_centroid_positions(readout, coords)
-                    self.pixel_line_plot.draw(readout, coords, bboxes, centroids)
-                    posn_str += " Readout %d: %s." % (readout, coords_str)
-
-                possible_intensity = None
-                fi = self.pyslip.tiles.raw_image
-                detector = fi.get_detector()
-                ifs = (int(coords[1]), int(coords[0]))  # int fast slow
-                isf = (int(coords[0]), int(coords[1]))  # int slow fast
-                image_data = fi.get_image_data()
-                if not isinstance(image_data, tuple):
-                    image_data = (image_data,)
-                if readout >= 0:
-                    if detector[readout].is_coord_valid(ifs):
-                        possible_intensity = image_data[readout][isf]
-
-                if possible_intensity is not None:
-                    if possible_intensity == 0:
-                        format_str = " I=%6.4f"
-                        posn_str += format_str % possible_intensity
-                    elif possible_intensity == MASK_VAL:
-                        posn_str += " I=mask"
-                    else:
-                        yaya = int(math.ceil(math.log10(abs(possible_intensity))))
-                        format_str = " I=%%6.%df" % (max(0, 5 - yaya))
-                        posn_str += format_str % possible_intensity
-
-                if (
-                    len(coords) > 2 and readout >= 0
-                ):  # indicates it's a tiled image in a valid region
-                    reso = self.pyslip.tiles.get_resolution(
-                        coords[1], coords[0], readout
-                    )
-                else:
-                    reso = self.pyslip.tiles.get_resolution(coords[1], coords[0])
-
-                if reso is not None:
-                    posn_str += f" Resolution: {reso:.3f}"
-
-            self.statusbar.SetStatusText(posn_str)
-        else:
-            self.statusbar.SetStatusText(
-                "Click and drag to pan; "
-                + "middle-click and drag to plot intensity profile, right-click to zoom"
-            )
-            # print "event with no position",event
-        return
-
     def add_file_name_or_data(self, image_data):
         """
         Adds an image to the viewer's list of images.
@@ -869,6 +808,8 @@ class SpotFrame(XrayFrame):
             get_image_data=self.get_image_data,
             show_untrusted=show_untrusted,
         )
+
+        self.pyslip.Bind(EVT_LEFT_DOWN, self.OnLeftClick)
 
         # Update the navigation UI controls to reflect this loaded image
         self.image_chooser_panel.SetValue(self.images.selected_index + 1)
