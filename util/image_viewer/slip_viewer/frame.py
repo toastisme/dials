@@ -133,6 +133,8 @@ class XrayFrame(XFBaseClass):
         self.SetMinSize(self.GetSize())
         self.SetSize((720, 720))
 
+        self.current_image_coords = None
+
         self.Bind(EVT_EXTERNAL_UPDATE, self.OnExternalUpdate)
 
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUICalibration, id=self._id_calibration)
@@ -215,6 +217,7 @@ class XrayFrame(XFBaseClass):
                 if len(coords) == 2:
                     posn_str += " Readout: " + coords_str + "."
                 elif readout >= 0:
+                    self.current_image_coords = (readout, coords)
                     posn_str += " Readout %d: %s." % (readout, coords_str)
 
                 possible_intensity = None
