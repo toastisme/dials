@@ -127,8 +127,13 @@ class PixelLinePlot(wx.Frame):
         self.figure.canvas.mpl_connect("button_press_event", self.on_press_handler)
         self.figure.canvas.mpl_connect("button_release_event", self.on_release_handler)
         self.figure.canvas.mpl_connect("motion_notify_event", self.on_motion_handler)
+        self.Bind(wx.EVT_CLOSE, self.close_window_handler)
 
         self.Show()
+
+    def close_window_handler(self, event) -> None:
+        self.GetParent().pixel_line_plot_closed()
+        self.Destroy()
 
     def on_press_handler(self, event) -> None:
 
@@ -430,7 +435,7 @@ class SpotFrame(XrayFrame):
         self.mask_image_viewer = None
         self._mask_frame = None
 
-        self.pixel_line_plot = self.get_pixel_line_plot()
+        self.pixel_line_plot = None
 
         self.display_foreground_circles_patch = False  # hard code this option, for now
 
@@ -465,11 +470,27 @@ class SpotFrame(XrayFrame):
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUIMask, id=self._id_mask)
         self.Bind(EVT_ZEROMQ_EVENT, self.OnZeroMQEvent)
 
-    def get_pixel_line_plot(self, **kwargs):
+    def get_pixel_line_plot(self, **kwargs) -> PixelLinePlot:
+
+        """
+        Creates and returns a pixel line plot
+        """
+
         pixel_line_plot = PixelLinePlot(self, self.experiments[0][0], kwargs=kwargs)
         pixel_line_plot.SetSize(1024, 450)
         pixel_line_plot.SetPosition((0, self.GetSize()[0] - 500))
         return pixel_line_plot
+
+    def pixel_line_plot_closed(self) -> None:
+
+        """
+        Resets pixel line plot values
+        (called when the window is closed)
+        """
+
+        self.pixel_line_plot = None
+        self.show_pixel_line_plot = False
+        self.settings_frame.panel.show_pixel_line_plot.SetValue(False)
 
     def setup_toolbar(self):
         btn = self.toolbar.AddTool(
@@ -1329,6 +1350,12 @@ class SpotFrame(XrayFrame):
         elif self.beam_layer is not None:
             self.pyslip.DeleteLayer(self.beam_layer, update=False)
             self.beam_layer = None
+
+        if self.settings.show_pixel_line_plot and not self.pixel_line_plot:
+            self.pixel_line_plot = self.get_pixel_line_plot()
+        elif not self.settings.show_pixel_line_plot and self.pixel_line_plot:
+            self.pixel_line_plot.Close()
+            self.pixel_line_plot = None
 
         if self.settings.show_dials_spotfinder_spots:
             spotfinder_data = self.get_spotfinder_data()
@@ -2273,9 +2300,9 @@ class SpotSettingsPanel(wx.Panel):
         grid.Add(self.integrated, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
 
         # Toggle pixel line plot
-        self.pixel_line_plot = wx.CheckBox(self, -1, "Show pixel line plot")
-        self.pixel_line_plot.SetValue(self.settings.show_pixel_line_plot)
-        grid.Add(self.pixel_line_plot, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        self.show_pixel_line_plot = wx.CheckBox(self, -1, "Show pixel line plot")
+        self.show_pixel_line_plot.SetValue(self.settings.show_pixel_line_plot)
+        grid.Add(self.show_pixel_line_plot, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
 
         grid = wx.FlexGridSizer(cols=2, rows=1, vgap=0, hgap=0)
         self.clear_all_button = wx.Button(self, -1, "Clear all")
@@ -2476,6 +2503,7 @@ class SpotSettingsPanel(wx.Panel):
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.indexed)
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.integrated)
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.show_basis_vectors)
+        self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.show_pixel_line_plot)
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdateShowMask, self.show_mask)
 
         self.Bind(wx.EVT_UPDATE_UI, self.UpdateZoomCtrl)
@@ -2531,6 +2559,7 @@ class SpotSettingsPanel(wx.Panel):
             self.settings.min_local = self.min_local_ctrl.GetPhilValue()
             self.settings.gain = self.gain_ctrl.GetPhilValue()
             self.settings.find_spots_phil = self.save_params_txt_ctrl.GetPhilValue()
+            self.settings.show_pixel_line_plot = self.show_pixel_line_plot.GetValue()
 
     def UpdateZoomCtrl(self, event):
         self.settings.zoom_level = self.levels.index(
