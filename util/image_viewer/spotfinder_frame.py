@@ -47,7 +47,7 @@ try:
 except ImportError:
     pass
 
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 SpotfinderData = collections.namedtuple(
     "SpotfinderData",
@@ -215,15 +215,24 @@ class SpotFrame(XrayFrame):
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUIMask, id=self._id_mask)
         self.Bind(EVT_ZEROMQ_EVENT, self.OnZeroMQEvent)
 
-    def get_pixel_line_plot(self, imageset: ImageSet, **kwargs):
+    def get_pixel_line_plot(
+        self,
+        imageset: ImageSet,
+        reflection_table_list: List[flex.reflection_table],
+        **kwargs,
+    ):
 
         """
         Creates and returns a pixel line plot
         """
 
-        pixel_line_plot = PixelLinePlot(self, imageset, kwargs=kwargs)
-        pixel_line_plot.SetSize(1024, 450)
-        pixel_line_plot.SetPosition((0, self.GetSize()[0] - 500))
+        pixel_line_plot = PixelLinePlot(
+            self, imageset, reflection_table_list, kwargs=kwargs
+        )
+        pixel_line_plot.SetSize(pixel_line_plot.properties["default_window_size"])
+        pixel_line_plot.SetPosition(
+            pixel_line_plot.properties["default_window_position"]
+        )
         return pixel_line_plot
 
     def update_pixel_line_plot(self) -> None:
@@ -234,10 +243,13 @@ class SpotFrame(XrayFrame):
         """
 
         imageset = self.images.selected.image_set
+        reflection_table_list = self.get_imageset_reflection_table_list(imageset)
 
         # Create a new pixel line plot if not active and one is requested
         if self.settings.show_pixel_line_plot and not self.pixel_line_plot:
-            self.pixel_line_plot = self.get_pixel_line_plot(imageset)
+            self.pixel_line_plot = self.get_pixel_line_plot(
+                imageset, reflection_table_list
+            )
         elif self.pixel_line_plot:
             # Close the active pixel line plot if requested
             if not self.settings.show_pixel_line_plot:
@@ -246,6 +258,8 @@ class SpotFrame(XrayFrame):
             # Ensure current image is from pixel_line_plot.imageset
             elif imageset is not self.pixel_line_plot.imageset:
                 self.pixel_line_plot.update_imageset(imageset)
+                # Update reflections for the new imageset
+                self.pixel_line_plot.update_reflection_table_list(reflection_table_list)
 
     def pixel_line_plot_closed(self) -> None:
 
@@ -420,9 +434,9 @@ class SpotFrame(XrayFrame):
 
     def OnLeftClick(self, event):
         if self.pixel_line_plot and self.current_image_coords:
+
             panel, coords = self.current_image_coords
-            self.pixel_line_plot.draw(panel, coords)
-            bboxes, centroids = self.reflections[0].get_pixel_bbox_centroid_positions(
+            bboxes, centroids = self.pixel_line_plot.get_pixel_bbox_centroid_positions(
                 panel, coords
             )
             self.pixel_line_plot.draw(panel, coords, bboxes, centroids)
@@ -1422,6 +1436,14 @@ class SpotFrame(XrayFrame):
 
         return selection
 
+    def get_imageset_reflection_table_list(self, imageset: ImageSet):
+        reflection_table_list = []
+        for reflection_table in self.reflections:
+            exp_filter = self.__get_imageset_filter(reflection_table, imageset)
+            if exp_filter is not None:
+                reflection_table_list.append(reflection_table.select(exp_filter))
+        return reflection_table_list
+
     def get_spotfinder_data(self):
         fg_code = MaskCode.Valid | MaskCode.Foreground
         strong_code = MaskCode.Valid | MaskCode.Strong
@@ -1837,10 +1859,17 @@ class PixelLinePlot(wx.Frame):
     on a pixel shows a line plot of that pixel across the scan/ToF etc. dimension.
     """
 
-    def __init__(self, parent: SpotFrame, imageset: ImageSet, **kwargs):
+    def __init__(
+        self,
+        parent: SpotFrame,
+        imageset: ImageSet,
+        reflection_table_list: List[flex.reflection_table],
+        **kwargs,
+    ):
 
         wx.Frame.__init__(self, parent=parent)
         self.imageset = imageset
+        self.reflection_table_list = reflection_table_list
         self.properties = self.get_properties(**kwargs)
 
         # Setup blank plot
@@ -1889,6 +1918,11 @@ class PixelLinePlot(wx.Frame):
         self.imageset = imageset
         self.properties = self.get_properties(kwargs=kwargs)
         self.set_plot_properties()
+
+    def update_reflection_table_list(
+        self, reflection_table_list: List[flex.reflection_table]
+    ) -> None:
+        self.reflection_table_list = reflection_table_list
 
     def set_plot_properties(self) -> None:
 
@@ -2056,10 +2090,21 @@ class PixelLinePlot(wx.Frame):
             "min_delta_x_range": 500,
             "default_xlim": (0, 17500),
             "default_ylim": (0, 1000),
+            "default_window_size": (1024, 450),
+            "default_window_position": (0, self.GetSize()[0] - 500),
         }
         graph_properties = dict(default_values)
         graph_properties.update(kwargs)
         return graph_properties
+
+    def get_pixel_bbox_centroid_positions(self, panel: int, coords: Tuple[int, int]):
+        all_bboxes = []
+        all_centroids = []
+        for rt in self.reflection_table_list:
+            bboxes, centroids = rt.get_pixel_bbox_centroid_positions(panel, coords)
+            all_bboxes += list(bboxes)
+            all_centroids += list(centroids)
+        return all_bboxes, all_centroids
 
     def draw(
         self,
