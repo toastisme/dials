@@ -51,6 +51,8 @@ try:
 except ImportError:
     pass
 
+from typing import Dict, Tuple, Union
+
 SpotfinderData = collections.namedtuple(
     "SpotfinderData",
     [
@@ -115,10 +117,12 @@ class RadialProfileThresholdDebug:
 
 class PixelLinePlot(wx.Frame):
     def __init__(self, parent, experiment, **kwargs):
+
         wx.Frame.__init__(self, parent=parent)
-        self.base_zoom_level = 2.0
         self.experiment = experiment
         self.properties = self.get_properties(**kwargs)
+
+        # Setup blank plot
         self.figure = Figure(
             figsize=(self.properties["figsize"]), facecolor=self.properties["facecolor"]
         )
@@ -131,19 +135,96 @@ class PixelLinePlot(wx.Frame):
         self.axes.set_ylabel(self.properties["ylabel"])
         self.axes.set_ylim(self.properties["default_ylim"])
         self.axes.set_xlim(self.properties["default_xlim"])
+        self.axes.patch.set_facecolor(self.properties["facecolor"])
+
+        # Params for zooming
+        self.base_zoom_level = 2.0
+
+        # Params for panning
+        self.press = None
+        self.xpress = None
+        self.ypress = None
+        self.x0 = None
+        self.y0 = None
+        self.x1 = None
+        self.y1 = None
+
+        # Bookkeeping to avoid zooming/pannning out of range
         self.x_range = None
         self.y_range = None
-        self.axes.patch.set_facecolor(self.properties["facecolor"])
-        self.Show()
+
+        # Binding for event handlers
         self.figure.canvas.mpl_connect("scroll_event", self.zoom_handler)
+        self.figure.canvas.mpl_connect("button_press_event", self.on_press_handler)
+        self.figure.canvas.mpl_connect("button_release_event", self.on_release_handler)
+        self.figure.canvas.mpl_connect("motion_notify_event", self.on_motion_handler)
 
-    def zoom_handler(self, event, x_only=True):
+        self.Show()
 
+    def on_press_handler(self, event) -> None:
+
+        """
+        Press handler for panning
+        """
+
+        if event.inaxes != self.axes:
+            return
+        self.press = self.x0, self.y0, event.xdata, event.ydata
+        self.x0, self.y0, self.xpress, self.ypress = self.press
+
+    def on_release_handler(self, event) -> None:
+
+        """
+        Release handler for panning
+        """
+
+        self.press = None
+        self.canvas.draw()
+
+    def on_motion_handler(self, event, x_only: bool = True) -> None:
+
+        """
+        Motion handler for panning.
+        If x_only, panning is disabled for the y axis.
+        """
+
+        # Sanity check the event should be processed
         if self.x_range is None or self.y_range is None:
             return
+        if self.press is None:
+            return
+        if event.inaxes != self.axes:
+            return
 
-        cur_xlim = self.axes.get_xlim()
-        cur_ylim = self.axes.get_ylim()
+        # Handle x axis
+        dx = event.xdata - self.xpress
+        new_x = self.axes.get_xlim() - dx
+        # Only pan if within the range of data
+        if new_x[0] > self.x_range[0] and new_x[1] < self.x_range[1]:
+            self.axes.set_xlim(new_x)
+        if x_only:
+            self.canvas.draw()
+            return
+
+        # Handle y axis
+        dy = event.ydata - self.ypress
+        new_y = self.axes.get_ylim() - dy
+        # Only pan if within the range of data
+        if new_y[0] > self.yrange[0] and new_y[1] < self.y_range[1]:
+            self.axes.set_ylim(new_y)
+
+        self.canvas.draw()
+
+    def zoom_handler(self, event, x_only: bool = True) -> None:
+
+        """
+        Handles all zooming events, bound to the mouse wheel.
+        If x_only, ylim remains constant.
+        """
+
+        # Sanity check event should be processed
+        if self.x_range is None or self.y_range is None:
+            return
 
         xdata = event.xdata
         ydata = event.ydata
@@ -151,15 +232,21 @@ class PixelLinePlot(wx.Frame):
         if xdata is None or ydata is None:
             return
 
+        # Get current limits
+        cur_xlim = self.axes.get_xlim()
+        cur_ylim = self.axes.get_ylim()
+
+        # Zoom in
         if event.button == "down":
-            # zoom in
             scale_factor = 1 / self.base_zoom_level
+        # Zoom out
         elif event.button == "up":
-            # zoom out
             scale_factor = self.base_zoom_level
+        # Should never happen
         else:
             scale_factor = 1
 
+        # Get new x range and clamp to max x range
         new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
         new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
 
@@ -167,12 +254,15 @@ class PixelLinePlot(wx.Frame):
         rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
 
         new_xmin = xdata - new_width * (1 - relx)
+
+        # Clamp to maximum zoom out level
         if new_xmin < self.x_range[0]:
             new_xmin = self.x_range[0]
         new_xmax = xdata + new_width * (relx)
         if new_xmax > self.x_range[1]:
             new_xmax = self.x_range[1]
 
+        # Do nothing if trying to zoom in beyond maximum level
         if new_xmax - new_xmin < self.properties["min_delta_x_range"]:
             return
 
@@ -181,6 +271,7 @@ class PixelLinePlot(wx.Frame):
             self.canvas.draw()
             return
 
+        # Get new y range and clamp to max y range
         new_ymin = ydata - new_height * (1 - rely)
         if new_ymin < self.y_range[0]:
             new_ymin = self.y_range[0]
@@ -188,12 +279,17 @@ class PixelLinePlot(wx.Frame):
         if new_ymax > self.y_range[1]:
             new_ymax = self.y_range[1]
 
+        # Do nothing if trying to zoom in beyond maximum level
         if new_ymax - new_ymin < self.properties["min_delta_y_range"]:
             return
 
         self.axes.set_ylim([new_ymin, new_ymax])
 
-    def get_properties(self, **kwargs):
+    def get_properties(self, **kwargs) -> Dict[str, Union[str, int, Tuple]]:
+
+        """
+        Where all plot params are set.
+        """
 
         default_values = {
             "facecolor": "#FFE4E4",
@@ -214,7 +310,18 @@ class PixelLinePlot(wx.Frame):
         graph_properties.update(kwargs)
         return graph_properties
 
-    def draw(self, panel_idx, coords, bboxes=None, centroids=None):
+    def draw(
+        self,
+        panel_idx: int,
+        coords: Tuple,
+        bboxes: Tuple = None,
+        centroids: Tuple = None,
+    ) -> None:
+
+        """
+        Updates the plot with a line plot at coords from panel panel_idx.
+        If bboxes or centroids are given, these are also added to the plot.
+        """
         px = int(coords[0])
         py = int(coords[1])
         x, spectra = self.experiment.imageset.get_pixel_spectra(panel_idx, px, py)
