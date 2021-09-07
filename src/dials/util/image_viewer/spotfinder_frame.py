@@ -378,6 +378,7 @@ class SpotFrame(XrayFrame):
         self.imagesets = list(
             itertools.chain(*[x.imagesets() for x in self.experiments])
         )
+        self.current_imageset = None
         self.crystals = list(itertools.chain(*[x.crystals() for x in self.experiments]))
         if len(self.imagesets) == 0:
             raise RuntimeError("No imageset could be constructed")
@@ -521,6 +522,13 @@ class SpotFrame(XrayFrame):
         )
         return pixel_line_plot
 
+    def imageset_valid_for_pixel_line_plot(self, imageset: ImageSet) -> bool:
+        if ImageSet.is_sequence(imageset):
+            fmt_inst = imageset.get_format_class().get_instance(imageset.get_template())
+            if hasattr(fmt_inst, "get_pixel_spectra"):
+                return True
+        return False
+
     def update_pixel_line_plot(self) -> None:
 
         """
@@ -529,6 +537,18 @@ class SpotFrame(XrayFrame):
         """
 
         imageset = self.images.selected.image_set
+        # Check if not imageset experiment can have a PixelLinePlot
+        if imageset is not self.current_imageset:
+            if self.imageset_valid_for_pixel_line_plot(imageset):
+                self.settings_frame.panel.show_pixel_line_plot.Enable(True)
+            else:
+                # Disable the control to turn on the line plot
+                # and close any active window
+                self.settings_frame.panel.show_pixel_line_plot.Enable(False)
+                if self.pixel_line_plot:
+                    self.pixel_line_plot_closed()
+                return
+
         reflection_table_list = self.get_imageset_reflection_table_list(imageset)
 
         # Create a new pixel line plot if not active and one is requested
@@ -554,6 +574,7 @@ class SpotFrame(XrayFrame):
         (called when the window is closed)
         """
 
+        self.pixel_line_plot.Destroy()
         self.pixel_line_plot = None
         self.show_pixel_line_plot = False
         self.settings_frame.panel.show_pixel_line_plot.SetValue(False)
@@ -1551,6 +1572,7 @@ class SpotFrame(XrayFrame):
 
     def update_settings(self, layout=True):
         # super(SpotFrame, self).update_settings(layout=layout)
+
         new_brightness = self.settings.brightness
         new_color_scheme = self.settings.color_scheme
         if (
@@ -1575,6 +1597,7 @@ class SpotFrame(XrayFrame):
             self.beam_layer = None
 
         self.update_pixel_line_plot()
+        self.current_imageset = self.images.selected.image_set
 
         if self.settings.show_dials_spotfinder_spots:
             spotfinder_data = self.get_spotfinder_data()
@@ -2490,6 +2513,7 @@ class PixelLinePlot(wx.Frame):
     ):
 
         wx.Frame.__init__(self, parent=parent)
+        self.SetTitle("Pixel Line Plot")
         self.imageset = imageset
         self.reflection_table_list = reflection_table_list
         self.properties = self.get_properties(**kwargs)
@@ -2566,7 +2590,6 @@ class PixelLinePlot(wx.Frame):
         """
 
         self.GetParent().pixel_line_plot_closed()
-        self.Destroy()
 
     def on_press_handler(self, event) -> None:
 
@@ -2703,7 +2726,7 @@ class PixelLinePlot(wx.Frame):
             "linecolor": "black",
             "bboxcolor": "blue",
             "centroid_marker_color": "red",
-            "centroid_marker": "x",
+            "centroid_marker": "+",
             "centroid_markersize": 15,
             "figsize": (10, 0.5),
             "xlabel": "ToF (usec)",
@@ -3027,6 +3050,15 @@ class SpotSettingsPanel(wx.Panel):
         self.show_pixel_line_plot = wx.CheckBox(self, -1, "Show pixel line plot")
         self.show_pixel_line_plot.SetValue(self.settings.show_pixel_line_plot)
         grid.Add(self.show_pixel_line_plot, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        if (
+            not self.GetParent()
+            .GetParent()
+            .imageset_valid_for_pixel_line_plot(
+                self.GetParent().GetParent().images.selected.image_set
+            )
+        ):
+            self.show_pixel_line_plot.SetValue(False)
+            self.show_pixel_line_plot.Enable(False)
 
         grid = wx.FlexGridSizer(cols=2, rows=1, vgap=0, hgap=0)
         self.clear_all_button = wx.Button(self, -1, "Clear all")
