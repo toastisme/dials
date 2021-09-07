@@ -3,6 +3,9 @@ import itertools
 import math
 
 import wx
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+from matplotlib.figure import Figure
+from wx.core import EVT_LEFT_DOWN
 from wx.lib.intctrl import IntCtrl
 
 from cctbx import crystal, uctbx
@@ -43,6 +46,8 @@ try:
     from typing import Optional
 except ImportError:
     pass
+
+from typing import Dict, List, Tuple, Union
 
 SpotfinderData = collections.namedtuple(
     "SpotfinderData",
@@ -87,6 +92,7 @@ class SpotFrame(XrayFrame):
         self.imagesets = list(
             itertools.chain(*[x.imagesets() for x in self.experiments])
         )
+        self.current_imageset = None
         self.crystals = list(itertools.chain(*[x.crystals() for x in self.experiments]))
         if len(self.imagesets) == 0:
             raise RuntimeError("No imageset could be constructed")
@@ -175,6 +181,8 @@ class SpotFrame(XrayFrame):
         self.mask_image_viewer = None
         self._mask_frame = None
 
+        self.pixel_line_plot = None
+
         self.display_foreground_circles_patch = False  # hard code this option, for now
 
         self._kabsch_debug_list_hash = 0
@@ -207,6 +215,83 @@ class SpotFrame(XrayFrame):
 
         self.Bind(wx.EVT_UPDATE_UI, self.OnUpdateUIMask, id=self._id_mask)
         self.Bind(EVT_ZEROMQ_EVENT, self.OnZeroMQEvent)
+
+    def get_pixel_line_plot(
+        self,
+        imageset: ImageSet,
+        reflection_table_list: List[flex.reflection_table],
+        **kwargs,
+    ):
+
+        """
+        Creates and returns a pixel line plot
+        """
+
+        pixel_line_plot = PixelLinePlot(
+            self, imageset, reflection_table_list, kwargs=kwargs
+        )
+        pixel_line_plot.SetSize(pixel_line_plot.properties["default_window_size"])
+        pixel_line_plot.SetPosition(
+            pixel_line_plot.properties["default_window_position"]
+        )
+        return pixel_line_plot
+
+    def imageset_valid_for_pixel_line_plot(self, imageset: ImageSet) -> bool:
+        if ImageSet.is_sequence(imageset):
+            fmt_inst = imageset.get_format_class().get_instance(imageset.get_template())
+            if hasattr(fmt_inst, "get_pixel_spectra"):
+                return True
+        return False
+
+    def update_pixel_line_plot(self) -> None:
+
+        """
+        Update to pixel line plot when self.update_settings is called.
+
+        """
+
+        imageset = self.images.selected.image_set
+        # Check if not imageset experiment can have a PixelLinePlot
+        if imageset is not self.current_imageset:
+            if self.imageset_valid_for_pixel_line_plot(imageset):
+                self.settings_frame.panel.show_pixel_line_plot.Enable(True)
+            else:
+                # Disable the control to turn on the line plot
+                # and close any active window
+                self.settings_frame.panel.show_pixel_line_plot.Enable(False)
+                if self.pixel_line_plot:
+                    self.pixel_line_plot_closed()
+                return
+
+        reflection_table_list = self.get_imageset_reflection_table_list(imageset)
+
+        # Create a new pixel line plot if not active and one is requested
+        if self.settings.show_pixel_line_plot and not self.pixel_line_plot:
+            self.pixel_line_plot = self.get_pixel_line_plot(
+                imageset, reflection_table_list
+            )
+        elif self.pixel_line_plot:
+            # Close the active pixel line plot if requested
+            if not self.settings.show_pixel_line_plot:
+                self.pixel_line_plot.Close()
+                self.pixel_line_plot = None
+            # Ensure current image is from pixel_line_plot.imageset
+            elif imageset is not self.pixel_line_plot.imageset:
+                self.pixel_line_plot.update_imageset(imageset)
+                # Update reflections for the new imageset
+                self.pixel_line_plot.update_reflection_table_list(reflection_table_list)
+
+    def pixel_line_plot_closed(self) -> None:
+
+        """
+        Resets pixel line plot values
+        (called when the window is closed)
+        """
+
+        self.pixel_line_plot.Destroy()
+        self.pixel_line_plot = None
+        self.show_pixel_line_plot = False
+        self.settings_frame.panel.show_pixel_line_plot.SetValue(False)
 
     def setup_toolbar(self):
         btn = self.toolbar.AddTool(
@@ -367,6 +452,16 @@ class SpotFrame(XrayFrame):
         if value != self.params.stack_images:
             self.params.stack_images = value
             self.reload_image()
+
+    def OnLeftClick(self, event):
+        if self.pixel_line_plot and self.current_image_coords:
+
+            panel, coords = self.current_image_coords
+            bboxes, centroids = self.pixel_line_plot.get_pixel_bbox_centroid_positions(
+                panel, coords
+            )
+            self.pixel_line_plot.draw(panel, coords, bboxes, centroids)
+        event.Skip()
 
     def GetBoxCorners(self, layer, p1, p2):
         """Get list of points inside box.
@@ -611,6 +706,8 @@ class SpotFrame(XrayFrame):
             get_image_data=self.get_image_data,
             show_untrusted=show_untrusted,
         )
+
+        self.pyslip.Bind(EVT_LEFT_DOWN, self.OnLeftClick)
 
         # Update the navigation UI controls to reflect this loaded image
         self.image_chooser_panel.SetValue(self.images.selected_index + 1)
@@ -1032,6 +1129,7 @@ class SpotFrame(XrayFrame):
 
     def update_settings(self, layout=True):
         # super(SpotFrame, self).update_settings(layout=layout)
+
         new_brightness = self.settings.brightness
         new_color_scheme = self.settings.color_scheme
         if (
@@ -1054,6 +1152,9 @@ class SpotFrame(XrayFrame):
         elif self.beam_layer is not None:
             self.pyslip.DeleteLayer(self.beam_layer, update=False)
             self.beam_layer = None
+
+        self.update_pixel_line_plot()
+        self.current_imageset = self.images.selected.image_set
 
         if self.settings.show_dials_spotfinder_spots:
             spotfinder_data = self.get_spotfinder_data()
@@ -1358,6 +1459,14 @@ class SpotFrame(XrayFrame):
 
         return selection
 
+    def get_imageset_reflection_table_list(self, imageset: ImageSet):
+        reflection_table_list = []
+        for reflection_table in self.reflections:
+            exp_filter = self.__get_imageset_filter(reflection_table, imageset)
+            if exp_filter is not None:
+                reflection_table_list.append(reflection_table.select(exp_filter))
+        return reflection_table_list
+
     def get_spotfinder_data(self):
         fg_code = MaskCode.Valid | MaskCode.Foreground
         strong_code = MaskCode.Valid | MaskCode.Strong
@@ -1389,7 +1498,7 @@ class SpotFrame(XrayFrame):
         vector_data = []
         vector_text_data = []
         detector = self.pyslip.tiles.raw_image.get_detector()
-        scan = self.pyslip.tiles.raw_image.get_scan()
+        scan = self.pyslip.tiles.raw_image.get_sequence()
         to_degrees = 180 / math.pi
         # self.prediction_colours = ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c",
         # "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
@@ -1766,6 +1875,315 @@ class SpotFrame(XrayFrame):
             raise
 
 
+class PixelLinePlot(wx.Frame):
+
+    """
+    Class to manage the pixel line plot window, where clicking
+    on a pixel shows a line plot of that pixel across the scan/ToF etc. dimension.
+    """
+
+    def __init__(
+        self,
+        parent: SpotFrame,
+        imageset: ImageSet,
+        reflection_table_list: List[flex.reflection_table],
+        **kwargs,
+    ):
+
+        wx.Frame.__init__(self, parent=parent)
+        self.SetTitle("Pixel Line Plot")
+        self.imageset = imageset
+        self.reflection_table_list = reflection_table_list
+        self.properties = self.get_properties(**kwargs)
+
+        # Setup blank plot
+        self.figure = Figure(
+            figsize=(self.properties["figsize"]), facecolor=self.properties["facecolor"]
+        )
+        self.axes = self.figure.add_subplot(111)
+        self.canvas = FigureCanvas(self, -1, self.figure)
+        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.sizer.Add(self.canvas, 1, wx.EXPAND)
+        self.SetSizer(self.sizer)
+        self.set_plot_properties()
+
+        # Params for zooming
+        self.base_zoom_level = 2.0
+
+        # Params for panning
+        self.press = None
+        self.xpress = None
+        self.ypress = None
+        self.x0 = None
+        self.y0 = None
+        self.x1 = None
+        self.y1 = None
+
+        # Bookkeeping to avoid zooming/pannning out of range
+        self.x_range = None
+        self.y_range = None
+
+        # Binding for event handlers
+        self.figure.canvas.mpl_connect("scroll_event", self.zoom_handler)
+        self.figure.canvas.mpl_connect("button_press_event", self.on_press_handler)
+        self.figure.canvas.mpl_connect("button_release_event", self.on_release_handler)
+        self.figure.canvas.mpl_connect("motion_notify_event", self.on_motion_handler)
+        self.Bind(wx.EVT_CLOSE, self.close_window_handler)
+
+        self.Show()
+
+    def update_imageset(self, imageset: ImageSet, **kwargs) -> None:
+
+        """
+        Change the experiment being used in the line plot
+        (i.e when working with multiple datasets)
+        """
+
+        self.imageset = imageset
+        self.properties = self.get_properties(kwargs=kwargs)
+        self.set_plot_properties()
+
+    def update_reflection_table_list(
+        self, reflection_table_list: List[flex.reflection_table]
+    ) -> None:
+        self.reflection_table_list = reflection_table_list
+
+    def set_plot_properties(self) -> None:
+
+        """
+        Adds basic properties to the line plot,
+        based on values in self.properties
+        """
+
+        self.axes.set_xlabel(self.properties["xlabel"])
+        self.axes.set_ylabel(self.properties["ylabel"])
+        self.axes.set_ylim(self.properties["default_ylim"])
+        self.axes.set_xlim(self.properties["default_xlim"])
+        self.axes.patch.set_facecolor(self.properties["facecolor"])
+
+    def close_window_handler(self, event) -> None:
+
+        """
+        Handles when the window is closed by the user
+        """
+
+        self.GetParent().pixel_line_plot_closed()
+
+    def on_press_handler(self, event) -> None:
+
+        """
+        Press handler for panning
+        """
+
+        if event.inaxes != self.axes:
+            return
+        self.press = self.x0, self.y0, event.xdata, event.ydata
+        self.x0, self.y0, self.xpress, self.ypress = self.press
+
+    def on_release_handler(self, event) -> None:
+
+        """
+        Release handler for panning
+        """
+
+        self.press = None
+        self.canvas.draw()
+
+    def on_motion_handler(self, event, x_only: bool = True) -> None:
+
+        """
+        Motion handler for panning.
+        If x_only, panning is disabled for the y axis.
+        """
+
+        # Sanity check the event should be processed
+        if self.x_range is None or self.y_range is None:
+            return
+        if self.press is None:
+            return
+        if event.inaxes != self.axes:
+            return
+
+        # Handle x axis
+        dx = event.xdata - self.xpress
+        new_x = self.axes.get_xlim() - dx
+        # Only pan if within the range of data
+        if new_x[0] > self.x_range[0] and new_x[1] < self.x_range[1]:
+            self.axes.set_xlim(new_x)
+        if x_only:
+            self.canvas.draw()
+            return
+
+        # Handle y axis
+        dy = event.ydata - self.ypress
+        new_y = self.axes.get_ylim() - dy
+        # Only pan if within the range of data
+        if new_y[0] > self.yrange[0] and new_y[1] < self.y_range[1]:
+            self.axes.set_ylim(new_y)
+
+        self.canvas.draw()
+
+    def zoom_handler(self, event, x_only: bool = True) -> None:
+
+        """
+        Handles all zooming events, bound to the mouse wheel.
+        If x_only, ylim remains constant.
+        """
+
+        # Sanity check event should be processed
+        if self.x_range is None or self.y_range is None:
+            return
+
+        xdata = event.xdata
+        ydata = event.ydata
+
+        if xdata is None or ydata is None:
+            return
+
+        # Get current limits
+        cur_xlim = self.axes.get_xlim()
+        cur_ylim = self.axes.get_ylim()
+
+        # Zoom in
+        if event.button == "down":
+            scale_factor = 1 / self.base_zoom_level
+        # Zoom out
+        elif event.button == "up":
+            scale_factor = self.base_zoom_level
+        # Should never happen
+        else:
+            scale_factor = 1
+
+        # Get new x range and clamp to max x range
+        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
+        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
+
+        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
+        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
+
+        new_xmin = xdata - new_width * (1 - relx)
+
+        # Clamp to maximum zoom out level
+        if new_xmin < self.x_range[0]:
+            new_xmin = self.x_range[0]
+        new_xmax = xdata + new_width * (relx)
+        if new_xmax > self.x_range[1]:
+            new_xmax = self.x_range[1]
+
+        # Do nothing if trying to zoom in beyond maximum level
+        if new_xmax - new_xmin < self.properties["min_delta_x_range"]:
+            return
+
+        if x_only:
+            self.axes.set_xlim([new_xmin, new_xmax])
+            self.canvas.draw()
+            return
+
+        # Get new y range and clamp to max y range
+        new_ymin = ydata - new_height * (1 - rely)
+        if new_ymin < self.y_range[0]:
+            new_ymin = self.y_range[0]
+        new_ymax = ydata + new_height * (rely)
+        if new_ymax > self.y_range[1]:
+            new_ymax = self.y_range[1]
+
+        # Do nothing if trying to zoom in beyond maximum level
+        if new_ymax - new_ymin < self.properties["min_delta_y_range"]:
+            return
+
+        self.axes.set_ylim([new_ymin, new_ymax])
+
+    def get_properties(self, **kwargs) -> Dict[str, Union[str, int, Tuple]]:
+
+        """
+        Where all plot params are set.
+        """
+
+        default_values = {
+            "facecolor": "#FFE4E4",
+            "linecolor": "black",
+            "bboxcolor": "blue",
+            "centroid_marker_color": "red",
+            "centroid_marker": "+",
+            "centroid_markersize": 15,
+            "figsize": (10, 0.5),
+            "xlabel": "ToF (usec)",
+            "ylabel": "Intensity (AU)",
+            "min_delta_y_range": 1,
+            "min_delta_x_range": 500,
+            "default_xlim": (0, 17500),
+            "default_ylim": (0, 1000),
+            "default_window_size": (1024, 450),
+            "default_window_position": (0, self.GetSize()[0] - 500),
+        }
+        graph_properties = dict(default_values)
+        graph_properties.update(kwargs)
+        return graph_properties
+
+    def get_pixel_bbox_centroid_positions(self, panel: int, coords: Tuple[int, int]):
+        all_bboxes = []
+        all_centroids = []
+        for rt in self.reflection_table_list:
+            bboxes, centroids = rt.get_pixel_bbox_centroid_positions(panel, coords)
+            all_bboxes += list(bboxes)
+            all_centroids += list(centroids)
+        return all_bboxes, all_centroids
+
+    def draw(
+        self,
+        panel_idx: int,
+        coords: Tuple,
+        bboxes: Tuple = None,
+        centroids: Tuple = None,
+    ) -> None:
+
+        """
+        Updates the plot with a line plot at coords from panel panel_idx.
+        If bboxes or centroids are given, these are also added to the plot.
+        """
+        px = int(coords[0])
+        py = int(coords[1])
+        x, spectra = self.imageset.get_pixel_spectra(panel_idx, px, py)
+        self.x_range = (min(x), max(x))
+        self.y_range = (min(spectra), max(spectra))
+        self.axes.cla()
+        self.axes.plot(x, spectra, c=self.properties["linecolor"])
+        if bboxes:
+            for bbox in bboxes:
+                x0 = x[bbox[0]]
+                x1 = x[bbox[1]]
+                y0 = min(spectra[bbox[0] : bbox[1]])
+                y1 = max(spectra[bbox[0] : bbox[1]])
+                self.axes.plot(
+                    [x0, x0, x1, x1],
+                    [y0, y1, y1, y0],
+                    lw=1,
+                    c=self.properties["bboxcolor"],
+                )
+        if centroids:
+            for centroid in centroids:
+                cx = x[int(centroid)]
+                cy = spectra[int(centroid)]
+                self.axes.plot(
+                    [cx],
+                    [cy],
+                    self.properties["centroid_marker"],
+                    markersize=self.properties["centroid_markersize"],
+                    c=self.properties["centroid_marker_color"],
+                )
+
+        self.axes.set_title(f"panel {panel_idx} at ({px}, {py})")
+        self.axes.set_xlabel(self.properties["xlabel"])
+        self.axes.set_ylabel(self.properties["ylabel"])
+        self.axes.set_xlim(self.x_range)
+        if self.y_range[1] < self.properties["default_ylim"][1]:
+            self.axes.set_ylim(self.properties["default_ylim"])
+        else:
+            self.axes.set_ylim(self.y_range)
+        self.axes.patch.set_facecolor(self.properties["facecolor"])
+        self.canvas.draw()
+
+
 class SpotSettingsFrame(wx.MiniFrame):
     def __init__(self, *args, **kwds):
         super().__init__(*args, **kwds)
@@ -1812,6 +2230,7 @@ class SpotSettingsPanel(wx.Panel):
         self.settings.show_shoebox = self.params.show_shoebox
         self.settings.show_indexed = self.params.show_indexed
         self.settings.show_integrated = self.params.show_integrated
+        self.settings.show_pixel_line_plot = False
         self.settings.show_predictions = self.params.show_predictions
         self.settings.show_miller_indices = self.params.show_miller_indices
         self.settings.fontsize = 10
@@ -1995,6 +2414,20 @@ class SpotSettingsPanel(wx.Panel):
         self.integrated = wx.CheckBox(self, -1, "Integrated only")
         self.integrated.SetValue(self.settings.show_integrated)
         grid.Add(self.integrated, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+
+        # Toggle pixel line plot
+        self.show_pixel_line_plot = wx.CheckBox(self, -1, "Show pixel line plot")
+        self.show_pixel_line_plot.SetValue(self.settings.show_pixel_line_plot)
+        grid.Add(self.show_pixel_line_plot, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 5)
+        if (
+            not self.GetParent()
+            .GetParent()
+            .imageset_valid_for_pixel_line_plot(
+                self.GetParent().GetParent().images.selected.image_set
+            )
+        ):
+            self.show_pixel_line_plot.SetValue(False)
+            self.show_pixel_line_plot.Enable(False)
 
         grid = wx.FlexGridSizer(cols=2, rows=1, vgap=0, hgap=0)
         self.clear_all_button = wx.Button(self, -1, "Clear all")
@@ -2195,6 +2628,7 @@ class SpotSettingsPanel(wx.Panel):
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.indexed)
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.integrated)
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.show_basis_vectors)
+        self.Bind(wx.EVT_CHECKBOX, self.OnUpdate, self.show_pixel_line_plot)
         self.Bind(wx.EVT_CHECKBOX, self.OnUpdateShowMask, self.show_mask)
 
         self.Bind(wx.EVT_UPDATE_UI, self.UpdateZoomCtrl)
@@ -2250,6 +2684,7 @@ class SpotSettingsPanel(wx.Panel):
             self.settings.min_local = self.min_local_ctrl.GetPhilValue()
             self.settings.gain = self.gain_ctrl.GetPhilValue()
             self.settings.find_spots_phil = self.save_params_txt_ctrl.GetPhilValue()
+            self.settings.show_pixel_line_plot = self.show_pixel_line_plot.GetValue()
 
     def UpdateZoomCtrl(self, event):
         self.settings.zoom_level = self.levels.index(
