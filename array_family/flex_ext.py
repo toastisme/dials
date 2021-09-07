@@ -1030,10 +1030,8 @@ class _:
                 return False
         return True
 
-    coord = [int, int]
-
     def get_pixel_bbox_centroid_positions(
-        self, panel: int, pixel_pos: coord
+        self, panel: int, pixel_pos: Tuple[int, int]
     ) -> Tuple[list, list]:
 
         """
