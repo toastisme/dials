@@ -524,7 +524,14 @@ class SpotFrame(XrayFrame):
 
     def imageset_valid_for_pixel_line_plot(self, imageset: ImageSet) -> bool:
         if ImageSet.is_sequence(imageset):
-            fmt_inst = imageset.get_format_class().get_instance(imageset.get_template())
+            if imageset.data().has_single_file_reader():
+                fmt_inst = imageset.get_format_class().get_instance(
+                    imageset.get_template()
+                )
+            else:
+                fmt_inst = imageset.get_format_class().get_instance(
+                    imageset.get_path(0)
+                )
             if hasattr(fmt_inst, "get_pixel_spectra"):
                 return True
         return False
