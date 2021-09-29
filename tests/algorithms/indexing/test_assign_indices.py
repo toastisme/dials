@@ -9,7 +9,7 @@ import pytest
 from cctbx import crystal, sgtbx
 from cctbx.sgtbx import bravais_types
 from dxtbx.format import Format
-from dxtbx.imageset import ImageSetData, RotImageSequence
+from dxtbx.imageset import ImageSequence, ImageSetData
 from dxtbx.model import (
     Crystal,
     DetectorFactory,
@@ -99,7 +99,7 @@ def experiment():
     isetdata = ImageSetData(
         reader=Format.Reader(None, ["path"] * len(scan)), masker=None
     )
-    iset = RotImageSequence(
+    iset = ImageSequence(
         isetdata, beam=beam, detector=detector, goniometer=goniometer, sequence=scan
     )
 

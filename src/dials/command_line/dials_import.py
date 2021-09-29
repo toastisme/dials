@@ -9,12 +9,8 @@ import warnings
 from collections import namedtuple
 
 import dxtbx.model.compare as compare
-<<<<<<< HEAD:src/dials/command_line/dials_import.py
 import libtbx.phil
-from dxtbx.imageset import ImageGrid, ImageSequence
-=======
-from dxtbx.imageset import ImageGrid, ImageSet, RotImageSequence
->>>>>>> More name changes from scan to sequence.:command_line/dials_import.py
+from dxtbx.imageset import ImageGrid, ImageSequence, ImageSet
 from dxtbx.model.experiment_list import (
     Experiment,
     ExperimentList,
@@ -346,8 +342,9 @@ class ManualGeometryUpdater:
         """
         from copy import deepcopy
 
-        from dxtbx.imageset import ImageSetFactory, RotImageSequence
+        from dxtbx.imageset import ImageSequence, ImageSetFactory
         from dxtbx.model import (
+            BeamFactory,
             DetectorFactory,
             GoniometerFactory,
             MonochromaticBeamFactory,
@@ -359,13 +356,11 @@ class ManualGeometryUpdater:
             for j in imageset.indices():
                 imageset.set_sequence(None, j)
                 imageset.set_goniometer(None, j)
-        if not isinstance(imageset, RotImageSequence):
+        if not isinstance(imageset, ImageSequence):
             if self.params.geometry.convert_stills_to_sequences:
                 imageset = self.convert_stills_to_sequence(imageset)
-        if isinstance(imageset, RotImageSequence):
-            beam = MonochromaticBeamFactory.from_phil(
-                self.params.geometry, imageset.get_beam()
-            )
+        if isinstance(imageset, ImageSequence):
+            beam = BeamFactory.from_phil(self.params.geometry, imageset.get_beam())
             detector = DetectorFactory.from_phil(
                 self.params.geometry, imageset.get_detector(), beam
             )
@@ -576,7 +571,7 @@ class MetaDataUpdater:
             # Append to new imageset list
             if ImageSet.is_sequence(imageset):
                 if (
-                    isinstance(imageset, RotImageSequence)
+                    isinstance(imageset, ImageSequence)
                     and imageset.get_sequence().is_still()
                 ):
                     # make lots of experiments all pointing at one
@@ -853,7 +848,7 @@ def assert_single_sequence(experiments, params):
                 continue
             if ImageSet.is_sequence(e.imageset):
                 if (
-                    isinstance(e.imageset, RotImageSequence)
+                    isinstance(e.imageset, ImageSequence)
                     and e.imageset.get_sequence().is_still()
                 ):
                     num_still_sequences += 1
@@ -1016,38 +1011,6 @@ def do_import(
     write_experiments(experiments, params)
     return experiments
 
-<<<<<<< HEAD:src/dials/command_line/dials_import.py
-=======
-    def assert_single_sequence(self, experiments, params):
-        """
-        Print an error message if more than 1 sequence
-        """
-        sequences = [
-            e.imageset for e in experiments if ImageSet.is_sequence(e.imageset)
-        ]
-
-        if len(sequences) > 1:
-
-            # Print some info about multiple sequences
-            self.diagnose_multiple_sequences(sequences, params)
-
-            # Raise exception
-            raise Sorry(
-                """
-        More than 1 sequence was found. Two things may be happening here:
-
-        1. There really is more than 1 sequence. If you expected this to be the
-           case, set the parameter allow_multiple_sequences=True. If you don't
-           expect this, then check the input to dials.import.
-
-        2. There may be something wrong with your image headers (for example,
-           the rotation ranges of each image may not match up). You should
-           investigate what went wrong, but you can force dials.import to treat
-           your images as a single sequence by using the template=image_####.cbf
-           parameter (see help).
-      """
-            )
->>>>>>> More name changes from scan to sequence.:command_line/dials_import.py
 
 @show_mail_handle_errors()
 def run(args=None, *, phil=phil_scope):

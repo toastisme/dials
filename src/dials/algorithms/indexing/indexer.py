@@ -8,7 +8,7 @@ import pkg_resources
 import iotbx.phil
 import libtbx
 from cctbx import sgtbx
-from dxtbx.model import ExperimentList, RotImageSequence, TOFImageSequence
+from dxtbx.model import ExperimentList, ImageSequence
 
 import dials.util
 from dials.algorithms.indexing import (
@@ -383,7 +383,7 @@ class Indexer:
             has_stills = False
             has_sequences = False
             for expt in experiments:
-                if isinstance(expt.imageset, RotImageSequence):
+                if isinstance(expt.imageset, ImageSequence):
                     has_sequences = True
                 else:
                     has_stills = True
@@ -421,10 +421,7 @@ class Indexer:
                     # specific to rotations vs. stills, so here reset any ImageSequences to stills.
                     # Note, dials.stills_process resets ImageSequences to ImageSets already,
                     # and it's not free (the ImageSet cache is dropped), only do it if needed
-                    if type(experiment.imageset) in [
-                        RotImageSequence,
-                        TOFImageSequence,
-                    ]:
+                    if type(experiment.imageset) in [ImageSequence]:
                         experiment.imageset = ImageSet(
                             experiment.imageset.data(), experiment.imageset.indices()
                         )

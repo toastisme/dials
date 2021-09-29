@@ -213,7 +213,7 @@ def run(args=None, phil=working_phil):
         phil=phil,
         read_reflections=True,
         read_experiments=True,
-        check_format=False,
+        check_format=True,
         epilog=help_message,
     )
 

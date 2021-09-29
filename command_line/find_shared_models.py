@@ -2,7 +2,7 @@ import datetime
 import logging
 from collections import Counter
 
-from dxtbx.imageset import RotImageSequence
+from dxtbx.imageset import ImageSequence
 from libtbx.phil import parse
 
 from dials.util import log, show_mail_handle_errors, tabulate
@@ -77,7 +77,7 @@ class Script:
         # Get the list of sequences
         sequences = []
         for experiment in experiments:
-            if isinstance(experiment.imageset, RotImageSequence):
+            if isinstance(experiment.imageset, ImageSequence):
                 sequences.append(experiment.imageset)
         logger.info("Number of sequences = %d", len(sequences))
 
