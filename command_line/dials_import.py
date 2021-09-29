@@ -5,7 +5,7 @@ import pickle
 from collections import namedtuple
 
 import dxtbx.model.compare as compare
-from dxtbx.imageset import ImageGrid, ImageSet, RotImageSequence
+from dxtbx.imageset import ImageGrid, ImageSequence, ImageSet
 from dxtbx.model.experiment_list import (
     Experiment,
     ExperimentList,
@@ -343,8 +343,9 @@ class ManualGeometryUpdater:
         """
         from copy import deepcopy
 
-        from dxtbx.imageset import ImageSetFactory, RotImageSequence
+        from dxtbx.imageset import ImageSequence, ImageSetFactory
         from dxtbx.model import (
+            BeamFactory,
             DetectorFactory,
             GoniometerFactory,
             MonochromaticBeamFactory,
@@ -356,13 +357,11 @@ class ManualGeometryUpdater:
             for j in imageset.indices():
                 imageset.set_sequence(None, j)
                 imageset.set_goniometer(None, j)
-        if not isinstance(imageset, RotImageSequence):
+        if not isinstance(imageset, ImageSequence):
             if self.params.geometry.convert_stills_to_sequences:
                 imageset = self.convert_stills_to_sequence(imageset)
-        if isinstance(imageset, RotImageSequence):
-            beam = MonochromaticBeamFactory.from_phil(
-                self.params.geometry, imageset.get_beam()
-            )
+        if isinstance(imageset, ImageSequence):
+            beam = BeamFactory.from_phil(self.params.geometry, imageset.get_beam())
             detector = DetectorFactory.from_phil(
                 self.params.geometry, imageset.get_detector(), beam
             )
@@ -573,7 +572,7 @@ class MetaDataUpdater:
             # Append to new imageset list
             if ImageSet.is_sequence(imageset):
                 if (
-                    isinstance(imageset, RotImageSequence)
+                    isinstance(imageset, ImageSequence)
                     and imageset.get_sequence().is_still()
                 ):
                     # make lots of experiments all pointing at one
@@ -839,7 +838,7 @@ class ImageImporter:
                 continue
             if ImageSet.is_sequence(e.imageset):
                 if (
-                    isinstance(e.imageset, RotImageSequence)
+                    isinstance(e.imageset, ImageSequence)
                     and e.imageset.get_sequence().is_still()
                 ):
                     num_still_sequences += 1
