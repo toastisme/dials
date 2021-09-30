@@ -10,7 +10,7 @@ from typing import Iterable, Tuple
 import libtbx
 from dxtbx.format.image import ImageBool
 from dxtbx.imageset import ImageSequence, ImageSet
-from dxtbx.model import ExperimentList
+from dxtbx.model import ExperimentList, Scan
 
 from dials.array_family import flex
 from dials.model.data import PixelList, PixelListLabeller
@@ -264,7 +264,10 @@ def pixel_list_to_shoeboxes(
     spotsizes = flex.size_t()
     hotpixels = tuple(flex.size_t() for i in range(len(imageset.get_detector())))
     if isinstance(imageset, ImageSequence):
-        twod = imageset.get_sequence().is_still()
+        if isinstance(imageset.get_sequence(), Scan):
+            twod = imageset.get_sequence().is_still()
+        else:
+            twod = False
     else:
         twod = True
     for i, (p, hp) in enumerate(zip(pixel_labeller, hotpixels)):
