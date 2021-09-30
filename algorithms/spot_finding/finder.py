@@ -9,8 +9,8 @@ from typing import Iterable, Tuple
 
 import libtbx
 from dxtbx.format.image import ImageBool
-from dxtbx.imageset import ImageSet, RotImageSequence, TOFImageSequence
-from dxtbx.model import ExperimentList
+from dxtbx.imageset import ImageSequence, ImageSet
+from dxtbx.model import ExperimentList, Scan
 
 from dials.array_family import flex
 from dials.model.data import PixelList, PixelListLabeller
@@ -61,7 +61,7 @@ class ExtractPixelsFromImage:
         :param index: The index of the image
         """
         # Get the frame number
-        if isinstance(self.imageset, RotImageSequence):
+        if isinstance(self.imageset, ImageSequence):
             frame = self.imageset.get_array_range()[0] + index
         else:
             ind = self.imageset.indices()
@@ -263,10 +263,11 @@ def pixel_list_to_shoeboxes(
     shoeboxes = flex.shoebox()
     spotsizes = flex.size_t()
     hotpixels = tuple(flex.size_t() for i in range(len(imageset.get_detector())))
-    if isinstance(imageset, RotImageSequence):
-        twod = imageset.get_sequence().is_still()
-    elif isinstance(imageset, TOFImageSequence):
-        twod = False
+    if isinstance(imageset, ImageSequence):
+        if isinstance(imageset.get_sequence(), Scan):
+            twod = imageset.get_sequence().is_still()
+        else:
+            twod = False
     else:
         twod = True
     for i, (p, hp) in enumerate(zip(pixel_labeller, hotpixels)):

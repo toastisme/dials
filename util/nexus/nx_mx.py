@@ -708,7 +708,7 @@ def load_crystal(entry):
 
 
 def dump(entry, experiments, params):
-    from dxtbx.imageset import RotImageSequence
+    from dxtbx.imageset import ImageSequence
 
     print("Dumping NXmx")
 
@@ -768,7 +768,7 @@ def dump(entry, experiments, params):
         else:
             from os.path import abspath
 
-            if isinstance(experiment.imageset, RotImageSequence):
+            if isinstance(experiment.imageset, ImageSequence):
                 template = abspath(experiment.imageset.get_template())
                 nx_dials["template"] = template
                 nx_dials["template"].attrs[
