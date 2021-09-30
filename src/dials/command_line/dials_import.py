@@ -11,6 +11,7 @@ from collections import namedtuple
 import dxtbx.model.compare as compare
 import libtbx.phil
 from dxtbx.imageset import ImageGrid, ImageSequence, ImageSet
+from dxtbx.model import Scan
 from dxtbx.model.experiment_list import (
     Experiment,
     ExperimentList,
@@ -571,7 +572,7 @@ class MetaDataUpdater:
             # Append to new imageset list
             if ImageSet.is_sequence(imageset):
                 if (
-                    isinstance(imageset, ImageSequence)
+                    isinstance(imageset.get_sequence(), Scan)
                     and imageset.get_sequence().is_still()
                 ):
                     # make lots of experiments all pointing at one
@@ -848,7 +849,7 @@ def assert_single_sequence(experiments, params):
                 continue
             if ImageSet.is_sequence(e.imageset):
                 if (
-                    isinstance(e.imageset, ImageSequence)
+                    isinstance(e.imageset.get_sequence(), Scan)
                     and e.imageset.get_sequence().is_still()
                 ):
                     num_still_sequences += 1
