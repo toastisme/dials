@@ -63,21 +63,18 @@ class Render3d:
     def load_models(self, experiments, reflections):
         self.experiments = experiments
         self.reflections_input = reflections
-        if (
-            self.experiments[0].goniometer is not None
-            and "tof_wavelength" not in reflections
-        ):
+        if self.experiments[0].goniometer is not None:
             self.viewer.set_rotation_axis(
                 self.experiments[0].goniometer.get_rotation_axis()
             )
-        self.viewer.set_beam_vector(self.experiments[0].beam.get_s0())
+        self.viewer.set_beam_vector(self.experiments[0].beam.get_unit_s0())
         if self.settings.beam_centre is None:
             try:
                 (
                     self.settings.beam_centre_panel,
                     self.settings.beam_centre,
                 ) = self.experiments[0].detector.get_ray_intersection(
-                    self.experiments[0].beam.get_s0()
+                    self.experiments[0].beam.get_unit_s0()
                 )
             except RuntimeError:
                 pass

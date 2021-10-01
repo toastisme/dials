@@ -1400,7 +1400,7 @@ Found %s"""
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
                 s0s = cctbx.array_family.flex.vec3_double(len(s1))
-                xyz_mm_value = cctbx.array_family.flex.vec3_double(len(s1))
+                tofs = cctbx.array_family.flex.double(len(s1))
 
                 for j in range(len(s1)):
                     s1n = np.linalg.norm(s1[j]) * 10 ** -3
@@ -1408,11 +1408,11 @@ Found %s"""
                         L0_in_m + s1n, frame_tof_vals[j]
                     )
                     s0s[j] = get_tof_s0(unit_s0, wavelengths[j])
-                    xyz_mm_value[i] = np.asarray((x[i], y[i], frame_tof_vals[i]))
+                    tofs[j] = float(frame_tof_vals[j])
 
                 self["wavelength"].set_selected(sel, wavelengths)
                 self["s0"].set_selected(sel, s0s)
-                self["xyzobs.mm.value"].set_selected(sel, xyz_mm_value)
+                self["tof"].set_selected(sel, tofs)
 
         def add_monochromatic_data(sel_expt):
 
@@ -1502,7 +1502,6 @@ Found %s"""
                             np.array(s1[s1_idx]) - np.array(expt.beam.get_unit_s0())
                         ) / wavelengths[s1_idx]
                 else:
-
                     s1 = s1 / s1.norms() * (1 / expt.beam.get_wavelength())
                     S = s1 - expt.beam.get_s0()
                 self["s1"].set_selected(sel, s1)
