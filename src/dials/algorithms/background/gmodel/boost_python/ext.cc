@@ -44,7 +44,7 @@ namespace dials { namespace algorithms { namespace background { namespace boost_
       .def("mask", &PolarTransformResult::mask);
 
     class_<PolarTransform>("PolarTransform", no_init)
-      .def(init<const MonochromaticBeam &, const Panel &, const Goniometer &>())
+      .def(init<const MonoBeam &, const Panel &, const Goniometer &>())
       .def("image_xmap", &PolarTransform::image_xmap)
       .def("image_ymap", &PolarTransform::image_ymap)
       .def("discontinuity", &PolarTransform::discontinuity)

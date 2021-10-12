@@ -30,7 +30,7 @@ namespace dials {
       namespace gaussian_rs {
 
   // Use a load of stuff from other namespaces
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -70,7 +70,7 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator3D(const MonochromaticBeam &beam,
+    BBoxCalculator3D(const MonoBeam &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
                      const Scan &scan,
@@ -94,7 +94,7 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator3D(const MonochromaticBeam &beam,
+    BBoxCalculator3D(const MonoBeam &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
                      const Scan &scan,
@@ -252,7 +252,7 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator2D(const MonochromaticBeam &beam,
+    BBoxCalculator2D(const MonoBeam &beam,
                      const Detector &detector,
                      double delta_divergence,
                      double delta_mosaicity)

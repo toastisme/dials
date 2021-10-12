@@ -14,7 +14,7 @@ from dxtbx.model import (
     Crystal,
     DetectorFactory,
     GoniometerFactory,
-    MonochromaticBeamFactory,
+    MonoBeamFactory,
     SequenceFactory,
 )
 from dxtbx.model.experiment_list import Experiment, ExperimentList
@@ -72,9 +72,7 @@ def crystal_factory():
 
 @pytest.fixture
 def experiment():
-    beam = MonochromaticBeamFactory.make_beam(
-        wavelength=0.97625, sample_to_source=(0, 0, 1)
-    )
+    beam = MonoBeamFactory.make_beam(wavelength=0.97625, sample_to_source=(0, 0, 1))
 
     detector = DetectorFactory.simple(
         sensor="PAD",

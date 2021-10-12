@@ -174,7 +174,7 @@ Panel:
     t0: 0.32
 Max resolution (at corners): 1.008375
 Max resolution (inscribed):  1.204621
-MonochromaticBeam:
+MonoBeam:
     wavelength: 0.9795
     sample to source direction : {0,0,1}
     divergence: 0

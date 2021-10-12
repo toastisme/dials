@@ -19,7 +19,7 @@
 
 namespace dials { namespace util {
 
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Panel;
   using scitbx::vec2;
   using scitbx::vec3;
@@ -34,7 +34,7 @@ namespace dials { namespace util {
      * @param beam The beam model
      * @param panel The panel model
      */
-    ResolutionMaskGenerator(const MonochromaticBeam &beam, const Panel &panel)
+    ResolutionMaskGenerator(const MonoBeam &beam, const Panel &panel)
         : resolution_(
           af::c_grid<2>(panel.get_image_size()[1], panel.get_image_size()[0])) {
       vec3<double> s0 = beam.get_s0();

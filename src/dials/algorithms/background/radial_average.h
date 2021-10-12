@@ -17,13 +17,13 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Panel;
 
   class RadialAverage {
   public:
-    RadialAverage(boost::shared_ptr<MonochromaticBeam> beam,
+    RadialAverage(boost::shared_ptr<MonoBeam> beam,
                   const Detector &detector,
                   double vmin,
                   double vmax,
@@ -92,7 +92,7 @@ namespace dials { namespace algorithms {
     }
 
   private:
-    boost::shared_ptr<MonochromaticBeam> beam_;
+    boost::shared_ptr<MonoBeam> beam_;
     Detector detector_;
     af::shared<double> sum_;
     af::shared<double> weight_;

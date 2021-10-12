@@ -24,7 +24,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Panel;
@@ -45,7 +45,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialise the sampler
      */
-    EwaldSphereSampler(const boost::shared_ptr<MonochromaticBeam> beam,
+    EwaldSphereSampler(const boost::shared_ptr<MonoBeam> beam,
                        const Detector &detector,
                        const Goniometer &goniometer,
                        const Scan &scan,
@@ -314,7 +314,7 @@ namespace dials { namespace algorithms {
       return coord_[index];
     }
 
-    boost::shared_ptr<MonochromaticBeam> beam() const {
+    boost::shared_ptr<MonoBeam> beam() const {
       return beam_;
     }
 
@@ -340,7 +340,7 @@ namespace dials { namespace algorithms {
       return par_sum + iy + iz * tot_sum;
     }
 
-    boost::shared_ptr<MonochromaticBeam> beam_;
+    boost::shared_ptr<MonoBeam> beam_;
     Detector detector_;
     Goniometer goniometer_;
     Scan scan_;

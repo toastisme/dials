@@ -11,7 +11,7 @@ from dxtbx.model import (
     Crystal,
     DetectorFactory,
     GoniometerFactory,
-    MonochromaticBeamFactory,
+    MonoBeamFactory,
     SequenceFactory,
 )
 from iotbx import pdb
@@ -51,7 +51,7 @@ class Simulation:
         )
 
         # Set up beam
-        self.beam = MonochromaticBeamFactory.make_simple_beam(wavelength=1)
+        self.beam = MonoBeamFactory.make_simple_beam(wavelength=1)
 
         # Set up scan
         sequence_width = 90.0

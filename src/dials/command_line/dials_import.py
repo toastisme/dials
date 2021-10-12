@@ -348,7 +348,7 @@ class ManualGeometryUpdater:
             BeamFactory,
             DetectorFactory,
             GoniometerFactory,
-            MonochromaticBeamFactory,
+            MonoBeamFactory,
             SequenceFactory,
         )
 
@@ -388,7 +388,7 @@ class ManualGeometryUpdater:
                 imageset.set_sequence(sequence)
         else:
             for i in range(len(imageset)):
-                beam = MonochromaticBeamFactory.from_phil(
+                beam = MonoBeamFactory.from_phil(
                     self.params.geometry, imageset.get_beam(i)
                 )
                 detector = DetectorFactory.from_phil(

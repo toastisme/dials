@@ -25,7 +25,7 @@ namespace dials { namespace algorithms {
   using dials::algorithms::polygon::spatial_interpolation::grid_to_quad;
   using dials::algorithms::polygon::spatial_interpolation::Match;
   using dials::algorithms::polygon::spatial_interpolation::quad_to_grid;
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Panel;
@@ -67,7 +67,7 @@ namespace dials { namespace algorithms {
      * @param panel The panel model
      * @param goniometer The goniometer model
      */
-    PolarTransform(const MonochromaticBeam &beam,
+    PolarTransform(const MonoBeam &beam,
                    const Panel &panel,
                    const Goniometer &goniometer) {
       // Set some image sizes

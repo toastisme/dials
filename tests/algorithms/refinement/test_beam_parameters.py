@@ -9,7 +9,7 @@ from scitbx import matrix
 
 
 def test_beam_parameters():
-    from dxtbx.model import MonochromaticBeamFactory
+    from dxtbx.model import MonoBeamFactory
 
     from dials.algorithms.refinement.parameterisation.beam_parameters import (
         BeamParameterisation,
@@ -20,7 +20,7 @@ def test_beam_parameters():
     )
 
     # make a random beam vector and parameterise it
-    s0 = MonochromaticBeamFactory.make_beam(
+    s0 = MonoBeamFactory.make_beam(
         sample_to_source=matrix.col.random(3, 0.5, 1.5), wavelength=1.2
     )
     s0p = BeamParameterisation(s0)
@@ -37,7 +37,7 @@ def test_beam_parameters():
     for i in range(attempts):
 
         # make a random beam vector and parameterise it
-        s0 = MonochromaticBeamFactory.make_beam(
+        s0 = MonoBeamFactory.make_beam(
             sample_to_source=matrix.col.random(3, 0.5, 1.5),
             wavelength=random.uniform(0.8, 1.5),
         )

@@ -10,14 +10,7 @@ import pytest
 
 from cctbx import crystal, miller, uctbx
 from cctbx.sgtbx import space_group
-from dxtbx.model import (
-    Crystal,
-    Detector,
-    Experiment,
-    Goniometer,
-    MonochromaticBeam,
-    Scan,
-)
+from dxtbx.model import Crystal, Detector, Experiment, Goniometer, MonoBeam, Scan
 from dxtbx.model.experiment_list import ExperimentList
 from libtbx import phil
 
@@ -120,7 +113,7 @@ def generated_exp(n=1, scan=True, image_range=[0, 10]):
         scan = Scan(image_range=image_range, oscillation=[0.0, 1.0])
     else:
         scan = None
-    beam = MonochromaticBeam(s0=(0.0, 0.0, 1.01))
+    beam = MonoBeam(s0=(0.0, 0.0, 1.01))
     goniometer = Goniometer((1.0, 0.0, 0.0))
     goniometer_2 = Goniometer((1.0, 1.0, 0.0))
     detector = Detector()
