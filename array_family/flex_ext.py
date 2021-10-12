@@ -1302,7 +1302,7 @@ Found %s"""
         """
         Adds wavelength, tof, s0, and unit_s0 columns to self.
         All experiments with a TOFSequence have values set from their time-of-flight.
-        All monochromatic experiments just take values from the MonochromaticBeam object,
+        All monochromatic experiments just take values from the MonoBeam object,
         with a tof value of -1.
         """
 

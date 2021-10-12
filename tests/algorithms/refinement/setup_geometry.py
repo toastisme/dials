@@ -3,12 +3,7 @@
 
 import random
 
-from dxtbx.model import (
-    Crystal,
-    DetectorFactory,
-    GoniometerFactory,
-    MonochromaticBeamFactory,
-)
+from dxtbx.model import Crystal, DetectorFactory, GoniometerFactory, MonoBeamFactory
 from libtbx.phil import command_line, parse
 from scitbx import matrix
 
@@ -111,9 +106,7 @@ class Extract:
 
             beam_dir = matrix.col(self._params.beam.direction.exactly)
 
-        self.beam = MonochromaticBeamFactory.make_beam(
-            unit_s0=beam_dir, wavelength=wavelength
-        )
+        self.beam = MonoBeamFactory.make_beam(unit_s0=beam_dir, wavelength=wavelength)
 
     def build_detector(self):
 

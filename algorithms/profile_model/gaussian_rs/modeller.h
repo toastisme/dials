@@ -28,7 +28,7 @@ namespace dials { namespace algorithms {
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformReverse;
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformSpec;
   using dials::model::Shoebox;
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -47,7 +47,7 @@ namespace dials { namespace algorithms {
 
     enum FitMethod { ReciprocalSpace = 1, DetectorSpace = 2 };
 
-    GaussianRSProfileModellerBase(const boost::shared_ptr<MonochromaticBeam> beam,
+    GaussianRSProfileModellerBase(const boost::shared_ptr<MonoBeam> beam,
                                   const Detector &detector,
                                   const Goniometer &goniometer,
                                   const Scan &scan,
@@ -77,7 +77,7 @@ namespace dials { namespace algorithms {
                                 grid_method)) {}
 
   protected:
-    boost::shared_ptr<SamplerIface> init_sampler(boost::shared_ptr<MonochromaticBeam> beam,
+    boost::shared_ptr<SamplerIface> init_sampler(boost::shared_ptr<MonoBeam> beam,
                                                  const Detector &detector,
                                                  const Goniometer &goniometer,
                                                  const Scan &scan,
@@ -113,7 +113,7 @@ namespace dials { namespace algorithms {
       return sampler;
     }
 
-    boost::shared_ptr<MonochromaticBeam> beam_;
+    boost::shared_ptr<MonoBeam> beam_;
     Detector detector_;
     Goniometer goniometer_;
     Scan scan_;
@@ -169,7 +169,7 @@ namespace dials { namespace algorithms {
      * @param threshold The modelling threshold value
      * @param grid_method The gridding method
      */
-    GaussianRSProfileModeller(boost::shared_ptr<MonochromaticBeam> beam,
+    GaussianRSProfileModeller(boost::shared_ptr<MonoBeam> beam,
                               const Detector &detector,
                               const Goniometer &goniometer,
                               const Scan &scan,
@@ -207,7 +207,7 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(sampler_ != 0);
     }
 
-    boost::shared_ptr<MonochromaticBeam> beam() const {
+    boost::shared_ptr<MonoBeam> beam() const {
       return beam_;
     }
 

@@ -58,7 +58,7 @@ namespace dials { namespace util { namespace boost_python {
          arg("s0n")));
 
     class_<ResolutionMaskGenerator>("ResolutionMaskGenerator", no_init)
-      .def(init<const MonochromaticBeam &, const Panel &>())
+      .def(init<const MonoBeam &, const Panel &>())
       .def("apply", &ResolutionMaskGenerator::apply);
 
     python_streambuf_wrapper::wrap();

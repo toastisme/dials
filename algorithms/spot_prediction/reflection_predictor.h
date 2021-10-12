@@ -32,7 +32,7 @@ namespace dials { namespace algorithms {
 
   using boost::shared_ptr;
   using dials::model::Ray;
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::is_angle_in_range;
@@ -86,7 +86,7 @@ namespace dials { namespace algorithms {
      * Keep a reference to all the models.
      */
     ScanStaticReflectionPredictor(
-      const boost::shared_ptr<MonochromaticBeam> beam,
+      const boost::shared_ptr<MonoBeam> beam,
       const Detector &detector,
       const Goniometer &goniometer,
       const Scan &scan,
@@ -369,7 +369,7 @@ namespace dials { namespace algorithms {
       p.flags.push_back(0);
     }
 
-    boost::shared_ptr<MonochromaticBeam> beam_;
+    boost::shared_ptr<MonoBeam> beam_;
     Detector detector_;
     Goniometer goniometer_;
     Scan scan_;
@@ -403,7 +403,7 @@ namespace dials { namespace algorithms {
      * Initialise the predictor
      */
     ScanVaryingReflectionPredictor(
-      const boost::shared_ptr<MonochromaticBeam> beam,
+      const boost::shared_ptr<MonoBeam> beam,
       const Detector &detector,
       const Goniometer &goniometer,
       const Scan &scan,
@@ -428,7 +428,7 @@ namespace dials { namespace algorithms {
     /**
      * Return the beam model
      */
-    boost::shared_ptr<MonochromaticBeam> beam() const {
+    boost::shared_ptr<MonoBeam> beam() const {
       return beam_;
     }
 
@@ -904,7 +904,7 @@ namespace dials { namespace algorithms {
       p.flags.push_back(0);
     }
 
-    boost::shared_ptr<MonochromaticBeam> beam_;
+    boost::shared_ptr<MonoBeam> beam_;
     Detector detector_;
     Goniometer goniometer_;
     Scan scan_;
@@ -926,7 +926,7 @@ namespace dials { namespace algorithms {
      * Initialise the predictor
      */
     StillsDeltaPsiReflectionPredictor(
-      const boost::shared_ptr<MonochromaticBeam> beam,
+      const boost::shared_ptr<MonoBeam> beam,
       const Detector &detector,
       mat3<double> ub,
       const cctbx::uctbx::unit_cell &unit_cell,
@@ -1160,7 +1160,7 @@ namespace dials { namespace algorithms {
     }
 
   protected:
-    boost::shared_ptr<MonochromaticBeam> beam_;
+    boost::shared_ptr<MonoBeam> beam_;
     Detector detector_;
     mat3<double> ub_;
     cctbx::uctbx::unit_cell unit_cell_;
@@ -1176,7 +1176,7 @@ namespace dials { namespace algorithms {
      */
   public:
     NaveStillsReflectionPredictor(
-      const boost::shared_ptr<MonochromaticBeam> beam,
+      const boost::shared_ptr<MonoBeam> beam,
       const Detector &detector,
       mat3<double> ub,
       const cctbx::uctbx::unit_cell &unit_cell,
@@ -1244,7 +1244,7 @@ namespace dials { namespace algorithms {
      * Initialise the predictor
      */
     SphericalRelpStillsReflectionPredictor(
-      const boost::shared_ptr<MonochromaticBeam> beam,
+      const boost::shared_ptr<MonoBeam> beam,
       const Detector &detector,
       mat3<double> ub,
       const cctbx::uctbx::unit_cell &unit_cell,

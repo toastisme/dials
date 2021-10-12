@@ -23,7 +23,7 @@ namespace dials { namespace algorithms { namespace background { namespace boost_
         (arg("reflections"), arg("value")));
 
     class_<RadialAverage>("RadialAverage", no_init)
-      .def(init<boost::shared_ptr<MonochromaticBeam>,
+      .def(init<boost::shared_ptr<MonoBeam>,
                 const Detector&,
                 double,
                 double,

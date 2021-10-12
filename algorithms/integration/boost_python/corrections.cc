@@ -28,8 +28,8 @@ namespace dials { namespace algorithms { namespace boost_python {
     def("qe_correction", &qe_correction, (arg("mu"), arg("t0"), arg("s1"), arg("n")));
 
     class_<Corrections>("Corrections", no_init)
-      .def(init<const MonochromaticBeam&, const Goniometer&, const Detector&>())
-      .def(init<const MonochromaticBeam&, const Detector&>())
+      .def(init<const MonoBeam&, const Goniometer&, const Detector&>())
+      .def(init<const MonoBeam&, const Detector&>())
       .def("lp", &Corrections::lp, (arg("s1")))
       .def("qe", &Corrections::qe, (arg("s1"), arg("panel")));
 

@@ -60,7 +60,7 @@ namespace dials {
       double nsigma,
       std::size_t grid_size) {
       return boost::shared_ptr<TransformSpec>(new TransformSpec(
-        extract<boost::shared_ptr<MonochromaticBeam> >(experiment.attr("beam")),
+        extract<boost::shared_ptr<MonoBeam> >(experiment.attr("beam")),
         extract<Detector>(experiment.attr("detector")),
         extract<Goniometer>(experiment.attr("goniometer")),
         extract<Scan>(experiment.attr("scan")),
@@ -161,11 +161,11 @@ namespace dials {
 
     BOOST_PYTHON_MODULE(dials_algorithms_profile_model_gaussian_rs_transform_ext) {
       af::versa<vec3<double>, af::c_grid<2> > (*overload1)(
-        const Panel &, const MonochromaticBeam &, std::size_t, bool) = &beam_vector_map;
+        const Panel &, const MonoBeam &, std::size_t, bool) = &beam_vector_map;
       af::versa<vec3<double>, af::c_grid<2> > (*overload2)(
-        const Panel &, const MonochromaticBeam &, bool) = &beam_vector_map;
+        const Panel &, const MonoBeam &, bool) = &beam_vector_map;
       af::versa<vec3<double>, af::c_grid<2> > (*overload3)(
-        const Panel &, const MonochromaticBeam &) = &beam_vector_map;
+        const Panel &, const MonoBeam &) = &beam_vector_map;
 
       def("beam_vector_map",
           overload1,
@@ -218,7 +218,7 @@ namespace dials {
              (arg("frames"), arg("phi"), arg("zeta")));
 
       class_<TransformSpec>("TransformSpec", no_init)
-        .def(init<boost::shared_ptr<MonochromaticBeam>,
+        .def(init<boost::shared_ptr<MonoBeam>,
                   const Detector &,
                   const Goniometer &,
                   const Scan &,
