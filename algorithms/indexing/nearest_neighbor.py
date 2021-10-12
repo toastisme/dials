@@ -12,6 +12,7 @@ class NeighborAnalysis:
         histogram_binning="linear",
         nn_per_bin=5,
     ):
+
         self.tolerance = tolerance  # Margin of error for max unit cell estimate
         from scitbx.array_family import flex
 
@@ -26,7 +27,13 @@ class NeighborAnalysis:
         else:
             entering_flags = flex.bool(reflections.size(), True)
         rs_vectors = reflections["rlp"]
-        phi_deg = reflections["xyzobs.mm.value"].parts()[2] * (180 / math.pi)
+
+        if reflections.contains_tof_data():
+            z = reflections["tof"]
+            step_size = 0.003
+        else:
+            # Use rotation angle in deg
+            z = reflections["xyzobs.mm.value"].parts()[2] * (180 / math.pi)
 
         d_spacings = flex.double()
         # nearest neighbor analysis
@@ -36,16 +43,16 @@ class NeighborAnalysis:
             sel_imageset = reflections["imageset_id"] == imageset_id
             if sel_imageset.count(True) == 0:
                 continue
-            phi_min = flex.min(phi_deg.select(sel_imageset))
-            phi_max = flex.max(phi_deg.select(sel_imageset))
-            d_phi = phi_max - phi_min
-            n_steps = max(int(math.ceil(d_phi / step_size)), 1)
+            z_min = flex.min(z.select(sel_imageset))
+            z_max = flex.max(z.select(sel_imageset))
+            d_z = z_max - z_min
+            n_steps = max(int(math.ceil(d_z / step_size)), 1)
 
             for n in range(n_steps):
                 sel_step = (
                     sel_imageset
-                    & (phi_deg >= (phi_min + n * step_size))
-                    & (phi_deg < (phi_min + (n + 1) * step_size))
+                    & (z >= (z_min + n * step_size))
+                    & (z < (z_min + (n + 1) * step_size))
                 )
 
                 for entering in (True, False):
