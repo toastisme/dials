@@ -20,7 +20,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::CrystalBase;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
@@ -37,7 +37,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialize with models
      */
-    PixelToMillerIndex(const MonochromaticBeam &beam,
+    PixelToMillerIndex(const MonoBeam &beam,
                        const Detector &detector,
                        const Goniometer &goniometer,
                        const Scan &scan,
@@ -53,7 +53,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialize with models
      */
-    PixelToMillerIndex(const MonochromaticBeam &beam,
+    PixelToMillerIndex(const MonoBeam &beam,
                        const Detector &detector,
                        const CrystalBase &crystal)
         : detector_(detector),

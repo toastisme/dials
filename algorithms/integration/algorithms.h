@@ -42,7 +42,7 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -72,7 +72,7 @@ namespace dials { namespace algorithms {
      * @param delta_b The beam divergence
      * @param delta_m The mosaicity
      */
-    GaussianRSMaskCalculator(const MonochromaticBeam &beam,
+    GaussianRSMaskCalculator(const MonoBeam &beam,
                              const Detector &detector,
                              const Goniometer &gonio,
                              const Scan &scan,

@@ -1030,6 +1030,9 @@ class _:
                 return False
         return True
 
+    def contains_tof_data(self):
+        return "tof" in self
+
     def get_pixel_bbox_centroid_positions(
         self, panel: int, pixel_pos: Tuple[int, int]
     ) -> Tuple[list, list]:
@@ -1299,7 +1302,7 @@ Found %s"""
         """
         Adds wavelength, tof, s0, and unit_s0 columns to self.
         All experiments with a TOFSequence have values set from their time-of-flight.
-        All monochromatic experiments just take values from the MonochromaticBeam object,
+        All monochromatic experiments just take values from the MonoBeam object,
         with a tof value of -1.
         """
 
@@ -1325,7 +1328,7 @@ Found %s"""
 
         def add_tof_data(sel_expt):
 
-            L0_in_m = expt.beam.get_sample_to_moderator_distance()
+            L0_in_m = expt.beam.get_sample_to_moderator_distance() * 10 ** -3
             unit_s0 = np.asarray(expt.beam.get_unit_s0())
             tof_in_s = expt.sequence.get_tof_in_seconds()
             # Cubic spline for estimating ToF between frames

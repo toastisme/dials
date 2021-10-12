@@ -8,14 +8,10 @@ from scitbx import matrix
 class Model:
     def __init__(self, test_nave_model=False):
         # Set up experimental models with regular geometry
-        from dxtbx.model import (
-            DetectorFactory,
-            GoniometerFactory,
-            MonochromaticBeamFactory,
-        )
+        from dxtbx.model import DetectorFactory, GoniometerFactory, MonoBeamFactory
 
         # Beam along the Z axis
-        self.beam = MonochromaticBeamFactory.make_beam(
+        self.beam = MonoBeamFactory.make_beam(
             unit_s0=matrix.col((0, 0, 1)), wavelength=1.0
         )
 

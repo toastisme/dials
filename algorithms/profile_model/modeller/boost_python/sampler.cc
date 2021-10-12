@@ -112,7 +112,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def_pickle(CircleSamplerPickleSuite());
 
     class_<EwaldSphereSampler, bases<SamplerIface> >("EwaldSphereSampler", no_init)
-      .def(init<const boost::shared_ptr<MonochromaticBeam>,
+      .def(init<const boost::shared_ptr<MonoBeam>,
                 const Detector &,
                 const Goniometer &,
                 const Scan &,

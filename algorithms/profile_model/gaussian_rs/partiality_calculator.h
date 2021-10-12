@@ -32,7 +32,7 @@ namespace dials {
 
   // Use a load of stuff from other namespaces
   using boost::math::erf;
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -71,7 +71,7 @@ namespace dials {
      * @param scan The scan parameters
      * @param sigma_mosaicity The xds sigma_mosaicity parameter
      */
-    PartialityCalculator3D(const MonochromaticBeam &beam,
+    PartialityCalculator3D(const MonoBeam &beam,
                            const Goniometer &gonio,
                            const Scan &scan,
                            double sigma_m)
@@ -89,7 +89,7 @@ namespace dials {
      * @param scan The scan parameters
      * @param sigma_mosaicity The xds sigma_mosaicity parameter
      */
-    PartialityCalculator3D(const MonochromaticBeam &beam,
+    PartialityCalculator3D(const MonoBeam &beam,
                            const Goniometer &gonio,
                            const Scan &scan,
                            const af::const_ref<double> &sigma_m)
@@ -177,7 +177,7 @@ namespace dials {
      * @param beam The beam parameters
      * @param sigma_mosaicity The xds sigma_mosaicity parameter
      */
-    PartialityCalculator2D(const MonochromaticBeam &beam, double sigma_m) : s0_(beam.get_s0()) {}
+    PartialityCalculator2D(const MonoBeam &beam, double sigma_m) : s0_(beam.get_s0()) {}
 
     /**
      * Calculate the Partiality of the reflection.

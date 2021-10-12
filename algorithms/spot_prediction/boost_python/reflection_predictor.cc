@@ -20,7 +20,7 @@ namespace dials { namespace algorithms { namespace boost_python {
     typedef ScanStaticReflectionPredictor Predictor;
 
     class_<Predictor>("ScanStaticReflectionPredictor", no_init)
-      .def(init<const boost::shared_ptr<MonochromaticBeam>,
+      .def(init<const boost::shared_ptr<MonoBeam>,
                 const Detector&,
                 const Goniometer&,
                 const Scan&,
@@ -41,7 +41,7 @@ namespace dials { namespace algorithms { namespace boost_python {
     typedef ScanVaryingReflectionPredictor Predictor;
 
     class_<Predictor>("ScanVaryingReflectionPredictor", no_init)
-      .def(init<const boost::shared_ptr<MonochromaticBeam>,
+      .def(init<const boost::shared_ptr<MonoBeam>,
                 const Detector&,
                 const Goniometer&,
                 const Scan&,
@@ -74,7 +74,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       const af::const_ref<std::size_t>&) = &Predictor::operator();
 
     class_<Predictor>("StillsDeltaPsiReflectionPredictor", no_init)
-      .def(init<const boost::shared_ptr<MonochromaticBeam>,
+      .def(init<const boost::shared_ptr<MonoBeam>,
                 const Detector&,
                 mat3<double>,
                 const cctbx::uctbx::unit_cell&,
@@ -106,7 +106,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       const af::const_ref<std::size_t>&) = &Predictor::operator();
 
     class_<Predictor>("NaveStillsReflectionPredictor", no_init)
-      .def(init<const boost::shared_ptr<MonochromaticBeam>,
+      .def(init<const boost::shared_ptr<MonoBeam>,
                 const Detector&,
                 mat3<double>,
                 const cctbx::uctbx::unit_cell&,
@@ -140,7 +140,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       const af::const_ref<std::size_t>&) = &Predictor::operator();
 
     class_<Predictor>("SphericalRelpStillsReflectionPredictor", no_init)
-      .def(init<const boost::shared_ptr<MonochromaticBeam>,
+      .def(init<const boost::shared_ptr<MonoBeam>,
                 const Detector&,
                 mat3<double>,
                 const cctbx::uctbx::unit_cell&,

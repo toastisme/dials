@@ -27,7 +27,7 @@
 namespace dials { namespace algorithms {
 
   using dials::model::Foreground;
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -41,7 +41,7 @@ namespace dials { namespace algorithms {
    * space.
    */
   int simulate_reciprocal_space_gaussian(
-    const MonochromaticBeam &beam,
+    const MonoBeam &beam,
     const Detector &detector,
     const Goniometer &goniometer,
     const Scan &scan,
@@ -108,7 +108,7 @@ namespace dials { namespace algorithms {
    * space. Estimate the expected intensity within the masked region.
    */
   int integrate_reciprocal_space_gaussian(
-    const MonochromaticBeam &beam,
+    const MonoBeam &beam,
     const Detector &detector,
     const Goniometer &goniometer,
     const Scan &scan,

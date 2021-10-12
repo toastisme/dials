@@ -43,7 +43,7 @@ namespace dials { namespace af { namespace boost_python {
   using dials::model::PixelListLabeller;
   using dials::model::Shoebox;
   using dials::model::Valid;
-  using dxtbx::model::MonochromaticBeam;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::CrystalBase;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
@@ -871,7 +871,7 @@ namespace dials { namespace af { namespace boost_python {
   template <typename FloatType>
   af::shared<bool> mask_neighbouring(af::ref<Shoebox<FloatType> > self,
                                      af::const_ref<cctbx::miller::index<> > hkl,
-                                     const MonochromaticBeam &beam,
+                                     const MonoBeam &beam,
                                      const Detector &detector,
                                      const Goniometer &goniometer,
                                      const Scan &scan,
