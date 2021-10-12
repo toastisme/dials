@@ -418,12 +418,10 @@ class PredictionParameterisation:
             sel = panels == ipanel
             D.set_selected(sel, D_mat)
 
-        """
-        if reflections.contains_valid_tof_data():
-            s0 = reflections["tof_s0"]
+        if reflections.contains_beam_data():
+            s0 = reflections["s0"]
         else:
-        """
-        s0 = experiment.beam.get_s0()
+            s0 = experiment.beam.get_s0()
 
         result = {
             "s0": s0,
