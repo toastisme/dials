@@ -79,7 +79,9 @@ class TargetFactory:
 
         # Determine whether the target is in X, Y, Phi space or just X, Y to choose
         # the right Target to instantiate
-        if do_stills:
+        if experiments.is_single_tof_experiment():
+            targ = TOFLeastSquaresPositionalResidualWithRmsdCutoff
+        elif do_stills:
             if do_sparse:
                 from dials.algorithms.refinement.target_stills import (
                     LeastSquaresStillsResidualWithRmsdCutoffSparse as targ,
@@ -647,6 +649,97 @@ class LeastSquaresPositionalResidualWithRmsdCutoff(Target):
             and r[1] < self._binsize_cutoffs[1]
             and r[2] < self._binsize_cutoffs[2]
         ):
+            return True
+        return False
+
+
+class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
+    """An TOF implementation of the target class providing a least squares residual
+    in terms of detector impact position X, Y, terminating on achieved
+    rmsd (or on intrisic convergence of the chosen minimiser)"""
+
+    _grad_names = ["dX_dp", "dY_dp"]
+    rmsd_names = ["RMSD_X", "RMSD_Y"]
+    rmsd_units = ["mm", "mm"]
+
+    def __init__(
+        self,
+        experiments,
+        predictor,
+        reflection_manager,
+        prediction_parameterisation,
+        restraints_parameterisation,
+        frac_binsize_cutoff=0.33333,
+        absolute_cutoffs=None,
+        gradient_calculation_blocksize=None,
+    ):
+
+        Target.__init__(
+            self,
+            experiments,
+            predictor,
+            reflection_manager,
+            prediction_parameterisation,
+            restraints_parameterisation,
+            gradient_calculation_blocksize,
+        )
+
+        # Set up the RMSD achieved criterion. For simplicity, we take models from
+        # the first Experiment only. If this is not appropriate for refinement over
+        # all experiments then absolute cutoffs should be used instead.
+        detector = experiments[0].detector
+
+        if not absolute_cutoffs:
+            pixel_sizes = [p.get_pixel_size() for p in detector]
+            min_px_size_x = min(e[0] for e in pixel_sizes)
+            min_px_size_y = min(e[1] for e in pixel_sizes)
+            self._binsize_cutoffs = [
+                min_px_size_x * frac_binsize_cutoff,
+                min_px_size_y * frac_binsize_cutoff,
+            ]
+        else:
+            assert len(absolute_cutoffs) == 2
+            self._binsize_cutoffs = absolute_cutoffs
+
+    @staticmethod
+    def _extract_residuals_and_weights(matches):
+
+        # return residuals and weights as 1d flex.double vectors
+        residuals = flex.double.concatenate(matches["x_resid"], matches["y_resid"])
+
+        weights, w_y, w_z = matches["xyzobs.mm.weights"].parts()
+        weights.extend(w_y)
+
+        return residuals, weights
+
+    @staticmethod
+    def _extract_squared_residuals(matches):
+
+        residuals2 = flex.double.concatenate(matches["x_resid2"], matches["y_resid2"])
+
+        return residuals2
+
+    def _rmsds_core(self, reflections):
+        """calculate unweighted RMSDs for the specified reflections"""
+
+        resid_x = flex.sum(reflections["x_resid2"])
+        resid_y = flex.sum(reflections["y_resid2"])
+        n = len(reflections)
+
+        rmsds = (
+            math.sqrt(resid_x / n),
+            math.sqrt(resid_y / n),
+        )
+        return rmsds
+
+    def achieved(self):
+        """RMSD criterion for target achieved"""
+        r = self._rmsds if self._rmsds else self.rmsds()
+
+        # reset cached rmsds to avoid getting out of step
+        self._rmsds = None
+
+        if r[0] < self._binsize_cutoffs[0] and r[1] < self._binsize_cutoffs[1]:
             return True
         return False
 
