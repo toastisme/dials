@@ -220,9 +220,15 @@ class ModelRankWeighted(ModelRank):
 
     def score_by_rmsd_xy(self, reverse=False):
         # smaller rmsds = better
-        rmsd_x, rmsd_y, rmsd_z = flex.vec3_double(
-            s.rmsds for s in self.all_solutions
-        ).parts()
+        try:
+            rmsd_x, rmsd_y, rmsd_z = flex.vec3_double(
+                s.rmsds for s in self.all_solutions
+            ).parts()
+        except TypeError:
+            rmsd_x, rmsd_y = flex.vec2_double(
+                s.rmsds for s in self.all_solutions
+            ).parts()
+
         rmsd_xy = flex.sqrt(flex.pow2(rmsd_x) + flex.pow2(rmsd_y))
         score = flex.log(rmsd_xy) / math.log(2)
         return self.rmsd_weight * (score - flex.min(score))
@@ -272,10 +278,16 @@ class ModelRankWeighted(ModelRank):
 
         perm = flex.sort_permutation(combined_scores)
 
-        rmsd_x, rmsd_y, rmsd_z = flex.vec3_double(
-            s.rmsds for s in self.all_solutions
-        ).parts()
-        rmsd_xy = flex.sqrt(flex.pow2(rmsd_x) + flex.pow2(rmsd_y))
+        try:
+            rmsd_x, rmsd_y, rmsd_z = flex.vec3_double(
+                s.rmsds for s in self.all_solutions
+            ).parts()
+            rmsd_xy = flex.sqrt(flex.pow2(rmsd_x) + flex.pow2(rmsd_y))
+        except TypeError:
+            rmsd_x, rmsd_y = flex.vec2_double(
+                s.rmsds for s in self.all_solutions
+            ).parts()
+            rmsd_xy = flex.sqrt(flex.pow2(rmsd_x) + flex.pow2(rmsd_y))
 
         for i in perm:
             s = self.all_solutions[i]

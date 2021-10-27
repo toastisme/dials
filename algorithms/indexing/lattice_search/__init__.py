@@ -7,6 +7,7 @@ import pkg_resources
 
 import libtbx.phil
 import scitbx.matrix
+from dxtbx.model import Scan
 from dxtbx.model.experiment_list import Experiment, ExperimentList
 from scitbx.array_family import flex
 
@@ -191,7 +192,7 @@ class LatticeSearch(indexer.Indexer):
             experiments = ExperimentList()
             for i_expt, expt in enumerate(self.experiments):
                 # XXX Not sure if we still need this loop over self.experiments
-                if expt.sequence is not None:
+                if isinstance(expt.sequence, Scan):
                     start, end = expt.sequence.get_oscillation_range()
                     if (end - start) > 360:
                         # only use reflections from the first 360 degrees of the scan
