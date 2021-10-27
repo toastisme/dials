@@ -11,6 +11,8 @@ from dials_algorithms_spot_prediction_ext import (
     SphericalRelpStillsReflectionPredictor,
     StillsDeltaPsiReflectionPredictor,
     StillsRayPredictor,
+    TOFRayPredictor,
+    TOFReflectionPredictor,
     ray_intersection,
 )
 
@@ -29,7 +31,9 @@ __all__ = [
     "SphericalRelpStillsReflectionPredictor",
     "StillsDeltaPsiReflectionPredictor",
     "StillsRayPredictor",
+    "TOFRayPredictor",
     "StillsReflectionPredictor",
+    "TOFReflectionPredictor",
 ]
 
 
@@ -95,6 +99,17 @@ def ScanVaryingReflectionPredictor(
         dmin,
         margin,
         padding,
+    )
+
+
+def TOFReflectionPredictorPy(experiment, dmin):
+    return TOFReflectionPredictor(
+        experiment.beam.get_unit_s0(),
+        experiment.detector,
+        experiment.crystal.get_A(),
+        experiment.crystal.get_unit_cell(),
+        experiment.crystal.get_space_group().type(),
+        dmin,
     )
 
 
