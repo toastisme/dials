@@ -276,7 +276,6 @@ class RefinerFactory:
 
         # copy and filter the reflections
         reflections = cls._filter_reflections(reflections)
-
         return cls._build_components(params, reflections, experiments)
 
     @classmethod
@@ -291,6 +290,8 @@ class RefinerFactory:
         exps_are_stills = []
         for exp in experiments:
             if exp.sequence is None:
+                exps_are_stills.append(True)
+            elif exp.is_tof_experiment():
                 exps_are_stills.append(True)
             elif exp.sequence.get_num_images() == 1:
                 if single_as_still:
@@ -370,7 +371,11 @@ class RefinerFactory:
         x_calc, y_calc, phi_calc = obs["xyzcal.mm"].parts()
         obs["x_resid"] = x_calc - x_obs
         obs["y_resid"] = y_calc - y_obs
-        obs["phi_resid"] = phi_calc - phi_obs
+
+        if experiments.is_single_tof_experiment():
+            obs["wavelength_resid"] = obs["wavelength_cal"] - obs["wavelength"]
+        else:
+            obs["phi_resid"] = phi_calc - phi_obs
 
         # determine whether to do basic centroid analysis to automatically
         # determine outlier rejection block
