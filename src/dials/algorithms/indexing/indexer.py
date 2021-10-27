@@ -8,7 +8,7 @@ import pkg_resources
 import iotbx.phil
 import libtbx
 from cctbx import sgtbx
-from dxtbx.model import ExperimentList, ImageSequence
+from dxtbx.model import ExperimentList, ImageSequence, Scan
 
 import dials.util
 from dials.algorithms.indexing import (
@@ -828,7 +828,7 @@ class Indexer:
                     sel, panel.millimeter_to_pixel(xy_cal_mm.select(sel))
                 )
             x_px, y_px = xy_cal_px.parts()
-            if expt.sequence is not None:
+            if isinstance(expt.sequence, Scan):
                 z_px = expt.sequence.get_array_index_from_angle(z_rad, deg=False)
             else:
                 # must be a still image, z centroid not meaningful
