@@ -2,6 +2,7 @@ import logging
 import re
 
 import libtbx
+from dxtbx.model import Scan
 from libtbx.phil import parse
 
 from dials.algorithms.refinement import DialsRefineConfigError
@@ -29,6 +30,7 @@ from .detector_parameters import (
 )
 from .goniometer_parameters import GoniometerParameterisation
 from .prediction_parameters import (
+    TOFPredictionParameterisation,
     XYPhiPredictionParameterisation,
     XYPhiPredictionParameterisationSparse,
 )
@@ -390,6 +392,10 @@ def _set_n_intervals(smoother_params, analysis, scan, exp_ids):
 
 def _parameterise_beams(options, experiments, analysis):
     beam_params = []
+
+    if experiments.is_single_tof_experiment():
+        return beam_params
+
     sv_beam = options.scan_varying and not options.beam.force_static
     for ibeam, beam in enumerate(experiments.beams()):
         # The Beam is parameterised with reference to a goniometer axis (or None).
@@ -476,7 +482,7 @@ def _parameterise_crystals(options, experiments, analysis):
         goniometer, scan = assoc_models[0]
         if goniometer is None:
             # There should be no associated goniometer and scan models
-            if any(g or s for (g, s) in assoc_models):
+            if any(g or isinstance(s, Scan) for (g, s) in assoc_models):
                 raise DialsRefineConfigError(
                     "A crystal model appears in a mixture of scan and still "
                     "experiments, which is not supported"
@@ -794,11 +800,7 @@ def build_prediction_parameterisation(
     analysis = _centroid_analysis(options, experiments, reflection_manager)
 
     # Parameterise each unique model
-    """
-    if reflections is not None and reflections.contains_valid_tof_data():
-        beam_params = []
-    else:
-    """
+
     beam_params = _parameterise_beams(options, experiments, analysis)
     xl_ori_params, xl_uc_params = _parameterise_crystals(options, experiments, analysis)
     det_params = _parameterise_detectors(options, experiments, analysis)
@@ -806,7 +808,9 @@ def build_prediction_parameterisation(
 
     # Build the prediction equation parameterisation
     if do_stills:  # doing stills
-        if options.sparse:
+        if experiments.is_single_tof_experiment():
+            PredParam = TOFPredictionParameterisation
+        elif options.sparse:
             if options.spherical_relp_model:
                 PredParam = SphericalRelpStillsPredictionParameterisationSparse
             else:
