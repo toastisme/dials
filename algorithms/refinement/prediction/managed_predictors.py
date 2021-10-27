@@ -9,13 +9,15 @@
 
 from math import pi
 
+from scipy.constants import Planck, m_n
+
 from scitbx.array_family import flex
 
 from dials.algorithms.spot_prediction import ScanStaticRayPredictor
 from dials.algorithms.spot_prediction import ScanStaticReflectionPredictor as sc
 from dials.algorithms.spot_prediction import ScanVaryingReflectionPredictor as sv
 from dials.algorithms.spot_prediction import StillsReflectionPredictor as st
-from dials_array_family_flex_ext import reflection_table
+from dials.algorithms.spot_prediction import TOFReflectionPredictorPy
 
 # constants
 TWO_PI = 2.0 * pi
@@ -81,11 +83,6 @@ class ExperimentsPredictor:
             sel = reflections["id"] == iexp
             refs = reflections.select(sel)
 
-            """
-            if reflections.contains_valid_tof_data():
-                self._predict_one_tof_experiment(e, refs)
-            else:
-            """
             self._predict_one_experiment(e, refs)
             # write predictions back to overall reflections
             reflections.set_selected(sel, refs)
@@ -105,35 +102,39 @@ class ExperimentsPredictor:
         return reflections
 
 
-class ScansExperimentsPredictor(ExperimentsPredictor):
-    def _predict_one_tof_experiment(self, experiment, reflections):
-        updated_fields = [
-            "miller_index",
-            "entering",
-            "panel",
-            "s1",
-            "xyzcal.px",
-            "xyzcal.mm",
-            "flags",
-        ]
-        predicted_reflections = reflection_table()
-        for r in range(len(reflections)):
-            # wavelength = reflections[r]["wavelength"]
-            # s0 = reflections[r]["s0"]
-            predictor = sc(experiment)
-            UB = experiment.crystal.get_A()
-            reflection = reflection_table()
-            reflection["xyzcal.px"][0] = (
-                reflection["xyzcalpx"][0],
-                reflection["xyzcalpx"][1],
-                reflections[r]["xyzobs.px.value"][2],
-            )
-            reflection.extend(reflections[r : r + 1])
-            predictor.for_reflection_table(reflection, UB)
-            predicted_reflections.extend(reflection)
-        for i in updated_fields:
-            reflections[i] = predicted_reflections[i]
+class TOFExperimentsPredictor(ExperimentsPredictor):
+    def _predict_one_experiment(self, experiment, reflections):
 
+        dmin = experiment.detector.get_max_resolution(min(reflections["s0"]))
+        predictor = TOFReflectionPredictorPy(experiment, dmin)
+        UB = experiment.crystal.get_A()
+        predictor.for_reflection_table(reflections, UB)
+
+    def _post_prediction(self, reflections):
+
+        if "tof_cal" not in reflections:
+            reflections["tof_cal"] = flex.double(reflections.nrows())
+        for i, expt in enumerate(self._experiments):
+            if "imageset_id" in reflections:
+                sel_expt = reflections["imageset_id"] == i
+            else:
+                sel_expt = reflections["id"] == i
+            expt_reflections = reflections.select(sel_expt)
+            L = expt.beam.get_sample_to_moderator_distance()
+            expt_reflections = reflections.select(sel_expt)
+            for idx, reflection in enumerate(expt_reflections):
+                wavelength = expt_reflections[idx]["wavelength_cal"]
+                expt_reflections[idx]["tof_cal"] = self._calc_tof_from_wavelength(
+                    wavelength, L
+                )
+
+        return reflections
+
+    def _calc_tof_from_wavelength(self, wavelength, L):
+        return (wavelength * m_n * L) / Planck
+
+
+class ScansExperimentsPredictor(ExperimentsPredictor):
     def _predict_one_experiment(self, experiment, reflections):
 
         # scan-varying
@@ -199,37 +200,13 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
         UB = experiment.crystal.get_A()
         predictor.for_reflection_table(reflections, UB)
 
-    def _predict_one_tof_experiment(self, experiment, reflections):
-        updated_fields = [
-            "miller_index",
-            "entering",
-            "panel",
-            "s1",
-            "xyzcal.px",
-            "xyzcal.mm",
-            "flags",
-            "delpsical.rad",
-        ]
-        predicted_reflections = reflection_table()
-        for r in range(len(reflections)):
-            wavelength = reflections[r]["tof_wavelength"]
-            s0 = reflections[r]["tof_s0"]
-            experiment.beam.set_wavelength(wavelength)
-            experiment.beam.set_s0(s0)
-            predictor = st(experiment, spherical_relp=self.spherical_relp_model)
-            UB = experiment.crystal.get_A()
-            reflection = reflection_table()
-            reflection.extend(reflections[r : r + 1])
-            predictor.for_reflection_table(reflection, UB)
-            predicted_reflections.extend(reflection)
-        experiment.beam.set_wavelength(0.0)
-        for i in updated_fields:
-            reflections[i] = predicted_reflections[i]
-
 
 class ExperimentsPredictorFactory:
     @staticmethod
     def from_experiments(experiments, force_stills=False, spherical_relp=False):
+
+        if experiments.is_single_tof_experiment():
+            return TOFExperimentsPredictor(experiments)
 
         # Determine whether or not to use a stills predictor
         if not force_stills:

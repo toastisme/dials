@@ -6,6 +6,7 @@ import math
 import random
 
 import libtbx
+from dxtbx.model import Scan
 from libtbx.phil import parse
 from scitbx import matrix
 from scitbx.math import five_number_summary
@@ -226,8 +227,11 @@ class ReflectionManagerFactory:
             flex.set_random_seed(params.random_seed)
             logger.debug("Random seed set to %d", params.random_seed)
 
+        if experiments.is_single_tof_experiment():
+            refman = TOFReflectionManager
+
         # check whether we deal with stills or scans
-        if do_stills:
+        elif do_stills:
             refman = StillsReflectionManager
             # check incompatible weighting strategy
             if params.weighting_strategy.override == "statistical":
@@ -354,10 +358,8 @@ class ReflectionManager:
         self._axes = [
             matrix.col(g.get_rotation_axis()) if g else None for g in goniometers
         ]
-        if reflections.contains_beam_data():
-            self._s0vecs = [
-                matrix.col(reflections["s0"][r]) for r in range(len(reflections))
-            ]
+        if experiments.is_single_tof_experiment():
+            self._s0vecs = [None]
         else:
             self._s0vecs = [matrix.col(e.beam.get_s0()) for e in self._experiments]
 
@@ -605,7 +607,7 @@ class ReflectionManager:
             nrefs = sample_size = len(isel)
 
             # set sample size according to nref_per_degree (per experiment)
-            if exp.sequence and self._nref_per_degree:
+            if isinstance(exp.sequence, Scan) and self._nref_per_degree:
                 sequence_range_rad = exp.sequence.get_oscillation_range(deg=False)
                 width = abs(sequence_range_rad[1] - sequence_range_rad[0]) * RAD2DEG
                 if self._nref_per_degree is libtbx.Auto:
@@ -794,6 +796,70 @@ class StillsReflectionManager(ReflectionManager):
         rows.append(
             ["DeltaPsi weights"] + [f"{e * DEG2RAD ** 2:.4g}" for e in row_data]
         )
+
+        msg = (
+            f"\nSummary statistics for {nref} observations" + " matched to predictions:"
+        )
+        logger.info(msg)
+        logger.info(dials.util.tabulate(rows, header) + "\n")
+
+
+class TOFReflectionManager(ReflectionManager):
+    """Overloads for a Reflection Manager that does not exclude
+    reflections too close to the spindle, and reports only information
+    about X, and Y residuals"""
+
+    _weighting_strategy = weighting_strategies.StillsWeightingStrategy()
+    experiment_type = "ToF"
+
+    def _id_refs_to_keep(self, obs_data):
+        """Create a selection of observations that pass certain conditions.
+
+        Stills-specific version removes checks relevant only to experiments
+        with a rotation axis."""
+
+        # first exclude reflections with miller index set to 0,0,0
+        sel1 = obs_data["miller_index"] != (0, 0, 0)
+
+        # exclude reflections with overloads, as these have worse centroids
+        sel2 = ~obs_data.get_flags(obs_data.flags.overloaded)
+
+        # combine selections
+        sel = sel1 & sel2
+        inc = flex.size_t_range(len(obs_data)).select(sel)
+
+        return inc
+
+    def print_stats_on_matches(self):
+        """Print some basic statistics on the matches"""
+
+        l = self.get_matches()
+        nref = len(l)
+        if nref == 0:
+            logger.warning(
+                "Unable to calculate summary statistics for zero observations"
+            )
+            return
+
+        from scitbx.math import five_number_summary
+
+        try:
+            x_resid = l["x_resid"]
+            y_resid = l["y_resid"]
+            w_x, w_y, _ = l["xyzobs.mm.weights"].parts()
+        except KeyError:
+            return
+
+        header = ["", "Min", "Q1", "Med", "Q3", "Max"]
+        rows = []
+        row_data = five_number_summary(x_resid)
+        rows.append(["Xc - Xo (mm)"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(y_resid)
+        rows.append(["Yc - Yo (mm)"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(w_x)
+        rows.append(["X weights"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(w_y)
+        rows.append(["Y weights"] + [f"{e:.4g}" for e in row_data])
 
         msg = (
             f"\nSummary statistics for {nref} observations" + " matched to predictions:"
