@@ -250,6 +250,56 @@ namespace dials { namespace algorithms {
     vec3<double> s0_m2_plane;
   };
 
+  /**
+   * Class to predict s1 rays for ToF data 
+   */
+  class TOFRayPredictor{
+    public:
+      typedef cctbx::miller::index<> miller_index;
+
+      TOFRayPredictor(const vec3<double> unit_s0) : unit_s0_(unit_s0){
+        DIALS_ASSERT(unit_s0_.length() > 0.0);
+      }
+
+      /**
+       * For a given miller index and UB matrix, calculates the predicted s1 ray. 
+       * The TOFRayPredictor wavelength and s0 variables are updated during the calculation,
+       * so that they can be monitored for convergence.
+       * @param h The miller index
+       * @param ub The UB matrix
+       * @returns Ray
+       */
+      Ray operator()(const miller_index &h, 
+                     const mat3<double> &ub){
+
+        // Calculate the reciprocal lattice vector
+        vec3<double> q = ub * h;
+
+        // Calculate the wavelength required to meet the diffraction condition
+        wavelength_ = -2*((unit_s0_ * q)/(q *q));
+        DIALS_ASSERT(wavelength_ > 0);
+        s0_ = unit_s0_ / wavelength_;
+        DIALS_ASSERT(s0_.length() > 0);
+
+        // Calculate the Ray (default zero angle and 'entering' as false)
+        vec3<double> s1 = s0_ + q;
+        return Ray(s1, 0.0, false);
+      }
+
+      double get_wavelength() const{
+        return wavelength_;
+      }
+
+      vec3<double> get_s0() const{
+        return s0_;
+      }
+
+    private:
+      const vec3<double> unit_s0_;
+      double wavelength_;
+      vec3<double> s0_;
+  };
+
 }}  // namespace dials::algorithms
 
 #endif  // DIALS_ALGORITHMS_SPOT_PREDICTION_RAY_PREDICTOR_H
