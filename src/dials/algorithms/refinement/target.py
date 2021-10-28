@@ -659,8 +659,8 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
     rmsd (or on intrisic convergence of the chosen minimiser)"""
 
     _grad_names = ["dX_dp", "dY_dp"]
-    rmsd_names = ["RMSD_X", "RMSD_Y"]
-    rmsd_units = ["mm", "mm"]
+    rmsd_names = ["RMSD_X", "RMSD_Y", "RMSD_wavelength"]
+    rmsd_units = ["mm", "mm", "A"]
 
     def __init__(
         self,
@@ -724,11 +724,13 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
 
         resid_x = flex.sum(reflections["x_resid2"])
         resid_y = flex.sum(reflections["y_resid2"])
+        resid_wavelength = flex.sum(reflections["wavelength_resid"])
         n = len(reflections)
 
         rmsds = (
             math.sqrt(resid_x / n),
             math.sqrt(resid_y / n),
+            math.sqrt(resid_wavelength / n),
         )
         return rmsds
 

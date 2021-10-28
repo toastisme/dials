@@ -831,6 +831,9 @@ class Refiner:
             elif units == "rad":  # convert radians to degrees for reporting
                 header.append(name + "\n(deg)")
                 rmsd_multipliers.append(RAD2DEG)
+            elif name == "RMSD_wavelength" and units == "A":
+                header.append(name + f"\n({units})")
+                rmsd_multipliers.append(1.0)
             else:  # leave unknown units alone
                 header.append(name + "\n(" + units + ")")
 
@@ -904,6 +907,8 @@ class Refiner:
                 # will convert other angles in radians to degrees (e.g. for
                 # RMSD_DeltaPsi and RMSD_2theta)
                 header.append(name + "\n(deg)")
+            elif name == "RMSD_wavelength" and units == "A":
+                header.append(name + f"\n({units})")
             else:  # skip other/unknown RMSDs
                 pass
 
@@ -944,6 +949,8 @@ class Refiner:
                     rmsds.append(rmsd * images_per_rad)
                 elif units == "rad":
                     rmsds.append(rmsd * RAD2DEG)
+                elif name == "RMSD_wavelength" and units == "A":
+                    rmsds.append(rmsd)
             rows.append([str(iexp), str(num)] + [f"{r:.5g}" for r in rmsds])
 
         if len(rows) > 0:
@@ -982,6 +989,8 @@ class Refiner:
                     name == "RMSD_DeltaPsi" and units == "rad"
                 ):  # convert radians to degrees for reporting of stills
                     header.append(name + "\n(deg)")
+                elif name == "RMSD_wavelength" and units == "A":
+                    header.append(name + f"\n({units})")
                 else:  # skip RMSDs that cannot be expressed in image/scan space
                     pass
 
@@ -1008,6 +1017,8 @@ class Refiner:
                         rmsds.append(rmsd * images_per_rad)
                     elif name == "RMSD_DeltaPsi" and units == "rad":
                         rmsds.append(rmsd * RAD2DEG)
+                    elif name == "RMSD_wavelength" and units == "A":
+                        rmsds.append(rmsd)
                 rows.append([str(ipanel), str(num)] + [f"{r:.5g}" for r in rmsds])
 
             if len(rows) > 0:
