@@ -177,12 +177,15 @@ class ReciprocalLatticeViewer(wx.Frame, Render3d):
             )
 
     def set_detector_panel_numbers(self):
-        panel_numbers = sorted(list(set(self.reflections["panel"])))
+        panel_numbers = sorted(set(self.reflections["panel"]))
         panel_numbers = list(map(str, panel_numbers))
         self.settings_panel.filter_by_panel_ctrl.SetItems(panel_numbers)
 
     def update_settings(self, *args, **kwds):
-        self.set_beam_centre(self.settings.beam_centre_panel, self.settings.beam_centre)
+        if self.settings.beam_centre_panel and self.settings.beam_centre:
+            self.set_beam_centre(
+                self.settings.beam_centre_panel, self.settings.beam_centre
+            )
         self.map_points_to_reciprocal_space()
         self.set_points()
         self.viewer.update_settings(*args, **kwds)
@@ -493,10 +496,11 @@ class SettingsWindow(wxtbx.utils.SettingsPanel):
             self.parent.update_settings()
         except ValueError:  # Handle beam centre changes, which could fail
             self.settings.beam_centre_panel = old_beam_panel
-            self.settings.beam_centre = old_beam_centre
             self.beam_panel_ctrl.SetValue(old_beam_panel)
-            self.beam_fast_ctrl.SetValue(old_beam_centre[0])
-            self.beam_slow_ctrl.SetValue(old_beam_centre[1])
+            self.settings.beam_centre = old_beam_centre
+            if old_beam_centre is not None:
+                self.beam_fast_ctrl.SetValue(old_beam_centre[0])
+                self.beam_slow_ctrl.SetValue(old_beam_centre[1])
 
 
 class RLVWindow(wx_viewer.show_points_and_lines_mixin):
