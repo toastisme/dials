@@ -723,7 +723,7 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
         rmsds = (
             math.sqrt(resid_x / n),
             math.sqrt(resid_y / n),
-            math.sqrt(resid_wavelength / n),
+            math.sqrt(abs(resid_wavelength) / n),
         )
         return rmsds
 
