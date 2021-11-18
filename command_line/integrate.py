@@ -484,13 +484,16 @@ def run_integration(params, experiments, reference=None):
     logger.info("\n".join(("", "=" * 80, "")))
     logger.info(heading("Predicting reflections"))
 
-    # if reference.contains_valid_tof_data():
-    #    predicted = flex.reflection_table.tof_from_predictions_multi(
-    #        experiments[0], reference
-    #    )
-    # else:
+    if experiments.is_single_tof_experiment() and not params.prediction.d_min:
+
+        min_s0_idx = min(
+            range(len(reference["wavelength"])), key=reference["wavelength"].__getitem__
+        )
+        min_s0 = reference["s0"][min_s0_idx]
+        params.prediction.d_min = experiments[0].detector.get_max_resolution(min_s0)
+
     predicted = flex.reflection_table.from_predictions_multi(
-        experiments,
+        experiments=experiments,
         dmin=params.prediction.d_min,
         dmax=params.prediction.d_max,
         margin=params.prediction.margin,
