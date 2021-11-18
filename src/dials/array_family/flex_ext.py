@@ -106,45 +106,6 @@ class _:
         return predict()
 
     @staticmethod
-    def tof_from_predictions_multi(experiment, reflections, dmin=None, dmax=None):
-        result = dials_array_family_flex_ext.reflection_table()
-        current_wavelength = experiment.beam.get_wavelength()
-        current_s0 = experiment.beam.get_s0()
-        fmt_cls = experiment.imageset.get_format_class()
-        fmt_cls_inst = fmt_cls(experiment.imageset.paths()[0])
-        wavelengths = fmt_cls_inst.get_wavelength_channels_in_ang()
-
-        for idx, i in enumerate(wavelengths):
-            # for i in range(len(reflections)):
-            # experiment.beam.set_wavelength(reflections[i]["tof_wavelength"])
-            experiment.beam.set_wavelength(i)
-            rlist = dials_array_family_flex_ext.reflection_table.from_predictions(
-                experiment,
-                dmin=dmin,
-                dmax=dmax,
-            )
-            rlist["tof_wavelength"] = cctbx.array_family.flex.double(rlist.nrows(), i)
-            for j in range(len(rlist)):
-                # xyzcal_px[j] =  (rlist[j]["xyzcal.px"][0], rlist[j]["xyzcal.px"][1], idx+1)
-                rlist["xyzcal.px"][j] = (
-                    rlist[j]["xyzcal.px"][0],
-                    rlist[j]["xyzcal.px"][1],
-                    idx + 1,
-                )
-                # rlist[j]["xyzcal.px"] = cctbx.array_family.flex.vec3_double(1,(rlist[j]["xyzcal.px"][0], rlist[j]["xyzcal.px"][1], idx))
-            # rlist["tof_wavelength"] = cctbx.array_family.flex.double(rlist.nrows(), reflections[i]["tof_wavelength"])
-            rlist["tof_s0"] = cctbx.array_family.flex.vec3_double(
-                rlist.nrows(), experiment.beam.get_s0()
-            )
-            # rlist["xyzcal.px"] = xyzcal_px
-
-            result.extend(rlist)
-        result["id"] = cctbx.array_family.flex.int(len(result), 0)
-        experiment.beam.set_wavelength(current_wavelength)
-        experiment.beam.set_s0(current_s0)
-        return result
-
-    @staticmethod
     def from_predictions_multi(
         experiments, dmin=None, dmax=None, margin=1, force_static=False, padding=0
     ):

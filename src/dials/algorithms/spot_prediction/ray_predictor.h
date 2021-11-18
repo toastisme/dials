@@ -277,7 +277,6 @@ namespace dials { namespace algorithms {
 
         // Calculate the wavelength required to meet the diffraction condition
         wavelength_ = -2*((unit_s0_ * q)/(q *q));
-        DIALS_ASSERT(wavelength_ > 0);
         s0_ = unit_s0_ / wavelength_;
         DIALS_ASSERT(s0_.length() > 0);
 

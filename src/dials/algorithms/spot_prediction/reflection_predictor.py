@@ -62,6 +62,7 @@ class ReflectionPredictor:
             ScanStaticReflectionPredictor,
             ScanVaryingReflectionPredictor,
             StillsReflectionPredictor,
+            TOFReflectionPredictorPy,
         )
         from dials.array_family import flex
 
@@ -78,6 +79,15 @@ class ReflectionPredictor:
                     mask = result["d"] > dmax
                     result.del_selected(mask)
                 return result
+
+        if experiment.is_tof_experiment():
+            predictor = TOFReflectionPredictorPy(experiment=experiment, dmin=dmin)
+            predict = Predictor(
+                "ToF prediction",
+                lambda: predictor.for_ub(experiment.crystal.get_A()),
+            )
+            self._predict = predict
+            return
 
         # Check prediction to maximum resolution is possible
         wl = experiment.beam.get_wavelength()
