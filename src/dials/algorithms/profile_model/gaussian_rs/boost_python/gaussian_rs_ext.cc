@@ -206,6 +206,20 @@ namespace dials {
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
 
+      class_<BBoxCalculatorTOF>("BBoxCalculatorTOF", no_init)
+        .def(init<const PolyBeam&, const Detector&, double, double>(
+          (arg("beam"),
+           arg("detector"),
+           arg("delta_divergence"),
+           arg("delta_mosaicity"))))
+        .def("__call__",
+             &BBoxCalculatorTOF::single,
+             (arg("s0"), arg("s1"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &BBoxCalculatorTOF::array,
+             (arg("s0"), arg("s1"), arg("frame"), arg("panel")));
+          
+
       class_<BBoxMultiCalculator>("BBoxMultiCalculator")
         .def("append", &BBoxMultiCalculator::push_back)
         .def("__len__", &BBoxMultiCalculator::size)
