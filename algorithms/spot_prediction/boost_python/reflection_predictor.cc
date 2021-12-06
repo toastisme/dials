@@ -172,7 +172,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       const af::const_ref<std::size_t>&) = &Predictor::operator();
 
     class_<Predictor>("TOFReflectionPredictor", no_init)
-      .def(init<const vec3<double>&,
+      .def(init<const PolyBeam&,
                 const Detector&,
                 mat3<double>,
                 const cctbx::uctbx::unit_cell&,
