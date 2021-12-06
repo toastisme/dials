@@ -253,7 +253,7 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator2D(const boost::python::object &beam,
+    BBoxCalculator2D(const MonoBeam &beam,
                      const Detector &detector,
                      double delta_divergence,
                      double delta_mosaicity)
@@ -360,7 +360,11 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
+<<<<<<< HEAD:src/dials/algorithms/profile_model/gaussian_rs/bbox_calculator.h
     BBoxCalculatorTOF(const boost::python::object &beam,
+=======
+    BBoxCalculatorTOF(const PolyBeam &beam,
+>>>>>>> Added BBoxCalculatorTOF.:algorithms/profile_model/gaussian_rs/bbox_calculator.h
                      const Detector &detector,
                      double delta_divergence,
                      double delta_mosaicity)
