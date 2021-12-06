@@ -33,6 +33,7 @@ namespace dials { namespace algorithms {
   using boost::shared_ptr;
   using dials::model::Ray;
   using dxtbx::model::MonoBeam;
+  using dxtbx::model::PolyBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::is_angle_in_range;
@@ -1332,19 +1333,19 @@ namespace dials { namespace algorithms {
      * Initialise the predictor
      */
     TOFReflectionPredictor(
-      const vec3<double> &unit_s0,
+      const PolyBeam &beam,
       const Detector &detector,
       mat3<double> ub,
       const cctbx::uctbx::unit_cell &unit_cell,
       const cctbx::sgtbx::space_group_type &space_group_type,
       const double &dmin)
-        : unit_s0_(unit_s0),
+        : beam_(beam),
           detector_(detector),
           ub_(ub),
           unit_cell_(unit_cell),
           space_group_type_(space_group_type),
           dmin_(dmin),
-          predict_ray_(unit_s0_) {}
+          predict_ray_(beam.get_unit_s0()) {}
 
     /**
      * Predict all reflection.
@@ -1508,8 +1509,11 @@ namespace dials { namespace algorithms {
       Ray ray;
       ray = predict_ray_(h, ub);
       double wavelength = predict_ray_.get_wavelength();
-      vec3<double> s0 = predict_ray_.get_s0();
-      append_for_ray(p, h, ray, panel, wavelength, s0);
+      vec2<double> r = beam_.get_wavelength_range();
+      if (wavelength >= r[0] && wavelength <= r[1]){
+        vec3<double> s0 = predict_ray_.get_s0();
+        append_for_ray(p, h, ray, panel, wavelength, s0);
+      }
     }
 
     /**
@@ -1565,7 +1569,7 @@ namespace dials { namespace algorithms {
     }
 
   protected:
-    const vec3<double> unit_s0_;
+    PolyBeam beam_;
     Detector detector_;
     mat3<double> ub_;
     cctbx::uctbx::unit_cell unit_cell_;
