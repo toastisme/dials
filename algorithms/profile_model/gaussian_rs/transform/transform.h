@@ -79,10 +79,10 @@ namespace dials {
        * @param n_sigma The number of standard deviations
        * @param grid_size The size of the reflection basis grid
        */
-      TransformSpec(const boost::shared_ptr<MonoBeam> beam,
+      TransformSpec(const boost::python::object beam,
                     const Detector &detector,
                     const Goniometer &gonio,
-                    const Scan &scan,
+                    const boost::python::object &scan,
                     double sigma_b,
                     double sigma_m,
                     double n_sigma,
@@ -109,7 +109,7 @@ namespace dials {
       }
 
       /** @returns the beam */
-      const boost::shared_ptr<MonoBeam> beam() const {
+      const boost::python::object beam() const {
         return beam_;
       }
 
@@ -124,7 +124,7 @@ namespace dials {
       }
 
       /** @return the scan */
-      const Scan &scan() const {
+      const boost::python::object &scan() const {
         return scan_;
       }
 
@@ -164,10 +164,10 @@ namespace dials {
       }
 
     private:
-      boost::shared_ptr<MonoBeam> beam_;
+      boost::python::object beam_;
       Detector detector_;
       Goniometer goniometer_;
-      Scan scan_;
+      boost::python::object scan_;
       double sigma_b_;
       double sigma_m_;
       double n_sigma_;
@@ -254,20 +254,24 @@ namespace dials {
         // Calculate the fraction of intensity contributed from each data
         // frame to each grid coordinate
         vec2<int> zrange(bbox[4], bbox[5]);
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
+
 
         // Create the frame mapper
-        MapFramesForward<FloatType> map_frames_forward(spec.scan().get_array_range()[0],
-                                                       spec.scan().get_oscillation()[0],
-                                                       spec.scan().get_oscillation()[1],
+        MapFramesForward<FloatType> map_frames_forward(scan.get_array_range()[0],
+                                                       scan.get_oscillation()[0],
+                                                       scan.get_oscillation()[1],
                                                        spec.sigma_m(),
                                                        spec.n_sigma(),
                                                        spec.grid_size()[2] / 2);
         zfraction_arr_ = map_frames_forward(zrange, cs.phi(), cs.zeta());
 
         MapFramesReverse<FloatType> map_frames_backward(
-          spec.scan().get_array_range()[0],
-          spec.scan().get_oscillation()[0],
-          spec.scan().get_oscillation()[1],
+          scan.get_array_range()[0],
+          scan.get_oscillation()[0],
+          scan.get_oscillation()[1],
           spec.sigma_m(),
           spec.n_sigma(),
           spec.grid_size()[2] / 2);
@@ -591,12 +595,15 @@ namespace dials {
           }
         }
 
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data_.accessor()[0] + 1);
         for (std::size_t k = 0; k <= data_.accessor()[0]; ++k) {
           double c3 = zoff + k * zstep;
           double phip = cs.to_rotation_angle_fast(c3);
-          z[k] = spec.scan().get_array_index_from_angle(phip) - bbox[4];
+          z[k] = scan.get_array_index_from_angle(phip) - bbox[4];
         }
 
         // Get a list of pairs of overlapping polygons
@@ -739,13 +746,15 @@ namespace dials {
             xy(j, i) = xyp;
           }
         }
-
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data.accessor()[0] + 1);
         for (std::size_t k = 0; k <= data.accessor()[0]; ++k) {
           double c3 = zoff + k * zstep;
           double phip = cs.to_rotation_angle_fast(c3);
-          z[k] = spec.scan().get_array_index_from_angle(phip) - bbox[4];
+          z[k] = scan.get_array_index_from_angle(phip) - bbox[4];
         }
 
         // Get a list of pairs of overlapping polygons
@@ -887,20 +896,22 @@ namespace dials {
             xy(j, i) = xyp;
           }
         }
-
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data.accessor()[0] + 1);
         for (std::size_t k = 0; k <= data.accessor()[0]; ++k) {
           double c3 = zoff + k * zstep;
           double phip = cs.to_rotation_angle_fast(c3);
-          z[k] = spec.scan().get_array_index_from_angle(phip) - bbox[4];
+          z[k] = scan.get_array_index_from_angle(phip) - bbox[4];
         }
 
         // Create the frame mapper
         vec2<int> zrange(bbox[4], bbox[5]);
-        MapFramesReverse<double> map_frames(spec.scan().get_array_range()[0],
-                                            spec.scan().get_oscillation()[0],
-                                            spec.scan().get_oscillation()[1],
+        MapFramesReverse<double> map_frames(scan.get_array_range()[0],
+                                            scan.get_oscillation()[0],
+                                            scan.get_oscillation()[1],
                                             spec.sigma_m(),
                                             spec.n_sigma(),
                                             spec.grid_size()[2] / 2);
