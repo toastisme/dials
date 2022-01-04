@@ -60,10 +60,10 @@ namespace dials {
       double nsigma,
       std::size_t grid_size) {
       return boost::shared_ptr<TransformSpec>(new TransformSpec(
-        extract<boost::shared_ptr<MonoBeam> >(experiment.attr("beam")),
+        experiment.attr("beam"),
         extract<Detector>(experiment.attr("detector")),
         extract<Goniometer>(experiment.attr("goniometer")),
-        extract<Scan>(experiment.attr("scan")),
+        experiment.attr("scan"),
         sigma_b,
         sigma_m,
         nsigma,
@@ -218,10 +218,10 @@ namespace dials {
              (arg("frames"), arg("phi"), arg("zeta")));
 
       class_<TransformSpec>("TransformSpec", no_init)
-        .def(init<boost::shared_ptr<MonoBeam>,
+        .def(init<const boost::python::object&,
                   const Detector &,
                   const Goniometer &,
-                  const Scan &,
+                  const boost::python::object &,
                   double,
                   double,
                   double,
