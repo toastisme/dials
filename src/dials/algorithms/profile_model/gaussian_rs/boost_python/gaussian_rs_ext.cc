@@ -131,10 +131,10 @@ namespace dials {
         dials::algorithms::boost_python::empirical_profile_modeller_wrapper<
           GaussianRSProfileModeller>("GaussianRSProfileModeller");
       result
-        .def(init<boost::shared_ptr<MonoBeam>,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   double,
                   double,
                   double,
@@ -176,10 +176,10 @@ namespace dials {
              (arg("s1"), arg("frame"), arg("panel")));
 
       class_<BBoxCalculator3D, bases<BBoxCalculatorIface> >("BBoxCalculator3D", no_init)
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   double,
                   double>((arg("beam"),
                            arg("detector"),
@@ -187,10 +187,10 @@ namespace dials {
                            arg("scan"),
                            arg("delta_divergence"),
                            arg("delta_mosaicity"))))
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   const af::const_ref<double>,
                   const af::const_ref<double> >((arg("beam"),
                                                  arg("detector"),
@@ -200,14 +200,14 @@ namespace dials {
                                                  arg("delta_mosaicity"))));
 
       class_<BBoxCalculator2D, bases<BBoxCalculatorIface> >("BBoxCalculator2D", no_init)
-        .def(init<const MonoBeam&, const Detector&, double, double>(
+        .def(init<const boost::python::object&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
 
       class_<BBoxCalculatorTOF>("BBoxCalculatorTOF", no_init)
-        .def(init<const PolyBeam&, const Detector&, double, double>(
+        .def(init<const boost::python::object&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),
