@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from dxtbx.model import TOFSequence
 from libtbx.phil import parse
 
 from dials.array_family import flex
@@ -499,7 +500,7 @@ class Model(ProfileModelExt):
         beam,
         detector,
         goniometer=None,
-        scan=None,
+        sequence=None,
         sigma_b_multiplier=2.0,
         **kwargs,
     ):
@@ -525,13 +526,23 @@ class Model(ProfileModelExt):
 
         # Create the bbox calculator
         calculate = BBoxCalculator(
-            crystal, beam, detector, goniometer, scan, delta_b, delta_m
+            crystal, beam, detector, goniometer, sequence, delta_b, delta_m
         )
 
         # Calculate the bounding boxes of all the reflections
-        bbox = calculate(
-            reflections["s1"], reflections["xyzcal.px"].parts()[2], reflections["panel"]
-        )
+        if reflections.contains_beam_data() and isinstance(sequence, TOFSequence):
+            bbox = calculate(
+                reflections["s0_cal"],
+                reflections["s1"],
+                reflections["xyzcal.px"].parts()[2],
+                reflections["panel"],
+            )
+        else:
+            bbox = calculate(
+                reflections["s1"],
+                reflections["xyzcal.px"].parts()[2],
+                reflections["panel"],
+            )
 
         # Return the bounding boxes
         return bbox
@@ -611,19 +622,22 @@ class Model(ProfileModelExt):
             )
 
             # Return if no scan or gonio
-            if (
-                experiment.sequence is None
-                or experiment.goniometer is None
-                or experiment.sequence.is_still()
-            ):
+            if experiment.sequence is None:
+                return None
+            if experiment.goniometer is None and not experiment.is_tof_experiment():
+                return None
+            if not experiment.is_tof_experiment() and experiment.sequence.is_still():
                 return None
 
             # Compute the scan step
-            phi0, phi1 = experiment.sequence.get_oscillation_range(deg=True)
-            assert phi1 > phi0
-            phi_range = phi1 - phi0
+            if isinstance(experiment.sequence, TOFSequence):
+                z0, z1 = experiment.sequence.get_image_range()
+            else:
+                z0, z1 = experiment.sequence.get_oscillation_range(deg=True)
+            assert z1 > z0
+            z_range = z1 - z0
             num_scan_points = int(
-                ceil(phi_range / self.params.gaussian_rs.fitting.scan_step)
+                ceil(z_range / self.params.gaussian_rs.fitting.scan_step)
             )
             assert num_scan_points > 0
 
