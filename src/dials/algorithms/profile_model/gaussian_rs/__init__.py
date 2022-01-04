@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dxtbx.model import TOFSequence
 
 import dials.algorithms.profile_model.modeller  # noqa: F401; lgtm; true import dependency
 from dials.algorithms.profile_model.gaussian_rs.model import Model, phil_scope
@@ -6,6 +7,7 @@ from dials_algorithms_profile_model_gaussian_rs_ext import (
     BBoxCalculator2D,
     BBoxCalculator3D,
     BBoxCalculatorIface,
+    BBoxCalculatorTOF,
     BBoxMultiCalculator,
     CoordinateSystem,
     CoordinateSystem2d,
@@ -27,6 +29,7 @@ __all__ = [
     "BBoxCalculator",
     "BBoxCalculator2D",
     "BBoxCalculator3D",
+    "BBoxCalculatorTOF",
     "BBoxCalculatorIface",
     "BBoxMultiCalculator",
     "CoordinateSystem",
@@ -50,12 +53,16 @@ __all__ = [
 ]
 
 
-def BBoxCalculator(crystal, beam, detector, goniometer, scan, delta_b, delta_m):
+def BBoxCalculator(crystal, beam, detector, goniometer, sequence, delta_b, delta_m):
     """Return the relevant bbox calculator."""
-    if goniometer is None or scan is None or scan.is_still():
+    if isinstance(sequence, TOFSequence):
+        algorithm = BBoxCalculatorTOF(beam, detector, delta_b, delta_m)
+    elif goniometer is None or sequence is None or sequence.is_still():
         algorithm = BBoxCalculator2D(beam, detector, delta_b, delta_m)
     else:
-        algorithm = BBoxCalculator3D(beam, detector, goniometer, scan, delta_b, delta_m)
+        algorithm = BBoxCalculator3D(
+            beam, detector, goniometer, sequence, delta_b, delta_m
+        )
     return algorithm
 
 
