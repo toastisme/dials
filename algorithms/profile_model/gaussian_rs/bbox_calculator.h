@@ -71,16 +71,16 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator3D(const MonoBeam &beam,
+    BBoxCalculator3D(const boost::python::object &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
-                     const Scan &scan,
+                     const boost::python::object &scan,
                      double delta_divergence,
                      double delta_mosaicity)
-        : s0_(beam.get_s0()),
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
           m2_(gonio.get_rotation_axis()),
           detector_(detector),
-          scan_(scan),
+          scan_(boost::python::extract<Scan>(scan)),
           delta_divergence_(1, delta_divergence),
           delta_mosaicity_(1, delta_mosaicity) {
       DIALS_ASSERT(delta_divergence > 0.0);
@@ -95,22 +95,22 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator3D(const MonoBeam &beam,
+    BBoxCalculator3D(const boost::python::object &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
-                     const Scan &scan,
+                     const boost::python::object &scan,
                      const af::const_ref<double> &delta_divergence,
                      const af::const_ref<double> &delta_mosaicity)
-        : s0_(beam.get_s0()),
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
           m2_(gonio.get_rotation_axis()),
           detector_(detector),
-          scan_(scan),
+          scan_(boost::python::extract<Scan>(scan)),
           delta_divergence_(delta_divergence.begin(), delta_divergence.end()),
           delta_mosaicity_(delta_mosaicity.begin(), delta_mosaicity.end()) {
       DIALS_ASSERT(delta_divergence.all_gt(0.0));
       DIALS_ASSERT(delta_mosaicity.all_gt(0.0));
       DIALS_ASSERT(delta_divergence_.size() == delta_mosaicity_.size());
-      DIALS_ASSERT(delta_divergence_.size() == scan.get_num_images());
+      DIALS_ASSERT(delta_divergence_.size() == boost::python::extract<int>(scan.attr("get_num_images")));
       DIALS_ASSERT(delta_divergence_.size() > 0);
     }
 
@@ -253,12 +253,12 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator2D(const MonoBeam &beam,
-
+    BBoxCalculator2D(const boost::python::object &beam,
                      const Detector &detector,
                      double delta_divergence,
                      double delta_mosaicity)
-        : s0_(beam.get_s0()), detector_(detector), delta_divergence_(delta_divergence) {
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
+        detector_(detector), delta_divergence_(delta_divergence) {
       DIALS_ASSERT(delta_divergence > 0.0);
       DIALS_ASSERT(delta_mosaicity >= 0.0);
     }
@@ -360,7 +360,7 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculatorTOF(const PolyBeam &beam,
+    BBoxCalculatorTOF(const boost::python::object &beam,
                      const Detector &detector,
                      double delta_divergence,
                      double delta_mosaicity)
