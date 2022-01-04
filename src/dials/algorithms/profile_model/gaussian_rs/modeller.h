@@ -47,10 +47,10 @@ namespace dials { namespace algorithms {
 
     enum FitMethod { ReciprocalSpace = 1, DetectorSpace = 2 };
 
-    GaussianRSProfileModellerBase(const boost::shared_ptr<MonoBeam> beam,
+    GaussianRSProfileModellerBase(const boost::python::object &beam,
                                   const Detector &detector,
                                   const Goniometer &goniometer,
-                                  const Scan &scan,
+                                  const boost::python::object &scan,
                                   double sigma_b,
                                   double sigma_m,
                                   double n_sigma,
@@ -77,13 +77,13 @@ namespace dials { namespace algorithms {
                                 grid_method)) {}
 
   protected:
-    boost::shared_ptr<SamplerIface> init_sampler(boost::shared_ptr<MonoBeam> beam,
+    boost::shared_ptr<SamplerIface> init_sampler(const boost::python::object &beam,
                                                  const Detector &detector,
                                                  const Goniometer &goniometer,
-                                                 const Scan &scan,
+                                                 const boost::python::object &scan,
                                                  std::size_t num_scan_points,
                                                  int grid_method) {
-      int2 scan_range = scan.get_array_range();
+      int2 scan_range = boost::python::extract<int2>(scan.attr("get_array_range")());
       boost::shared_ptr<SamplerIface> sampler;
       if (grid_method == RegularGrid || grid_method == CircularGrid) {
         if (detector.size() > 1) {
@@ -104,19 +104,27 @@ namespace dials { namespace algorithms {
         sampler = boost::make_shared<CircleSampler>(
           detector[0].get_image_size(), scan_range, num_scan_points);
         break;
-      case SphericalGrid:
+      case SphericalGrid:{
+        std::string sequence_type = boost::python::extract<std::string>(scan.attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan rot_scan = boost::python::extract<Scan>(scan);
+        std::string beam_type = boost::python::extract<std::string>(beam.attr("__class__").attr("__name__"));
+        DIALS_ASSERT(beam_type == "MonoBeam");
+        boost::shared_ptr<MonoBeam> mono_beam = boost::python::extract<boost::shared_ptr<MonoBeam> >(beam);      
         sampler = boost::make_shared<EwaldSphereSampler>(
-          beam, detector, goniometer, scan, num_scan_points);
+          mono_beam, detector, goniometer, rot_scan, num_scan_points);
+        break;
+      }
       default:
         throw DIALS_ERROR("Unknown grid method");
       };
       return sampler;
     }
 
-    boost::shared_ptr<MonoBeam> beam_;
+    const boost::python::object beam_;
     Detector detector_;
     Goniometer goniometer_;
-    Scan scan_;
+    const boost::python::object scan_;
     double sigma_b_;
     double sigma_m_;
     double n_sigma_;
@@ -169,10 +177,11 @@ namespace dials { namespace algorithms {
      * @param threshold The modelling threshold value
      * @param grid_method The gridding method
      */
-    GaussianRSProfileModeller(boost::shared_ptr<MonoBeam> beam,
+    GaussianRSProfileModeller(
+                              const boost::python::object beam,
                               const Detector &detector,
                               const Goniometer &goniometer,
-                              const Scan &scan,
+                              const boost::python::object &scan,
                               double sigma_b,
                               double sigma_m,
                               double n_sigma,
@@ -207,7 +216,7 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(sampler_ != 0);
     }
 
-    boost::shared_ptr<MonoBeam> beam() const {
+    boost::python::object beam() const {
       return beam_;
     }
 
@@ -219,7 +228,7 @@ namespace dials { namespace algorithms {
       return goniometer_;
     }
 
-    Scan scan() const {
+    boost::python::object scan() const {
       return scan_;
     }
 
@@ -289,7 +298,7 @@ namespace dials { namespace algorithms {
         if (check1(flags[i], partiality[i], sbox[i])) {
           // Create the coordinate system
           vec3<double> m2 = spec_.goniometer().get_rotation_axis();
-          vec3<double> s0 = spec_.beam()->get_s0();
+          vec3<double> s0 = boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
           CoordinateSystem cs(m2, s0, s1[i], xyzmm[i][2]);
 
           // Create the data array
@@ -413,7 +422,7 @@ namespace dials { namespace algorithms {
 
             // Create the coordinate system
             vec3<double> m2 = spec_.goniometer().get_rotation_axis();
-            vec3<double> s0 = spec_.beam()->get_s0();
+            vec3<double> s0 = boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
             CoordinateSystem cs(m2, s0, s1[i], xyzmm[i][2]);
 
             // Create the data array
@@ -518,7 +527,7 @@ namespace dials { namespace algorithms {
 
             // Create the coordinate system
             vec3<double> m2 = spec_.goniometer().get_rotation_axis();
-            vec3<double> s0 = spec_.beam()->get_s0();
+            vec3<double> s0 = boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
             CoordinateSystem cs(m2, s0, s1[i], xyzmm[i][2]);
 
             // Compute the transform
