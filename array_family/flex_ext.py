@@ -1269,10 +1269,16 @@ Found %s"""
 
         import numpy as np
         from scipy import interpolate
-        from scipy.constants import Planck, m_n
+        from scipy.constants import Planck, c, m_n
 
         def get_tof_s0(s0_direction, tof_wavelength):
             return s0_direction * 1.0 / tof_wavelength
+
+        def get_energy(L: float, tof: float):
+            return (0.5 * m_n * (L / tof) ** 2) * 6.2415065e21
+
+        def get_spectra_idx_1D(fmt_instance, panel: int, x_px: int, y_px: int) -> int:
+            return fmt_instance.get_spectra_idx_1D(panel=panel, x_px=x_px, y_px=y_px)
 
         def get_tof_curve_coefficients(tof_vals):
             x = [i + 1 for i in range(len(tof_vals))]
@@ -1294,6 +1300,9 @@ Found %s"""
             tof_in_s = expt.sequence.get_tof_in_seconds()
             # Cubic spline for estimating ToF between frames
             tof_curve_coeffs = get_tof_curve_coefficients(tof_in_s)
+            fmt_instance = expt.imageset.get_format_class().get_instance(
+                expt.imageset.paths()[0], **expt.imageset.data().get_params()
+            )
 
             for i_panel in range(len(expt.detector)):
 
@@ -1305,21 +1314,38 @@ Found %s"""
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
+                s1_norm = s1 / s1.norms()
                 frame_tof_vals = get_frame_tof_vals(frame, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
+                energies = cctbx.array_family.flex.double(len(s1))
+                d_spacing = cctbx.array_family.flex.double(len(s1))
+                spectra_idx_1D = cctbx.array_family.flex.int(len(s1))
                 s0s = cctbx.array_family.flex.vec3_double(len(s1))
                 tofs = cctbx.array_family.flex.double(len(s1))
 
                 for j in range(len(s1)):
-                    s1n = np.linalg.norm(s1[j]) * 10 ** -3
+                    s1_length = np.linalg.norm(s1[j]) * 10 ** -3
                     wavelengths[j] = get_tof_wavelength_in_ang(
-                        L0_in_m + s1n, frame_tof_vals[j]
+                        L0_in_m + s1_length, frame_tof_vals[j]
                     )
                     s0s[j] = get_tof_s0(unit_s0, wavelengths[j])
+                    d_spacing[j] = 1 / np.linalg.norm(
+                        np.array(s1_norm[j]) - np.array(s0s[j]) / wavelengths[j]
+                    )
                     tofs[j] = float(frame_tof_vals[j])
+                    energies[j] = get_energy(L0_in_m + s1_length, frame_tof_vals[j])
+                    spectra_idx_1D[j] = get_spectra_idx_1D(
+                        fmt_instance=fmt_instance,
+                        panel=i_panel,
+                        x_px=int(px[j]),
+                        y_px=int(py[j]),
+                    )
 
                 self["wavelength"].set_selected(sel, wavelengths)
+                self["d_spacing"].set_selected(sel, d_spacing)
+                self["energy"].set_selected(sel, energies)
+                self["spectra_idx_1D"].set_selected(sel, spectra_idx_1D)
                 self["s0"].set_selected(sel, s0s)
                 self["tof"].set_selected(sel, tofs)
 
@@ -1327,18 +1353,24 @@ Found %s"""
 
             unit_s0 = expt.beam.get_unit_s0()
             wavelength = expt.beam.get_wavelength()
+            energy = Planck * c / (wavelength * 10 ** -10)
             s0 = expt.beam.get_s0()
-            tof = -1
             num_reflections = len(self.select(sel_expt))
 
             wavelengths = cctbx.array_family.flex.double(num_reflections, wavelength)
-            tofs = cctbx.array_family.flex.double(len(num_reflections), tof)
+            energies = cctbx.array_family.flex.double(num_reflections, energy)
+            d_spacing = cctbx.array_family.flex.double(num_reflections, -1)
+            spectra_idx_1D = cctbx.array_family.flex.int(num_reflections, -1)
+            tofs = cctbx.array_family.flex.double(len(num_reflections), -1)
             s0s = cctbx.array_family.flex.vec3_double(len(num_reflections), s0)
             unit_s0s = cctbx.array_family.flex.vec3_double(
                 len(num_reflections), unit_s0
             )
 
             self["wavelength"].set_selected(sel_expt, wavelengths)
+            self["energy"].set_selected(sel_expt, energies)
+            self["d_spacing"].set_selected(sel_expt, d_spacing)
+            self["spectra_idx_1D"].set_selected(sel_expt, spectra_idx_1D)
             self["tof"].set_selected(sel_expt, tofs)
             self["s0"].set_selected(sel_expt, s0s)
             self["unit_s0"].set_selected(sel_expt, unit_s0s)
@@ -1346,6 +1378,9 @@ Found %s"""
         self.centroid_px_to_mm(experiments)
         panel_numbers = cctbx.array_family.flex.size_t(self["panel"])
         self["wavelength"] = cctbx.array_family.flex.double(self.nrows())
+        self["d_spacing"] = cctbx.array_family.flex.double(self.nrows())
+        self["energy"] = cctbx.array_family.flex.double(self.nrows())
+        self["spectra_idx_1D"] = cctbx.array_family.flex.int(self.nrows())
         self["tof"] = cctbx.array_family.flex.double(self.nrows())
         self["s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
         self["unit_s0"] = cctbx.array_family.flex.vec3_double(self.nrows())
