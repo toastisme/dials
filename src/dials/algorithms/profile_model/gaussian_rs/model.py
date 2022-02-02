@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from dxtbx.model import TOFSequence
+from dxtbx.model import Goniometer, TOFSequence
 from libtbx.phil import parse
 
 from dials.array_family import flex
@@ -657,6 +657,9 @@ class Model(ProfileModelExt):
             else:
                 sigma_b = self.sigma_b(deg=False)
                 sigma_m = self.sigma_m(deg=False)
+
+            if experiment.goniometer is None:
+                experiment.goniometer = Goniometer()
 
             # Create the modeller
             return GaussianRSProfileModeller(

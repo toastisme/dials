@@ -71,13 +71,13 @@ namespace dials {
      * @param scan The scan parameters
      * @param sigma_mosaicity The xds sigma_mosaicity parameter
      */
-    PartialityCalculator3D(const MonoBeam &beam,
+    PartialityCalculator3D(const boost::python::object &beam,
                            const Goniometer &gonio,
-                           const Scan &scan,
+                           const boost::python::object &scan,
                            double sigma_m)
-        : s0_(beam.get_s0()),
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0")())),
           m2_(gonio.get_rotation_axis()),
-          scan_(scan),
+          scan_(boost::python::extract<Scan>(scan)),
           sigma_m_(1, sigma_m) {
       DIALS_ASSERT(sigma_m > 0.0);
     }
@@ -89,16 +89,16 @@ namespace dials {
      * @param scan The scan parameters
      * @param sigma_mosaicity The xds sigma_mosaicity parameter
      */
-    PartialityCalculator3D(const MonoBeam &beam,
+    PartialityCalculator3D(const boost::python::object &beam,
                            const Goniometer &gonio,
-                           const Scan &scan,
+                           const boost::python::object &scan,
                            const af::const_ref<double> &sigma_m)
-        : s0_(beam.get_s0()),
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0")())),
           m2_(gonio.get_rotation_axis()),
-          scan_(scan),
+          scan_(boost::python::extract<Scan>(scan)),
           sigma_m_(sigma_m.begin(), sigma_m.end()) {
       DIALS_ASSERT(sigma_m.all_gt(0.0));
-      DIALS_ASSERT(sigma_m.size() == scan.get_num_images());
+      DIALS_ASSERT(sigma_m.size() == boost::python::extract<int>(scan.attr("get_num_images")));
       DIALS_ASSERT(sigma_m.size() > 0);
     }
 
@@ -177,7 +177,66 @@ namespace dials {
      * @param beam The beam parameters
      * @param sigma_mosaicity The xds sigma_mosaicity parameter
      */
-    PartialityCalculator2D(const MonoBeam &beam, double sigma_m) : s0_(beam.get_s0()) {}
+    PartialityCalculator2D(
+      const boost::python::object &beam,
+      double sigma_m)
+      : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0")())) {}
+
+    /**
+     * Calculate the Partiality of the reflection.
+     *
+     * @param s1 The diffracted beam vector
+     * @param frame The frame number
+     * @param bbox The bounding box
+     * @returns The partiality as a fraction of the total phi extent
+     */
+    virtual double single(vec3<double> s1, double frame, int6 bbox) const {
+      // Ensure our values are ok
+      DIALS_ASSERT(s1.length_sq() > 0);
+      DIALS_ASSERT(bbox[4] < bbox[5]);
+
+      // FIXME This is a placeholder
+
+      // Return the fraction recorded
+      return 1.0;
+    }
+
+    /**
+     * Calculate the partiality for an array of reflections
+     * @param s1 The array of diffracted beam vectors
+     * @param frame The array of frame numbers.
+     * @param bbox The array of bboxes
+     */
+    virtual af::shared<double> array(const af::const_ref<vec3<double> > &s1,
+                                     const af::const_ref<double> &frame,
+                                     const af::const_ref<int6> &bbox) const {
+      DIALS_ASSERT(s1.size() == frame.size());
+      DIALS_ASSERT(s1.size() == bbox.size());
+      af::shared<double> result(s1.size(), af::init_functor_null<double>());
+      for (std::size_t i = 0; i < s1.size(); ++i) {
+        result[i] = single(s1[i], frame[i], bbox[i]);
+      }
+      return result;
+    }
+
+  private:
+    vec3<double> s0_;
+    vec3<double> m2_;
+    Scan scan_;
+  };
+
+  /** Calculate the partiality for each reflection */
+  class PartialityCalculatorTOF : public PartialityCalculatorIface {
+  public:
+    /**
+     * Initialise the partiality calculation.
+     * @param beam The beam parameters
+     * @param sigma_mosaicity The xds sigma_mosaicity parameter
+     */
+    PartialityCalculatorTOF(
+      const boost::python::object &beam,
+      double sigma_m)
+      : s0_(boost::python::extract<vec3<double> >(beam.attr("get_unit_s0")())) {}
 
     /**
      * Calculate the Partiality of the reflection.

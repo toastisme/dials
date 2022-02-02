@@ -930,7 +930,7 @@ class _Manager:
         Get a summary of the processing
         """
         # Compute the task table
-        if self.experiments.all_stills():
+        if self.experiments.all_stills() or self.experiments.is_single_tof_experiment():
             rows = [["#", "Group", "Frame From", "Frame To", "# Reflections"]]
             for i in range(len(self)):
                 job = self.manager.job(i)

@@ -247,17 +247,21 @@ namespace dials {
 
       class_<PartialityCalculator3D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator3D", no_init)
-        .def(init<const MonoBeam&, const Goniometer&, const Scan&, double>(
+        .def(init<const boost::python::object&, const Goniometer&, const boost::python::object&, double>(
           (arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))))
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   const af::const_ref<double>&>(
           (arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))));
 
       class_<PartialityCalculator2D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator2D", no_init)
-        .def(init<const MonoBeam&, double>((arg("beam"), arg("delta_m"))));
+        .def(init<const boost::python::object&, double>((arg("beam"), arg("delta_m"))));
+
+      class_<PartialityCalculatorTOF, bases<PartialityCalculatorIface> >(
+        "PartialityCalculatorTOF", no_init)
+        .def(init<const boost::python::object&, double>((arg("beam"), arg("delta_m"))));
 
       class_<PartialityMultiCalculator>("PartialityMultiCalculator")
         .def("append", &PartialityMultiCalculator::push_back)
@@ -265,7 +269,7 @@ namespace dials {
         .def("__call__", &PartialityMultiCalculator::operator());
 
       class_<MaskCalculator3D, bases<MaskCalculatorIface> >("MaskCalculator3D", no_init)
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -276,7 +280,7 @@ namespace dials {
                            arg("scan"),
                            arg("delta_divergence"),
                            arg("delta_mosaicity"))))
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -289,7 +293,14 @@ namespace dials {
                                                  arg("delta_mosaicity"))));
 
       class_<MaskCalculator2D, bases<MaskCalculatorIface> >("MaskCalculator2D", no_init)
-        .def(init<const MonoBeam&, const Detector&, double, double>(
+        .def(init<const boost::python::object&, const Detector&, double, double>(
+          (arg("beam"),
+           arg("detector"),
+           arg("delta_divergence"),
+           arg("delta_mosaicity"))));
+
+      class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF", no_init)
+        .def(init<const boost::python::object&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),
