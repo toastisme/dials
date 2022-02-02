@@ -272,7 +272,7 @@ namespace dials { namespace algorithms { namespace boost_python {
     // Export GausianRSMaskCalculator
     class_<GaussianRSMaskCalculator, bases<MaskCalculatorIface> >(
       "GaussianRSMaskCalculator", no_init)
-      .def(init<const MonoBeam &,
+      .def(init<const boost::python::object &,
                 const Detector &,
                 const Goniometer &,
                 const Scan &,
