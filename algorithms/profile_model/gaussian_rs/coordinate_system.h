@@ -141,6 +141,74 @@ namespace dials {
   /**
    * Class representing the local reflection coordinate system
    */
+  class CoordinateSystemTOF {
+  public:
+    CoordinateSystemTOF(){}
+
+    /**
+     * Transform the beam vector to the reciprocal space coordinate system.
+     * @param s_dash The beam vector
+     * @param s1 The centroid beam vector
+     * @param s0 The incident beam vector
+     * @returns The e1, e2, e3 coordinates
+     */
+    vec3<double> from_beam_vector(
+      const vec3<double> &s_dash,
+      const vec3<double> &s1,
+      const vec3<double> &s0
+      ) const {
+      double s1_length = s1.length();
+      DIALS_ASSERT(s1_length > 0);
+      vec3<double> unit_s0 = s0.normalize();
+      vec3<double> p_star = s1-s0;
+      vec3<double> p_star0 = s_dash-s0;
+      //vec3<double> p_star = s1 - unit_s0*(-(p_star0*p_star0)/(2*p_star0*unit_s0));
+      vec3<double> e1 = s1.cross(s0).normalize() / s1_length;
+      vec3<double> e2 = s1.cross(e1).normalize() / s1_length;
+      vec3<double> e3 = (s1+s0)/(s1_length + s0_length);
+      return vec3<double>(
+        e1 * (s_dash - s1),
+        e2 * (s_dash - s1_),
+        e3 * (p_star0 - p_star)/p_star.length());
+    }
+
+    /**
+     * Transform the reciprocal space coordinate to get the beam vector.
+     * @param ep_coords The reciprocal space coordinates.
+     * @param s1 The centroid beam vector
+     * @param s0 The incident beam vector
+     * @returns The beam vector
+     */
+    vec3<double> to_beam_vector(
+      const vec3<double> &ep_coords,
+      const vec3<double> &s1,
+      const vec3<double> &s0
+      ) const {
+      double s1_length = s1.length();
+      DIALS_ASSERT(s1_length > 0);
+      vec3<double> e1 = s1.cross(s0).normalize() / s1_length;
+      vec3<double> e2 = s1.cross(e1).normalize() / s1_length;
+      vec3<double> e3 = (s1+s0)/(s1_length + s0_length);
+      vec3<double> normalized_s1 = s1 / s1_length;
+
+      vec3<double> p = ep_coords[0] * e1 + ep_coords[1] * e2 + ep_coords[2] * e3;
+      double b = s1_length * s1_length - p.length_sq();
+      DIALS_ASSERT(b >= 0);
+      double d = -(normalized_s1 * p) + std::sqrt(b);
+      return p + d * normalized_s1;
+    }
+
+  private:
+    vec3<double> s0_;
+    vec3<double> s1_;
+    vec3<double> p_star_;
+    vec3<double> e1_;
+    vec3<double> e2_;
+  };
+
+  /**
+   * Class representing the local reflection coordinate system
+   */
   class CoordinateSystem {
   public:
     /**

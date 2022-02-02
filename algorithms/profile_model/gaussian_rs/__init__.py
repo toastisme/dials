@@ -14,10 +14,12 @@ from dials_algorithms_profile_model_gaussian_rs_ext import (
     MaskCalculator2D,
     MaskCalculator3D,
     MaskCalculatorIface,
+    MaskCalculatorTOF,
     MaskMultiCalculator,
     PartialityCalculator2D,
     PartialityCalculator3D,
     PartialityCalculatorIface,
+    PartialityCalculatorTOF,
     PartialityMultiCalculator,
     ideal_profile_double,
     ideal_profile_float,
@@ -36,12 +38,14 @@ __all__ = [
     "GaussianRSProfileModeller",
     "MaskCalculator",
     "MaskCalculator2D",
+    "MaskCalculatorTOF",
     "MaskCalculator3D",
     "MaskCalculatorIface",
     "MaskMultiCalculator",
     "Model",
     "PartialityCalculator",
     "PartialityCalculator2D",
+    "PartialityCalculatorTOF",
     "PartialityCalculator3D",
     "PartialityCalculatorIface",
     "PartialityMultiCalculator",
@@ -67,7 +71,9 @@ def BBoxCalculator(crystal, beam, detector, goniometer, sequence, delta_b, delta
 
 def PartialityCalculator(crystal, beam, detector, goniometer, scan, sigma_m):
     """Return the relevant partiality calculator."""
-    if goniometer is None or scan is None or scan.is_still():
+    if isinstance(scan, TOFSequence):
+        algorithm = PartialityCalculatorTOF(beam, sigma_m)
+    elif goniometer is None or scan is None or scan.is_still():
         algorithm = PartialityCalculator2D(beam, sigma_m)
     else:
         algorithm = PartialityCalculator3D(beam, goniometer, scan, sigma_m)
@@ -76,7 +82,9 @@ def PartialityCalculator(crystal, beam, detector, goniometer, scan, sigma_m):
 
 def MaskCalculator(crystal, beam, detector, goniometer, scan, delta_b, delta_m):
     """Return the relevant partiality calculator."""
-    if goniometer is None or scan is None or scan.is_still():
+    if isinstance(scan, TOFSequence):
+        algorithm = MaskCalculatorTOF(beam, detector, delta_b, delta_m)
+    elif goniometer is None or scan is None or scan.is_still():
         algorithm = MaskCalculator2D(beam, detector, delta_b, delta_m)
     else:
         algorithm = MaskCalculator3D(beam, detector, goniometer, scan, delta_b, delta_m)
