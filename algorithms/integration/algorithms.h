@@ -72,7 +72,7 @@ namespace dials { namespace algorithms {
      * @param delta_b The beam divergence
      * @param delta_m The mosaicity
      */
-    GaussianRSMaskCalculator(const MonoBeam &beam,
+    GaussianRSMaskCalculator(const boost::python::object &beam,
                              const Detector &detector,
                              const Goniometer &gonio,
                              const Scan &scan,
