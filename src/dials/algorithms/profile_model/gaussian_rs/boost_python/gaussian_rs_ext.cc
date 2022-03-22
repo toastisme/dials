@@ -365,6 +365,21 @@ namespace dials {
         .def("to_beam_vector_and_rotation_angle",
              &CoordinateSystem::to_beam_vector_and_rotation_angle);
 
+      // Export coordinate system
+      class_<CoordinateSystemTOF>("CoordinateSystemTOF", no_init)
+        .def(init<vec3<double>, vec3<double>, double>(
+          (arg("s0"), arg("s1"), arg("tof"))))
+        .def("s0", &CoordinateSystemTOF::s0)
+        .def("s1", &CoordinateSystemTOF::s1)
+        .def("tof", &CoordinateSystemTOF::tof)
+        .def("p_star", &CoordinateSystemTOF::p_star)
+        .def("e1_axis", &CoordinateSystemTOF::e1_axis)
+        .def("e2_axis", &CoordinateSystemTOF::e2_axis)
+        .def("e3_axis", &CoordinateSystemTOF::e3_axis)
+        .def("from_beam_vector", &CoordinateSystemTOF::from_beam_vector)
+        .def("to_beam_vector", &CoordinateSystemTOF::to_beam_vector)
+        .def("to_wavelength", &CoordinateSystemTOF::to_wavelength);
+
       boost_adaptbx::std_pair_conversions::to_tuple<vec3<double>, double>();
     }
 
