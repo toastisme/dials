@@ -343,10 +343,11 @@ def test_coordinate_system_tof():
     s0 = (-0.0, -0.0, 1.2361539425883734)
     s1 = (0.7862777150890727, 0.22627526775982446, -0.5749494394766611)
     tof = 0.0017464538167421889
+    wavelength = 0.8089607334068017
 
     cs = CoordinateSystemTOF(s0, s1, tof)
 
     c1, c2, c3 = cs.from_beam_vector(s1, s0)
     s_dash = cs.to_beam_vector((c1, c2))
-    wavelength = cs.to_wavelength(c3, s_dash)
-    assert wavelength == tof
+    converted_wavelength = cs.to_wavelength(c3, s_dash)
+    assert converted_wavelength == pytest.approx(wavelength)
