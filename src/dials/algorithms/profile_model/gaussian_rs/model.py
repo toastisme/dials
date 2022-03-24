@@ -650,6 +650,8 @@ class Model(ProfileModelExt):
             fit_method = int(
                 FitMethod.names[self.params.gaussian_rs.fitting.fit_method].real
             )
+            if isinstance(experiment.sequence, TOFSequence):
+                fit_method = 3
 
             if self._scan_varying:
                 sigma_b = flex.mean(self.sigma_b(deg=False))
