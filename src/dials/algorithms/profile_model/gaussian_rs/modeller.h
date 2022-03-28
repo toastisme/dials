@@ -20,6 +20,7 @@
 #include <dials/algorithms/profile_model/modeller/circle_sampler.h>
 #include <dials/algorithms/profile_model/modeller/ewald_sphere_sampler.h>
 #include <dials/algorithms/integration/fit/fitting.h>
+#include<iostream>
 
 namespace dials { namespace algorithms {
 
@@ -275,6 +276,13 @@ namespace dials { namespace algorithms {
      * @param reflections The reflection list
      */
     void model(af::reflection_table reflections) {
+
+      DIALS_ASSERT(reflections.contains("s0_cal"));
+      if (reflections.contains("s0_cal")){
+        model_tof(reflections);
+        return;
+      }
+
       // Check input is OK
       DIALS_ASSERT(reflections.is_consistent());
       DIALS_ASSERT(reflections.contains("shoebox"));
@@ -353,20 +361,20 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(reflections.contains("s1"));
       DIALS_ASSERT(reflections.contains("xyzcal.px"));
       DIALS_ASSERT(reflections.contains("xyzcal.mm"));
-      DIALS_ASSERT(reflections.contains("s0"));
-      DIALS_ASSERT(reflections.contains("tof"));
-      DIALS_ASSERT(reflections.contains("wavelength"));
+      DIALS_ASSERT(reflections.contains("s0_cal"));
+      DIALS_ASSERT(reflections.contains("wavelength_cal"));
+
 
       // Get some data
       af::const_ref<Shoebox<> > sbox = reflections["shoebox"];
       af::const_ref<double> partiality = reflections["partiality"];
-      af::const_ref<double> tof = reflections["tof"];
-      af::const_ref<double> walelength = reflections["wavelength"];
       af::const_ref<vec3<double> > s1 = reflections["s1"];
-      af::const_ref<vec3<double> > s0 = reflections["s0"];
+      af::const_ref<vec3<double> > s0 = reflections["s0_cal"];
       af::const_ref<vec3<double> > xyzpx = reflections["xyzcal.px"];
       af::const_ref<vec3<double> > xyzmm = reflections["xyzcal.mm"];
       af::ref<std::size_t> flags = reflections["flags"];
+
+       
 
       // Loop through all the reflections and add them to the model
       for (std::size_t i = 0; i < reflections.size(); ++i) {
@@ -375,7 +383,7 @@ namespace dials { namespace algorithms {
         // Check if we want to use this reflection
         if (check1(flags[i], partiality[i], sbox[i])) {
           // Create the coordinate system
-          CoordinateSystemTOF cs(s0[i], s1[i], tof[i]);
+          CoordinateSystemTOF cs(s0[i], s1[i]);
 
           // Create the data array
           af::versa<double, af::c_grid<3> > data(sbox[i].data.accessor());
@@ -423,12 +431,15 @@ namespace dials { namespace algorithms {
       af::shared<bool> success;
       switch (fit_method_) {
       case ReciprocalSpace:
+        std::cout<<"Fitting RS\n\n";
         success = fit_reciprocal_space(reflections);
         break;
       case DetectorSpace:
+        std::cout<<"Fitting DS\n\n";
         success = fit_detector_space(reflections);
         break;
       case TOF:
+        std::cout<<"Fitting TOF\n\n";
         success = fit_reciprocal_space_tof(reflections);
         break;
       default:
@@ -668,23 +679,21 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(reflections.contains("flags"));
       DIALS_ASSERT(reflections.contains("partiality"));
       DIALS_ASSERT(reflections.contains("s1"));
-      DIALS_ASSERT(reflections.contains("s0"));
+      DIALS_ASSERT(reflections.contains("s0_cal"));
       DIALS_ASSERT(reflections.contains("xyzcal.px"));
       DIALS_ASSERT(reflections.contains("xyzcal.mm"));
-      DIALS_ASSERT(reflections.contains("wavelength"));
-      DIALS_ASSERT(reflections.contains("tof"));
+      DIALS_ASSERT(reflections.contains("wavelength_cal"));
 
       // Get some data
       af::const_ref<Shoebox<> > sbox = reflections["shoebox"];
       af::const_ref<vec3<double> > s1 = reflections["s1"];
-      af::const_ref<vec3<double> > s0 = reflections["s0"];
+      af::const_ref<vec3<double> > s0 = reflections["s0_cal"];
       af::const_ref<vec3<double> > xyzpx = reflections["xyzcal.px"];
       af::const_ref<vec3<double> > xyzmm = reflections["xyzcal.mm"];
       af::ref<std::size_t> flags = reflections["flags"];
       af::ref<double> intensity_val = reflections["intensity.prf.value"];
       af::ref<double> intensity_var = reflections["intensity.prf.variance"];
       af::ref<double> reference_cor = reflections["profile.correlation"];
-      af::ref<double> tof = reflections["tof"];
       // af::ref<double> reference_rmsd = reflections["profile.rmsd"];
 
       // Loop through all the reflections and process them
@@ -709,7 +718,7 @@ namespace dials { namespace algorithms {
             mask_const_reference mask1 = mask(index).const_ref();
 
             // Create the coordinate system
-            CoordinateSystemTOF cs(s0[0], s1[i], tof[i]);
+            CoordinateSystemTOF cs(s0[0], s1[i]);
 
             // Create the data array
             af::versa<double, af::c_grid<3> > data(sbox[i].data.accessor());
@@ -739,9 +748,10 @@ namespace dials { namespace algorithms {
             // Get the transformed shoebox
             data_const_reference c = transform.profile().const_ref();
             data_const_reference b = transform.background().const_ref();
+            mask_const_reference m = transform.mask().const_ref();
 
             // Do the profile fitting
-            ProfileFitter<double> fit(c, b, mask.const_ref(), p, 1e-3, 100);
+            ProfileFitter<double> fit(c, b, m, p, 1e-3, 100);
             // DIALS_ASSERT(fit.niter() < 100);
 
             // Set the data in the reflection
@@ -755,7 +765,7 @@ namespace dials { namespace algorithms {
             success[i] = true;
 
           } catch (dials::error const &e) {
-            /* std::cout << e.what() << std::endl; */
+            std::cout << e.what() << std::endl; 
             continue;
           }
         }

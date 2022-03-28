@@ -1444,7 +1444,7 @@ class IntegratorTOF(Integrator):
 
     initialize_reflections = staticmethod(_initialize_tof)
     ProcessorClass = Processor3D
-    finalize_reflections = staticmethod(_finalize_rotation)
+    finalize_reflections = staticmethod(_finalize)
 
 
 class Integrator3DThreaded:

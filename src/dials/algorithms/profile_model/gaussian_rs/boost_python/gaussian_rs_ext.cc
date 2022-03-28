@@ -156,6 +156,7 @@ namespace dials {
 
       enum_<GaussianRSProfileModeller::FitMethod>("FitMethod")
         .value("reciprocal_space", GaussianRSProfileModeller::ReciprocalSpace)
+        .value("reciprocal_space_tof", GaussianRSProfileModeller::ReciprocalSpace)
         .value("detector_space", GaussianRSProfileModeller::DetectorSpace);
 
       /* register_ptr_to_python< boost::shared_ptr<GaussianRSProfileModeller> >(); */
@@ -367,11 +368,10 @@ namespace dials {
 
       // Export coordinate system
       class_<CoordinateSystemTOF>("CoordinateSystemTOF", no_init)
-        .def(init<vec3<double>, vec3<double>, double>(
-          (arg("s0"), arg("s1"), arg("tof"))))
+        .def(init<vec3<double>, vec3<double> >(
+          (arg("s0"), arg("s1"))))
         .def("s0", &CoordinateSystemTOF::s0)
         .def("s1", &CoordinateSystemTOF::s1)
-        .def("tof", &CoordinateSystemTOF::tof)
         .def("p_star", &CoordinateSystemTOF::p_star)
         .def("e1_axis", &CoordinateSystemTOF::e1_axis)
         .def("e2_axis", &CoordinateSystemTOF::e2_axis)
