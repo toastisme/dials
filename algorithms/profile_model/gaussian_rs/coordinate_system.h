@@ -150,21 +150,18 @@ namespace dials {
      * each reflection and we want to maximize performance.
      * @param s0 The incident beam vector
      * @param s1 The diffracted beam vector
-     * @param tof The time-of-flight (s)
      */
-    CoordinateSystemTOF(vec3<double> s0, vec3<double> s1, double tof)
+    CoordinateSystemTOF(vec3<double> s0, vec3<double> s1)
         : s0_(s0),
           s1_(s1),
           p_star_(s1-s0),
           e1_(s1.cross(s0).normalize()),
           e2_(s1.cross(e1_).normalize()),
-          e3_((s1 + s0).normalize()),
-          tof_(tof){}
+          e3_((s1 + s0).normalize()){}
 
     vec3<double> s0() const {return s0_;}
     vec3<double> s1() const {return s1_;}
     vec3<double> p_star() const {return p_star_;}
-    vec3<double> tof() const {return tof_;}
     vec3<double> e1_axis() const {return e1_;}
     vec3<double> e2_axis() const {return e2_;}
     vec3<double> e3_axis() const {return e3_;}
@@ -236,7 +233,6 @@ namespace dials {
     vec3<double> e1_;
     vec3<double> e2_;
     vec3<double> e3_;
-    double tof_;
   };
 
   /**

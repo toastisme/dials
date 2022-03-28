@@ -554,6 +554,10 @@ namespace dials {
         return background_;
       }
 
+      af::versa<bool, af::c_grid<3> > mask() const {
+        return mask_;
+      }
+
     private:
       void init(const TransformSpec &spec,
                 const CoordinateSystem &cs,
@@ -717,10 +721,21 @@ namespace dials {
         DIALS_ASSERT(bbox[5] > bbox[4]);
 
         // Init the arrays
-        af::c_grid<3> accessor(spec.grid_size());
+        int3 grid_size = spec.grid_size();
+        af::c_grid<3> accessor(grid_size);
         data_ = af::versa<double, af::c_grid<3> >(accessor, 0);
+        mask_ = af::versa<bool, af::c_grid<3> >(accessor, 0.0);
         if (use_background) {
           background_ = af::versa<double, af::c_grid<3> >(accessor, 0);
+        }
+
+
+        for (std::size_t k=0; k< grid_size[0]; ++k){
+          for (std::size_t j = 0; j < grid_size[1]; ++j) {
+            for (std::size_t i = 0; i < grid_size[2]; ++i) {
+              mask_(k, j, i) = true;
+            }
+          }
         }
 
         // Get the bbox size
@@ -843,6 +858,7 @@ namespace dials {
 
       af::versa<double, af::c_grid<3> > data_;
       af::versa<double, af::c_grid<3> > background_;
+      af::versa<bool, af::c_grid<3> > mask_;
     };
 
     /**
