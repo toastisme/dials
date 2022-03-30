@@ -5,7 +5,10 @@ import pytest
 
 from scitbx import matrix
 
-from dials.algorithms.profile_model.gaussian_rs import CoordinateSystem
+from dials.algorithms.profile_model.gaussian_rs import (
+    CoordinateSystem,
+    CoordinateSystemTOF,
+)
 
 ### Test the XDS coordinate system class
 
@@ -333,3 +336,18 @@ def test_e3_coordinate_approximation(rotationangle):
 
     # Check the true and approximate value are almost equal to 4dp
     assert phi_dash == pytest.approx(phi_dash_2, abs=1e-4)
+
+
+def test_coordinate_system_tof():
+
+    s0 = (-0.0, -0.0, 1.2361539425883734)
+    s1 = (0.7862777150890727, 0.22627526775982446, -0.5749494394766611)
+    tof = 0.0017464538167421889
+    wavelength = 0.8089607334068017
+
+    cs = CoordinateSystemTOF(s0, s1, tof)
+
+    c1, c2, c3 = cs.from_beam_vector(s1, s0)
+    s_dash = cs.to_beam_vector((c1, c2))
+    converted_wavelength = cs.to_wavelength(c3, s_dash)
+    assert converted_wavelength == pytest.approx(wavelength)

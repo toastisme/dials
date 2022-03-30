@@ -981,12 +981,24 @@ class _:
 
         import numpy as np
 
-        if "wavelength" not in self or "s0" not in self:
+        if "wavelength" in self:
+            wavelength_key = "wavelength"
+        elif "wavelength_cal" in self:
+            wavelength_key = "wavelength_cal"
+        else:
             return False
+
+        if "s0" in self:
+            s0_key = "s0"
+        elif "s0_cal" in self:
+            s0_key = "s0_cal"
+        else:
+            return False
+
         for i in range(len(self)):
-            if self["wavelength"][i] < 1e-8:
+            if abs(self[wavelength_key][i]) < 1e-8:
                 return False
-            s0_val = np.array(self["s0"][i])
+            s0_val = np.array(self[s0_key][i])
             if sum(s0_val * s0_val) ** 0.5 < 1e-8:
                 return False
         return True

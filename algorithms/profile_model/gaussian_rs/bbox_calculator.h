@@ -31,6 +31,7 @@ namespace dials {
 
   // Use a load of stuff from other namespaces
   using dxtbx::model::MonoBeam;
+  using dxtbx::model::PolyBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Scan;
@@ -70,16 +71,16 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator3D(const MonoBeam &beam,
+    BBoxCalculator3D(const boost::python::object &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
-                     const Scan &scan,
+                     const boost::python::object &scan,
                      double delta_divergence,
                      double delta_mosaicity)
-        : s0_(beam.get_s0()),
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
           m2_(gonio.get_rotation_axis()),
           detector_(detector),
-          scan_(scan),
+          scan_(boost::python::extract<Scan>(scan)),
           delta_divergence_(1, delta_divergence),
           delta_mosaicity_(1, delta_mosaicity) {
       DIALS_ASSERT(delta_divergence > 0.0);
@@ -94,22 +95,22 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator3D(const MonoBeam &beam,
+    BBoxCalculator3D(const boost::python::object &beam,
                      const Detector &detector,
                      const Goniometer &gonio,
-                     const Scan &scan,
+                     const boost::python::object &scan,
                      const af::const_ref<double> &delta_divergence,
                      const af::const_ref<double> &delta_mosaicity)
-        : s0_(beam.get_s0()),
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
           m2_(gonio.get_rotation_axis()),
           detector_(detector),
-          scan_(scan),
+          scan_(boost::python::extract<Scan>(scan)),
           delta_divergence_(delta_divergence.begin(), delta_divergence.end()),
           delta_mosaicity_(delta_mosaicity.begin(), delta_mosaicity.end()) {
       DIALS_ASSERT(delta_divergence.all_gt(0.0));
       DIALS_ASSERT(delta_mosaicity.all_gt(0.0));
       DIALS_ASSERT(delta_divergence_.size() == delta_mosaicity_.size());
-      DIALS_ASSERT(delta_divergence_.size() == scan.get_num_images());
+      DIALS_ASSERT(delta_divergence_.size() == boost::python::extract<int>(scan.attr("get_num_images")));
       DIALS_ASSERT(delta_divergence_.size() > 0);
     }
 
@@ -252,11 +253,12 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculator2D(const MonoBeam &beam,
+    BBoxCalculator2D(const boost::python::object &beam,
                      const Detector &detector,
                      double delta_divergence,
                      double delta_mosaicity)
-        : s0_(beam.get_s0()), detector_(detector), delta_divergence_(delta_divergence) {
+        : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
+        detector_(detector), delta_divergence_(delta_divergence) {
       DIALS_ASSERT(delta_divergence > 0.0);
       DIALS_ASSERT(delta_mosaicity >= 0.0);
     }
@@ -349,6 +351,113 @@ namespace dials {
     double delta_divergence_;
   };
 
+  class BBoxCalculatorTOF {
+  public:
+    /**
+     * Initialise the bounding box calculation.
+     * @param beam The beam parameters
+     * @param detector The detector parameters
+     * @param delta_divergence The xds delta_divergence parameter
+     * @param delta_mosaicity The xds delta_mosaicity parameter
+     */
+    BBoxCalculatorTOF(const boost::python::object &beam,
+                     const Detector &detector,
+                     double delta_divergence,
+                     double delta_mosaicity)
+        : detector_(detector), delta_divergence_(delta_divergence) {
+      DIALS_ASSERT(delta_divergence > 0.0);
+      DIALS_ASSERT(delta_mosaicity >= 0.0);
+    }
+
+    /**
+     * Calculate the bbox on the detector image volume for the reflection.
+     *
+     * The roi is calculated using the parameters delta_divergence and
+     * delta_mosaicity. The reflection mask comprises all pixels where:
+     *  |e1| <= delta_d, |e2| <= delta_d, |e3| <= delta_m
+     *
+     * We transform the coordinates of the box
+     *   (-delta_d, -delta_d, 0)
+     *   (+delta_d, -delta_d, 0)
+     *   (-delta_d, +delta_d, 0)
+     *   (+delta_d, +delta_d, 0)
+     *
+     * to the detector image volume and return the minimum and maximum values
+     * for the x, y, z image volume coordinates.
+     *
+     * @param s1 The diffracted beam vector
+     * @param frame The predicted frame number
+     * @returns A 6 element array: (minx, maxx, miny, maxy, minz, maxz)
+     */
+    virtual int6 single(vec3<double> s0, vec3<double> s1, double frame, std::size_t panel) const {
+      // Ensure our values are ok
+      DIALS_ASSERT(s1.length_sq() > 0);
+
+      // Create the coordinate system for the reflection
+      CoordinateSystem2d xcs(s0, s1);
+
+      // Get the divergence and mosaicity for this point
+      double delta_d = delta_divergence_;
+
+      // Calculate the beam vectors at the following xds coordinates:
+      //   (-delta_d, -delta_d, 0)
+      //   (+delta_d, -delta_d, 0)
+      //   (-delta_d, +delta_d, 0)
+      //   (+delta_d, +delta_d, 0)
+      double point = delta_d;
+      double3 sdash1 = xcs.to_beam_vector(double2(-point, -point));
+      double3 sdash2 = xcs.to_beam_vector(double2(+point, -point));
+      double3 sdash3 = xcs.to_beam_vector(double2(-point, +point));
+      double3 sdash4 = xcs.to_beam_vector(double2(+point, +point));
+
+      // Get the detector coordinates (px) at the ray intersections
+      double2 xy1 = detector_[panel].get_ray_intersection_px(sdash1);
+      double2 xy2 = detector_[panel].get_ray_intersection_px(sdash2);
+      double2 xy3 = detector_[panel].get_ray_intersection_px(sdash3);
+      double2 xy4 = detector_[panel].get_ray_intersection_px(sdash4);
+
+      // Return the roi in the following form:
+      // (minx, maxx, miny, maxy, minz, maxz)
+      // Min's are rounded down to the nearest integer, Max's are rounded up
+      double4 x(xy1[0], xy2[0], xy3[0], xy4[0]);
+      double4 y(xy1[1], xy2[1], xy3[1], xy4[1]);
+      int6 bbox((int)floor(min(x)),
+                (int)ceil(max(x)),
+                (int)floor(min(y)),
+                (int)ceil(max(y)),
+                (int)floor(frame),
+                (int)floor(frame) + 7);
+      DIALS_ASSERT(bbox[1] > bbox[0]);
+      DIALS_ASSERT(bbox[3] > bbox[2]);
+      DIALS_ASSERT(bbox[5] > bbox[4]);
+      return bbox;
+    }
+
+    /**
+     * Calculate the rois for an array of reflections given by the array of
+     * diffracted beam vectors and rotation angles.
+     * @param s1 The array of diffracted beam vectors
+     * @param phi The array of rotation angles.
+     */
+    virtual af::shared<int6> array(const af::const_ref<vec3<double> > &s0,
+                                   const af::const_ref<vec3<double> > &s1,
+                                   const af::const_ref<double> &frame,
+                                   const af::const_ref<std::size_t> &panel) const {
+      DIALS_ASSERT(s1.size() == frame.size());
+      DIALS_ASSERT(s1.size() == panel.size());
+      DIALS_ASSERT(s0.size() == frame.size());
+      DIALS_ASSERT(s0.size() == panel.size());
+      af::shared<int6> result(s1.size(), af::init_functor_null<int6>());
+      for (std::size_t i = 0; i < s1.size(); ++i) {
+        result[i] = single(s0[i], s1[i], frame[i], panel[i]);
+      }
+      return result;
+    }
+
+  private:
+    Detector detector_;
+    double delta_divergence_;
+  };
   /**
    * Class to help compute bbox for multiple experiments.
    */

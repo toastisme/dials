@@ -173,7 +173,7 @@ def generate_phil_scope():
 
       }
 
-      integrator = *auto 3d flat3d 2d single2d stills 3d_threaded
+      integrator = *auto 3d flat3d 2d single2d stills 3d_threaded tof
         .type = choice
         .help = "The integrator to use."
         .expert_level=3
@@ -473,6 +473,15 @@ def _initialize_rotation(experiments, params, reflections):
     if params.filter.powder_filter is not None:
         mask = params.filter.powder_filter(reflections["d"])
         reflections.set_flags(mask, reflections.flags.in_powder_ring)
+
+
+def _initialize_tof(experiments, params, reflections):
+
+    # Compute some reflection properties
+    reflections.compute_d(experiments)
+    reflections.compute_bbox(
+        experiments, sigma_b_multiplier=params.profile.sigma_b_multiplier
+    )
 
 
 def _initialize_stills(experiments, params, reflections):
@@ -1424,6 +1433,16 @@ class IntegratorStills(Integrator):
     finalize_reflections = staticmethod(_finalize_stills)
 
 
+class IntegratorTOF(Integrator):
+    """
+    Integrator for still algorithms
+    """
+
+    initialize_reflections = staticmethod(_initialize_tof)
+    ProcessorClass = Processor3D
+    finalize_reflections = staticmethod(_finalize)
+
+
 class Integrator3DThreaded:
     """
     Integrator for 3D algorithms
@@ -1660,6 +1679,7 @@ def create_integrator(params, experiments, reflections):
         "single2d": IntegratorSingle2D,
         "stills": IntegratorStills,
         "3d_threaded": Integrator3DThreaded,
+        "tof": IntegratorTOF,
     }.get(params.integration.integrator)
     if not IntegratorClass:
         raise ValueError(f"Unknown integration type {params.integration.integrator}")

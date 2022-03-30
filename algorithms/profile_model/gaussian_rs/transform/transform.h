@@ -45,6 +45,7 @@ namespace dials {
     using dxtbx::model::Detector;
     using dxtbx::model::Goniometer;
     using dxtbx::model::Scan;
+    using dxtbx::model::TOFSequence;
     using scitbx::vec2;
     using scitbx::vec3;
     using scitbx::af::double3;
@@ -79,10 +80,10 @@ namespace dials {
        * @param n_sigma The number of standard deviations
        * @param grid_size The size of the reflection basis grid
        */
-      TransformSpec(const boost::shared_ptr<MonoBeam> beam,
+      TransformSpec(const boost::python::object beam,
                     const Detector &detector,
                     const Goniometer &gonio,
-                    const Scan &scan,
+                    const boost::python::object &scan,
                     double sigma_b,
                     double sigma_m,
                     double n_sigma,
@@ -109,7 +110,7 @@ namespace dials {
       }
 
       /** @returns the beam */
-      const boost::shared_ptr<MonoBeam> beam() const {
+      const boost::python::object beam() const {
         return beam_;
       }
 
@@ -124,7 +125,7 @@ namespace dials {
       }
 
       /** @return the scan */
-      const Scan &scan() const {
+      const boost::python::object &scan() const {
         return scan_;
       }
 
@@ -164,10 +165,10 @@ namespace dials {
       }
 
     private:
-      boost::shared_ptr<MonoBeam> beam_;
+      boost::python::object beam_;
       Detector detector_;
       Goniometer goniometer_;
-      Scan scan_;
+      boost::python::object scan_;
       double sigma_b_;
       double sigma_m_;
       double n_sigma_;
@@ -254,20 +255,24 @@ namespace dials {
         // Calculate the fraction of intensity contributed from each data
         // frame to each grid coordinate
         vec2<int> zrange(bbox[4], bbox[5]);
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
+
 
         // Create the frame mapper
-        MapFramesForward<FloatType> map_frames_forward(spec.scan().get_array_range()[0],
-                                                       spec.scan().get_oscillation()[0],
-                                                       spec.scan().get_oscillation()[1],
+        MapFramesForward<FloatType> map_frames_forward(scan.get_array_range()[0],
+                                                       scan.get_oscillation()[0],
+                                                       scan.get_oscillation()[1],
                                                        spec.sigma_m(),
                                                        spec.n_sigma(),
                                                        spec.grid_size()[2] / 2);
         zfraction_arr_ = map_frames_forward(zrange, cs.phi(), cs.zeta());
 
         MapFramesReverse<FloatType> map_frames_backward(
-          spec.scan().get_array_range()[0],
-          spec.scan().get_oscillation()[0],
-          spec.scan().get_oscillation()[1],
+          scan.get_array_range()[0],
+          scan.get_oscillation()[0],
+          scan.get_oscillation()[1],
           spec.sigma_m(),
           spec.n_sigma(),
           spec.grid_size()[2] / 2);
@@ -519,6 +524,26 @@ namespace dials {
         init(spec, cs, bbox, panel, image, bkgrd, mask);
       }
 
+      TransformForwardNoModel(const TransformSpec &spec,
+                              const CoordinateSystemTOF &cs,
+                              int6 bbox,
+                              std::size_t panel,
+                              const af::const_ref<double, af::c_grid<3> > &image,
+                              const af::const_ref<bool, af::c_grid<3> > &mask) {
+        af::versa<double, af::c_grid<3> > bkgrd;
+        init(spec, cs, bbox, panel, image, bkgrd.const_ref(), mask);
+      }
+
+      TransformForwardNoModel(const TransformSpec &spec,
+                              const CoordinateSystemTOF &cs,
+                              int6 bbox,
+                              std::size_t panel,
+                              const af::const_ref<double, af::c_grid<3> > &image,
+                              const af::const_ref<double, af::c_grid<3> > &bkgrd,
+                              const af::const_ref<bool, af::c_grid<3> > &mask) {
+        init(spec, cs, bbox, panel, image, bkgrd, mask);
+      }
+
       /** @returns The transformed profile */
       af::versa<double, af::c_grid<3> > profile() const {
         return data_;
@@ -527,6 +552,10 @@ namespace dials {
       /** @returns The transformed background (if set) */
       af::versa<double, af::c_grid<3> > background() const {
         return background_;
+      }
+
+      af::versa<bool, af::c_grid<3> > mask() const {
+        return mask_;
       }
 
     private:
@@ -591,12 +620,170 @@ namespace dials {
           }
         }
 
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data_.accessor()[0] + 1);
         for (std::size_t k = 0; k <= data_.accessor()[0]; ++k) {
           double c3 = zoff + k * zstep;
           double phip = cs.to_rotation_angle_fast(c3);
-          z[k] = spec.scan().get_array_index_from_angle(phip) - bbox[4];
+          z[k] = scan.get_array_index_from_angle(phip) - bbox[4];
+        }
+
+        // Get a list of pairs of overlapping polygons
+        for (std::size_t j = 0; j < data_.accessor()[1]; ++j) {
+          for (std::size_t i = 0; i < data_.accessor()[2]; ++i) {
+            vec2<double> xy00 = xy(j, i);
+            vec2<double> xy01 = xy(j, i + 1);
+            vec2<double> xy11 = xy(j + 1, i + 1);
+            vec2<double> xy10 = xy(j + 1, i);
+            int x0 = (int)std::floor(min4(xy00[0], xy01[0], xy11[0], xy10[0]));
+            int x1 = (int)std::ceil(max4(xy00[0], xy01[0], xy11[0], xy10[0]));
+            int y0 = (int)std::floor(min4(xy00[1], xy01[1], xy11[1], xy10[1]));
+            int y1 = (int)std::ceil(max4(xy00[1], xy01[1], xy11[1], xy10[1]));
+            DIALS_ASSERT(x0 < x1);
+            DIALS_ASSERT(y0 < y1);
+            if (x0 < 0) x0 = 0;
+            if (y0 < 0) y0 = 0;
+            if (x1 > xs) x1 = xs;
+            if (y1 > ys) y1 = ys;
+            vert4 p1(xy00, xy01, xy11, xy10);
+            reverse_quad_inplace_if_backward(p1);
+            for (std::size_t jj = y0; jj < y1; ++jj) {
+              for (std::size_t ii = x0; ii < x1; ++ii) {
+                vec2<double> xy200(ii, jj);
+                vec2<double> xy201(ii, jj + 1);
+                vec2<double> xy211(ii + 1, jj + 1);
+                vec2<double> xy210(ii + 1, jj);
+                vert4 p2(xy200, xy201, xy211, xy210);
+                reverse_quad_inplace_if_backward(p2);
+                vert8 p3 = quad_with_convex_quad(p1, p2);
+                double area = simple_area(p3);
+                const double EPS = 1e-7;
+                if (area < 0.0) {
+                  DIALS_ASSERT(area > -EPS);
+                  area = 0.0;
+                }
+                if (area > 1.0) {
+                  DIALS_ASSERT(area <= (1.0 + EPS));
+                  area = 1.0;
+                }
+                DIALS_ASSERT(0.0 <= area && area <= 1.0);
+                if (area > 0) {
+                  for (std::size_t k = 0; k < data_.accessor()[0]; ++k) {
+                    double f00 = std::min(z[k], z[k + 1]);
+                    double f01 = std::max(z[k], z[k + 1]);
+                    DIALS_ASSERT(f01 > f00);
+                    int z0 = std::max((int)0, (int)std::floor(f00));
+                    int z1 = std::min((int)zs, (int)std::ceil(f01));
+                    DIALS_ASSERT(z0 >= 0 && z1 <= (int)zs);
+                    for (int kk = z0; kk < z1; ++kk) {
+                      if (mask(kk, jj, ii)) {
+                        std::size_t f10 = kk;
+                        std::size_t f11 = kk + 1;
+                        double f0 = std::max(f00, (double)f10);
+                        double f1 = std::min(f01, (double)f11);
+                        double fraction = f1 > f0 ? (f1 - f0) / 1.0 : 0.0;
+                        DIALS_ASSERT(fraction <= 1.0);
+                        DIALS_ASSERT(fraction >= 0.0);
+                        data_(k, j, i) += fraction * area * image(kk, jj, ii);
+                        if (use_background) {
+                          background_(k, j, i) += fraction * area * bkgrd(kk, jj, ii);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      void init(const TransformSpec &spec,
+                const CoordinateSystemTOF &cs,
+                int6 bbox,
+                std::size_t panel,
+                const af::const_ref<double, af::c_grid<3> > &image,
+                const af::const_ref<double, af::c_grid<3> > &bkgrd,
+                const af::const_ref<bool, af::c_grid<3> > &mask) {
+        // Check if we're using background
+        bool use_background = bkgrd.size() > 0;
+
+        // Check the input
+        if (use_background) {
+          DIALS_ASSERT(image.accessor().all_eq(bkgrd.accessor()));
+        }
+        DIALS_ASSERT(image.accessor().all_eq(mask.accessor()));
+        DIALS_ASSERT(bbox[1] > bbox[0]);
+        DIALS_ASSERT(bbox[3] > bbox[2]);
+        DIALS_ASSERT(bbox[5] > bbox[4]);
+
+        // Init the arrays
+        int3 grid_size = spec.grid_size();
+        af::c_grid<3> accessor(grid_size);
+        data_ = af::versa<double, af::c_grid<3> >(accessor, 0);
+        mask_ = af::versa<bool, af::c_grid<3> >(accessor, 0.0);
+        if (use_background) {
+          background_ = af::versa<double, af::c_grid<3> >(accessor, 0);
+        }
+
+
+        for (std::size_t k=0; k< grid_size[0]; ++k){
+          for (std::size_t j = 0; j < grid_size[1]; ++j) {
+            for (std::size_t i = 0; i < grid_size[2]; ++i) {
+              mask_(k, j, i) = true;
+            }
+          }
+        }
+
+        // Get the bbox size
+        std::size_t xs = bbox[1] - bbox[0];
+        std::size_t ys = bbox[3] - bbox[2];
+        std::size_t zs = bbox[5] - bbox[4];
+
+        // Compute the deltas
+        double delta_b = spec.sigma_b() * spec.n_sigma();
+        double delta_m = spec.sigma_m() * spec.n_sigma();
+
+        // Compute the grid step and offset
+        double xoff = -delta_b;
+        double yoff = -delta_b;
+        double zoff = -delta_m;
+        double xstep = (2.0 * delta_b) / data_.accessor()[2];
+        double ystep = (2.0 * delta_b) / data_.accessor()[1];
+        double zstep = (2.0 * delta_m) / data_.accessor()[0];
+
+        // Get the panel
+        const Panel &dp = spec.detector()[panel];
+
+        // Compute the detector coordinates of each point on the grid
+        af::versa<vec2<double>, af::c_grid<2> > xy(
+          af::c_grid<2>(data_.accessor()[1] + 1, data_.accessor()[2] + 1));
+
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "TOFSequence");
+        TOFSequence scan = boost::python::extract<TOFSequence>(spec.scan());
+        // Compute the frame numbers of each slice on the grid
+        af::shared<double> z(data_.accessor()[0] + 1);
+
+        for (std::size_t j = 0; j <= data_.accessor()[1]; ++j) {
+          for (std::size_t i = 0; i <= data_.accessor()[2]; ++i) {
+            double c1 = xoff + i * xstep;
+            double c2 = yoff + j * ystep;
+            vec3<double> s1p = cs.to_beam_vector(vec2<double>(c1, c2));
+            vec2<double> xyp = dp.get_ray_intersection_px(s1p);
+            xyp[0] -= bbox[0];
+            xyp[1] -= bbox[2];
+            xy(j, i) = xyp;
+            for (std::size_t k = 0; k <= data_.accessor()[0]; ++k){
+              double c3 = zoff + k * zstep;
+              double wavelength = cs.to_wavelength(c3, s1p);
+              double frame = boost::python::extract<double>(spec.scan().attr("get_frame_from_wavelength")(wavelength));
+              z[k] = frame - bbox[4];
+            }
+          }
         }
 
         // Get a list of pairs of overlapping polygons
@@ -671,6 +858,7 @@ namespace dials {
 
       af::versa<double, af::c_grid<3> > data_;
       af::versa<double, af::c_grid<3> > background_;
+      af::versa<bool, af::c_grid<3> > mask_;
     };
 
     /**
@@ -739,13 +927,15 @@ namespace dials {
             xy(j, i) = xyp;
           }
         }
-
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data.accessor()[0] + 1);
         for (std::size_t k = 0; k <= data.accessor()[0]; ++k) {
           double c3 = zoff + k * zstep;
           double phip = cs.to_rotation_angle_fast(c3);
-          z[k] = spec.scan().get_array_index_from_angle(phip) - bbox[4];
+          z[k] = scan.get_array_index_from_angle(phip) - bbox[4];
         }
 
         // Get a list of pairs of overlapping polygons
@@ -887,20 +1077,22 @@ namespace dials {
             xy(j, i) = xyp;
           }
         }
-
+        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        DIALS_ASSERT(sequence_type == "Scan");
+        Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data.accessor()[0] + 1);
         for (std::size_t k = 0; k <= data.accessor()[0]; ++k) {
           double c3 = zoff + k * zstep;
           double phip = cs.to_rotation_angle_fast(c3);
-          z[k] = spec.scan().get_array_index_from_angle(phip) - bbox[4];
+          z[k] = scan.get_array_index_from_angle(phip) - bbox[4];
         }
 
         // Create the frame mapper
         vec2<int> zrange(bbox[4], bbox[5]);
-        MapFramesReverse<double> map_frames(spec.scan().get_array_range()[0],
-                                            spec.scan().get_oscillation()[0],
-                                            spec.scan().get_oscillation()[1],
+        MapFramesReverse<double> map_frames(scan.get_array_range()[0],
+                                            scan.get_oscillation()[0],
+                                            scan.get_oscillation()[1],
                                             spec.sigma_m(),
                                             spec.n_sigma(),
                                             spec.grid_size()[2] / 2);

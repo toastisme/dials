@@ -131,10 +131,10 @@ namespace dials {
         dials::algorithms::boost_python::empirical_profile_modeller_wrapper<
           GaussianRSProfileModeller>("GaussianRSProfileModeller");
       result
-        .def(init<boost::shared_ptr<MonoBeam>,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   double,
                   double,
                   double,
@@ -156,6 +156,7 @@ namespace dials {
 
       enum_<GaussianRSProfileModeller::FitMethod>("FitMethod")
         .value("reciprocal_space", GaussianRSProfileModeller::ReciprocalSpace)
+        .value("reciprocal_space_tof", GaussianRSProfileModeller::ReciprocalSpace)
         .value("detector_space", GaussianRSProfileModeller::DetectorSpace);
 
       /* register_ptr_to_python< boost::shared_ptr<GaussianRSProfileModeller> >(); */
@@ -176,10 +177,10 @@ namespace dials {
              (arg("s1"), arg("frame"), arg("panel")));
 
       class_<BBoxCalculator3D, bases<BBoxCalculatorIface> >("BBoxCalculator3D", no_init)
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   double,
                   double>((arg("beam"),
                            arg("detector"),
@@ -187,10 +188,10 @@ namespace dials {
                            arg("scan"),
                            arg("delta_divergence"),
                            arg("delta_mosaicity"))))
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   const af::const_ref<double>,
                   const af::const_ref<double> >((arg("beam"),
                                                  arg("detector"),
@@ -200,11 +201,25 @@ namespace dials {
                                                  arg("delta_mosaicity"))));
 
       class_<BBoxCalculator2D, bases<BBoxCalculatorIface> >("BBoxCalculator2D", no_init)
-        .def(init<const MonoBeam&, const Detector&, double, double>(
+        .def(init<const boost::python::object&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
+
+      class_<BBoxCalculatorTOF>("BBoxCalculatorTOF", no_init)
+        .def(init<const boost::python::object&, const Detector&, double, double>(
+          (arg("beam"),
+           arg("detector"),
+           arg("delta_divergence"),
+           arg("delta_mosaicity"))))
+        .def("__call__",
+             &BBoxCalculatorTOF::single,
+             (arg("s0"), arg("s1"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &BBoxCalculatorTOF::array,
+             (arg("s0"), arg("s1"), arg("frame"), arg("panel")));
+          
 
       class_<BBoxMultiCalculator>("BBoxMultiCalculator")
         .def("append", &BBoxMultiCalculator::push_back)
@@ -233,17 +248,21 @@ namespace dials {
 
       class_<PartialityCalculator3D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator3D", no_init)
-        .def(init<const MonoBeam&, const Goniometer&, const Scan&, double>(
+        .def(init<const boost::python::object&, const Goniometer&, const boost::python::object&, double>(
           (arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))))
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Goniometer&,
-                  const Scan&,
+                  const boost::python::object&,
                   const af::const_ref<double>&>(
           (arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))));
 
       class_<PartialityCalculator2D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator2D", no_init)
-        .def(init<const MonoBeam&, double>((arg("beam"), arg("delta_m"))));
+        .def(init<const boost::python::object&, double>((arg("beam"), arg("delta_m"))));
+
+      class_<PartialityCalculatorTOF, bases<PartialityCalculatorIface> >(
+        "PartialityCalculatorTOF", no_init)
+        .def(init<const boost::python::object&, double>((arg("beam"), arg("delta_m"))));
 
       class_<PartialityMultiCalculator>("PartialityMultiCalculator")
         .def("append", &PartialityMultiCalculator::push_back)
@@ -251,7 +270,7 @@ namespace dials {
         .def("__call__", &PartialityMultiCalculator::operator());
 
       class_<MaskCalculator3D, bases<MaskCalculatorIface> >("MaskCalculator3D", no_init)
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -262,7 +281,7 @@ namespace dials {
                            arg("scan"),
                            arg("delta_divergence"),
                            arg("delta_mosaicity"))))
-        .def(init<const MonoBeam&,
+        .def(init<const boost::python::object&,
                   const Detector&,
                   const Goniometer&,
                   const Scan&,
@@ -275,7 +294,14 @@ namespace dials {
                                                  arg("delta_mosaicity"))));
 
       class_<MaskCalculator2D, bases<MaskCalculatorIface> >("MaskCalculator2D", no_init)
-        .def(init<const MonoBeam&, const Detector&, double, double>(
+        .def(init<const boost::python::object&, const Detector&, double, double>(
+          (arg("beam"),
+           arg("detector"),
+           arg("delta_divergence"),
+           arg("delta_mosaicity"))));
+
+      class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF", no_init)
+        .def(init<const boost::python::object&, const Detector&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("delta_divergence"),
@@ -339,6 +365,20 @@ namespace dials {
         .def("to_rotation_angle_fast", &CoordinateSystem::to_rotation_angle_fast)
         .def("to_beam_vector_and_rotation_angle",
              &CoordinateSystem::to_beam_vector_and_rotation_angle);
+
+      // Export coordinate system
+      class_<CoordinateSystemTOF>("CoordinateSystemTOF", no_init)
+        .def(init<vec3<double>, vec3<double> >(
+          (arg("s0"), arg("s1"))))
+        .def("s0", &CoordinateSystemTOF::s0)
+        .def("s1", &CoordinateSystemTOF::s1)
+        .def("p_star", &CoordinateSystemTOF::p_star)
+        .def("e1_axis", &CoordinateSystemTOF::e1_axis)
+        .def("e2_axis", &CoordinateSystemTOF::e2_axis)
+        .def("e3_axis", &CoordinateSystemTOF::e3_axis)
+        .def("from_beam_vector", &CoordinateSystemTOF::from_beam_vector)
+        .def("to_beam_vector", &CoordinateSystemTOF::to_beam_vector)
+        .def("to_wavelength", &CoordinateSystemTOF::to_wavelength);
 
       boost_adaptbx::std_pair_conversions::to_tuple<vec3<double>, double>();
     }

@@ -72,7 +72,7 @@ namespace dials { namespace algorithms {
      * @param delta_b The beam divergence
      * @param delta_m The mosaicity
      */
-    GaussianRSMaskCalculator(const MonoBeam &beam,
+    GaussianRSMaskCalculator(const boost::python::object &beam,
                              const Detector &detector,
                              const Goniometer &gonio,
                              const Scan &scan,
@@ -429,7 +429,7 @@ namespace dials { namespace algorithms {
 
       // Create the coordinate system
       vec3<double> m2 = data_spec.spec().goniometer().get_rotation_axis();
-      vec3<double> s0 = data_spec.spec().beam()->get_s0();
+      vec3<double> s0 = boost::python::extract<vec3<double> >(data_spec.spec().beam().attr("get_s0"));
       CoordinateSystem cs(m2, s0, s1, phi);
 
       // Get the reference profiles
@@ -575,7 +575,7 @@ namespace dials { namespace algorithms {
 
       // Create the coordinate system
       vec3<double> m2 = data_spec.spec().goniometer().get_rotation_axis();
-      vec3<double> s0 = data_spec.spec().beam()->get_s0();
+      vec3<double> s0 = boost::python::extract<vec3<double> >(data_spec.spec().beam().attr("get_s0"));
       CoordinateSystem cs(m2, s0, s1, phi);
 
       // Compute the transform
@@ -727,7 +727,7 @@ namespace dials { namespace algorithms {
 
       // Create the coordinate system
       vec3<double> m2 = data_spec.spec().goniometer().get_rotation_axis();
-      vec3<double> s0 = data_spec.spec().beam()->get_s0();
+      vec3<double> s0 = boost::python::extract<vec3<double> >(data_spec.spec().beam().attr("get_s0"));
       CoordinateSystem cs(m2, s0, s1, phi);
 
       // Compute the transform
@@ -758,7 +758,7 @@ namespace dials { namespace algorithms {
         vec3<double> s12 = adjacent_reflections[j].get<vec3<double> >("s1");
         double phi2 = adjacent_reflections[j].get<vec3<double> >("xyzcal.mm")[2];
         vec3<double> m22 = data_spec2.spec().goniometer().get_rotation_axis();
-        vec3<double> s02 = data_spec2.spec().beam()->get_s0();
+        vec3<double> s02 = boost::python::extract<vec3<double> >(data_spec2.spec().beam().attr("get_s0"));
         CoordinateSystem cs2(m22, s02, s12, phi2);
 
         // Compute the transform
@@ -994,7 +994,7 @@ namespace dials { namespace algorithms {
       if (check(experiment_id, flags, partiality, sbox)) {
         // Create the coordinate system
         vec3<double> m2 = spec_[experiment_id].goniometer().get_rotation_axis();
-        vec3<double> s0 = spec_[experiment_id].beam()->get_s0();
+        vec3<double> s0 = boost::python::extract<vec3<double> >(spec_[experiment_id].beam().attr("get_s0"));
         CoordinateSystem cs(m2, s0, s1, xyzmm[2]);
 
         // Create the data array
