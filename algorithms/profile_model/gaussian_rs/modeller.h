@@ -431,15 +431,12 @@ namespace dials { namespace algorithms {
       af::shared<bool> success;
       switch (fit_method_) {
       case ReciprocalSpace:
-        std::cout<<"Fitting RS\n\n";
         success = fit_reciprocal_space(reflections);
         break;
       case DetectorSpace:
-        std::cout<<"Fitting DS\n\n";
         success = fit_detector_space(reflections);
         break;
       case TOF:
-        std::cout<<"Fitting TOF\n\n";
         success = fit_reciprocal_space_tof(reflections);
         break;
       default:
@@ -748,10 +745,15 @@ namespace dials { namespace algorithms {
             // Get the transformed shoebox
             data_const_reference c = transform.profile().const_ref();
             data_const_reference b = transform.background().const_ref();
-            mask_const_reference m = transform.mask().const_ref();
+            mask_const_reference mask2 = transform.mask().const_ref();
+            af::versa<bool, af::c_grid<3> > m(mask2.accessor());
+            DIALS_ASSERT(mask1.size() == mask2.size());
+            for (std::size_t j = 0; j < m.size(); ++j) {
+              m[j] = mask1[j] && mask2[j];
+            }
 
             // Do the profile fitting
-            ProfileFitter<double> fit(c, b, m, p, 1e-3, 100);
+            ProfileFitter<double> fit(c, b, m.const_ref(), p, 1e-3, 100);
             // DIALS_ASSERT(fit.niter() < 100);
 
             // Set the data in the reflection
