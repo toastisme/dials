@@ -504,7 +504,7 @@ namespace dials {
   /**
    * A class to mask foreground/background pixels
    */
-  class MaskCalculatorTOF : public MaskCalculatorIface {
+  class MaskCalculatorTOF {
   public:
     /**
      * Initialise the stuff needed to create the mask.
@@ -517,25 +517,154 @@ namespace dials {
      */
     MaskCalculatorTOF(const boost::python::object &beam,
                      const Detector &detector,
+                     const boost::python::object &scan,
                      double delta_b,
                      double delta_m)
-        : detector_(detector), 
-        s0_(boost::python::extract<vec3<double> >(beam.attr("get_unit_s0")())) {
-      DIALS_ASSERT(delta_b > 0.0);
-      DIALS_ASSERT(delta_m >= 0.0);
-      delta_b_r_ = 1.0 / delta_b;
-      // delta_m_r_ = 1.0 / delta_m;
+        : detector_(detector),
+          scan_(scan){
+        DIALS_ASSERT(delta_b > 0.0);
+        DIALS_ASSERT(delta_m >= 0.0);
+        delta_b_r_ = 1.0 / delta_b;
+        delta_m_r_ = 1.0 / delta_m;
+        vec2<int> array_range = boost::python::extract<vec2<int> >(scan.attr("get_array_range"));
+        index0_ = array_range[0];
+        index1_ = array_range[1];
     }
 
     /**
      * Set all the foreground/background pixels in the shoebox mask.
      * @param shoebox The shoebox to mask
      * @param s1 The beam vector
+     * @param s0 The incident beam vector
      * @param frame The frame number
      * @param panel The panel number
      */
     virtual void single(Shoebox<> &shoebox,
                         vec3<double> s1,
+                        vec3<double> s0,
+                        double frame,
+                        std::size_t panel,
+                        bool adjacent = false) const {
+      DIALS_ASSERT(shoebox.is_consistent());
+      if (shoebox.flat) {
+        single_flat(shoebox, s1, s0, frame, panel);
+      } else {
+        single_normal(shoebox, s1, s0, frame, panel, adjacent);
+      }
+    }
+
+    /**
+     * Set all the foreground/background pixels in the shoebox mask.
+     * @param shoebox The shoebox to mask
+     * @param s1 The beam vector
+     * @param s0 The incident beam vector
+     * @param frame The frame number
+     * @param panel The panel number
+     */
+    void single_normal(Shoebox<> &shoebox,
+                       vec3<double> s1,
+                       vec3<double> s0,
+                       double frame,
+                       std::size_t panel_number,
+                       bool adjacent = false) const {
+      // Get some bits from the shoebox
+      af::ref<int, af::c_grid<3> > mask = shoebox.mask.ref();
+      int6 bbox = shoebox.bbox;
+      int x0 = bbox[0], x1 = bbox[1];
+      int y0 = bbox[2], y1 = bbox[3];
+      int z0 = bbox[4], z1 = bbox[5];
+      int xsize = x1 - x0;
+      int ysize = y1 - y0;
+      int zsize = z1 - z0;
+
+      // Get the divergence and mosaicity for this point
+      double delta_b_r2 = delta_b_r_ * delta_b_r_;
+      double delta_m_r2 = delta_m_r_ * delta_m_r_; 
+      // Get the panel
+      const Panel &panel = detector_[panel_number];
+
+      // Check the size of the mask
+      DIALS_ASSERT(mask.accessor()[0] == zsize);
+      DIALS_ASSERT(mask.accessor()[1] == ysize);
+      DIALS_ASSERT(mask.accessor()[2] == xsize);
+
+      // Create the coordinate system and generators
+      CoordinateSystemTOF cs(s0, s1);
+      double s0_length = s0.length();
+
+      // Loop through all the pixels in the shoebox, transform the point
+      // to the reciprocal space coordinate system and check that it is
+      // within the ellipse defined by:
+      // (c1 / delta_b)^2 + (c2 / delta_b)^2 <= 1
+      // Mark those points within as Foreground and those without as
+      // Background.
+
+      vec2<double> shoebox_centroid_px = panel.get_ray_intersection_px(s1);
+      double attenuation_length = panel.attenuation_length(shoebox_centroid_px);
+
+      af::versa<double, af::c_grid<2> > dxy_array(af::c_grid<2>(ysize + 1, xsize + 1));
+      af::versa<vec3<double>, af::c_grid<2> > beam_vectors(af::c_grid<2>(ysize + 1, xsize + 1));
+      for (int j = 0; j <= ysize; ++j) {
+        for (int i = 0; i <= xsize; ++i) {
+          vec3<double> beam_vector = panel.get_pixel_lab_coord(
+            vec2<double>(x0 + i, y0 + j), 
+            attenuation_length
+          );
+          vec2<double> gxy = cs.from_beam_vector(
+            beam_vector.normalize()* s0_length
+          );
+          dxy_array(j, i) = (gxy[0] * gxy[0] + gxy[1] * gxy[1]) * delta_b_r2;
+          beam_vectors(j,i) = beam_vector;
+        }
+      }
+
+      for (int j = 0; j < ysize; ++j) {
+        for (int i = 0; i < xsize; ++i) {
+          double dxy1 = dxy_array(j, i);
+          double dxy2 = dxy_array(j + 1, i);
+          double dxy3 = dxy_array(j, i + 1);
+          double dxy4 = dxy_array(j + 1, i + 1);
+          double dxy = std::min(std::min(dxy1, dxy2), std::min(dxy3, dxy4));
+          for (std::size_t k = 0; k < zsize; ++k) {
+            if (z0 + (int)k >= index0_ && z0 + (int)k < index1_) {
+
+              double wavelength1 = boost::python::extract<double>(
+                scan_.attr("get_wavelength_from_frame")(z0 + k - index0_));
+              double wavelength2 = boost::python::extract<double>(
+                scan_.attr("get_wavelength_from_frame")(z0 + k + 1 - index0_));
+
+              double gz1 =
+                cs.from_wavelength(wavelength1, beam_vectors(j,i));
+              double gz2 =
+                cs.from_wavelength(wavelength2, beam_vectors(j,i));
+              double gz = std::abs(gz1) < std::abs(gz2) ? gz1 : gz2;
+              double gzc2 = gz * gz * delta_m_r2;
+              /* int mask_value = (dxy + gzc2 <= 1.0) ? Foreground : Background; */
+              if (!adjacent) {
+                int mask_value = (dxy <= 1.0) ? Foreground : Background;
+                mask(k, j, i) |= mask_value;
+              } else {
+                if (dxy + gzc2 <= 1.0) {
+                  mask(k, j, i) |= Overlapped;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    /**
+     * Set all the foreground/background pixels in the shoebox mask.
+     * @param shoebox The shoebox to mask
+     * @param s1 The beam vector
+     * @param s0 The incident beam vector
+     * @param frame The frame number
+     * @param panel The panel number
+     */
+    virtual void single_flat(Shoebox<> &shoebox,
+                        vec3<double> s1,
+                        vec3<double> s0,
                         double frame,
                         std::size_t panel_number,
                         bool adjacent = false) const {
@@ -563,8 +692,8 @@ namespace dials {
       DIALS_ASSERT(mask.accessor()[2] == xsize);
 
       // Create the coordinate system and generators
-      CoordinateSystem2d cs(s0_, s1);
-      double s0_length = s0_.length();
+      CoordinateSystemTOF cs(s0, s1);
+      double s0_length = s0.length();
 
       // Loop through all the pixels in the shoebox, transform the point
       // to the reciprocal space coordinate system and check that it is
@@ -598,120 +727,32 @@ namespace dials {
      * Mask all the foreground/background pixels for all the shoeboxes
      * @param shoeboxes The shoebox list
      * @param s1 The list of beam vectors
+     * @param s0 The list of incident beam vectors
      * @param frame The list of frame numbers
      * @param panel The list of panel numbers
      */
     virtual void array(af::ref<Shoebox<> > shoeboxes,
                        const af::const_ref<vec3<double> > &s1,
+                       const af::const_ref<vec3<double> > &s0,
                        const af::const_ref<double> &frame,
                        const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
       DIALS_ASSERT(shoeboxes.size() == panel.size());
       for (std::size_t i = 0; i < shoeboxes.size(); ++i) {
-        this->single(shoeboxes[i], s1[i], frame[i], panel[i]);
+        this->single(shoeboxes[i], s1[i], s0[i], frame[i], panel[i]);
       }
-    }
-
-    virtual af::shared<double> volume(MultiPanelImageVolume<> volume,
-                                      const af::const_ref<int6> &bbox,
-                                      const af::const_ref<vec3<double> > &s1,
-                                      const af::const_ref<double> &frame,
-                                      const af::const_ref<std::size_t> &panel) const {
-      DIALS_ASSERT(bbox.size() == s1.size());
-      DIALS_ASSERT(bbox.size() == frame.size());
-      DIALS_ASSERT(bbox.size() == panel.size());
-      af::shared<double> fraction(bbox.size());
-      for (std::size_t i = 0; i < bbox.size(); ++i) {
-        fraction[i] =
-          volume_single(volume.get(panel[i]), bbox[i], s1[i], frame[i], panel[i], i);
-      }
-      return fraction;
-    }
-
-    template <typename FloatType>
-    double volume_single(ImageVolume<FloatType> volume,
-                         int6 bbox,
-                         vec3<double> s1,
-                         double frame,
-                         std::size_t panel_number,
-                         std::size_t index) const {
-      DIALS_ASSERT(volume.is_consistent());
-
-      // Get some bits from the shoebox
-      int x0 = bbox[0], x1 = bbox[1];
-      int y0 = bbox[2], y1 = bbox[3];
-      int z0 = bbox[4], z1 = bbox[5];
-      int width = volume.accessor()[2];
-      int height = volume.accessor()[1];
-      int frame0 = volume.frame0();
-      int frame1 = volume.frame1();
-      z0 = std::max(frame0, z0);
-      z1 = std::min(frame1, z1);
-      DIALS_ASSERT(x1 > x0);
-      DIALS_ASSERT(y1 > y0);
-      DIALS_ASSERT(z1 > z0);
-      int xsize = x1 - x0;
-      int ysize = y1 - y0;
-      int zsize = z1 - z0;
-      DIALS_ASSERT(zsize == 1);
-
-      /* DIALS_ASSERT(z >= z0 && z < z1); */
-      double delta_b_r2 = delta_b_r_ * delta_b_r_;
-      /* double delta_m_r2 = delta_m_r_ * delta_m_r_; */
-
-      // Get the panel
-      const Panel &panel = detector_[panel_number];
-
-      // Create the coordinate system and generators
-      CoordinateSystem2d cs(s0_, s1);
-      double s0_length = s0_.length();
-
-      // Loop through all the pixels in the shoebox, transform the point
-      // to the reciprocal space coordinate system and check that it is
-      // within the ellipse defined by:
-      // (c1 / delta_b)^2 + (c2 / delta_b)^2 <= 1
-      // Mark those points within as Foreground and those without as
-      // Background.
-      af::versa<double, af::c_grid<2> > dxy_array(af::c_grid<2>(ysize + 1, xsize + 1));
-      for (int j = 0; j <= ysize; ++j) {
-        for (int i = 0; i <= xsize; ++i) {
-          vec2<double> gxy = cs.from_beam_vector(
-            panel.get_pixel_lab_coord(vec2<double>(x0 + i, y0 + j)).normalize()
-            * s0_length);
-          dxy_array(j, i) = (gxy[0] * gxy[0] + gxy[1] * gxy[1]) * delta_b_r2;
-        }
-      }
-      int num1 = 0;
-      int num2 = 0;
-      for (int j = 0; j < ysize; ++j) {
-        for (int i = 0; i < xsize; ++i) {
-          double dxy1 = dxy_array(j, i);
-          double dxy2 = dxy_array(j + 1, i);
-          double dxy3 = dxy_array(j, i + 1);
-          double dxy4 = dxy_array(j + 1, i + 1);
-          double dxy = std::min(std::min(dxy1, dxy2), std::min(dxy3, dxy4));
-          int mask_value = (dxy <= 1.0) ? Foreground : Background;
-          int jj = y0 + j;
-          int ii = x0 + i;
-          if (jj >= 0 && ii >= 0 && jj < height && ii < width) {
-            volume.set_mask_value(z0 - frame0, y0 + j, x0 + i, mask_value, index);
-            num1++;
-          } else if (dxy <= 1.0) {
-            num2++;
-          }
-        }
-      }
-      DIALS_ASSERT(num1 + num2 > 0);
-      return (double)num2 / (double)(num1 + num2);
     }
 
   private:
     Detector detector_;
-    vec3<double> s0_;
+    boost::python::object scan_;
     double delta_b_r_;
-    /*double delta_m_r_;*/
+    double delta_m_r_;
+    int index0_;
+    int index1_;
   };
+
   /**
    * A class to mask foreground/background pixels
    */

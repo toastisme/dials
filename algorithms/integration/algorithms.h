@@ -52,6 +52,7 @@ namespace dials { namespace algorithms {
   using dials::algorithms::background::SimpleBackgroundCreator;
   using dials::algorithms::profile_model::gaussian_rs::CoordinateSystem;
   using dials::algorithms::profile_model::gaussian_rs::MaskCalculator3D;
+  using dials::algorithms::profile_model::gaussian_rs::MaskCalculatorTOF;
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformForward;
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformReverse;
   using dials::algorithms::profile_model::gaussian_rs::transform::
@@ -97,6 +98,47 @@ namespace dials { namespace algorithms {
 
   protected:
     MaskCalculator3D func_;
+  };
+
+  /**
+   * A class to calculate the reflection mask
+   */
+  class GaussianRSMaskCalculatorTOF {
+  public:
+    /**
+     * Init the algorithm
+     * @param beam The beam model
+     * @param detector The detector model
+     * @param gonio The goniometer model
+     * @param scan The scan model
+     * @param delta_b The beam divergence
+     * @param delta_m The mosaicity
+     */
+    GaussianRSMaskCalculatorTOF(const boost::python::object &beam,
+                             const Detector &detector,
+                             const boost::python::object &scan,
+                             double delta_b,
+                             double delta_m)
+        : func_(beam, detector, scan, delta_b, delta_m) {}
+
+    ~GaussianRSMaskCalculatorTOF() {}
+
+    /**
+     * Compute the mask for a single reflection
+     * @param reflection The reflection object
+     * @param adjacent Is this an adjacent relfection?
+     */
+    virtual void operator()(af::Reflection &reflection, bool adjacent = false) const {
+      func_.single(reflection.get<Shoebox<> >("shoebox"),
+                   reflection.get<vec3<double> >("s1"),
+                   reflection.get<vec3<double> >("s0"),
+                   reflection.get<vec3<double> >("xyzcal.px")[2],
+                   reflection.get<std::size_t>("panel"),
+                   adjacent);
+    }
+
+  protected:
+    MaskCalculatorTOF func_;
   };
 
   /**

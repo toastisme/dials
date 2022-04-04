@@ -10,19 +10,29 @@ class GaussianRSMaskCalculatorFactory:
         """
         from dials.algorithms.integration.parallel_integrator import (
             GaussianRSMaskCalculator,
+            GaussianRSMaskCalculatorTOF,
             GaussianRSMultiCrystalMaskCalculator,
         )
 
         result = GaussianRSMultiCrystalMaskCalculator()
         for e in experiments:
-            alg = GaussianRSMaskCalculator(
-                e.beam,
-                e.detector,
-                e.goniometer,
-                e.sequence,
-                e.profile.delta_b(deg=False),
-                e.profile.delta_m(deg=False),
-            )
+            if e.is_tof_experiment():
+                alg = GaussianRSMaskCalculatorTOF(
+                    e.beam,
+                    e.detector,
+                    e.sequence,
+                    e.profile.delta_b(deg=False),
+                    e.profile.delta_m(deg=False),
+                )
+            else:
+                alg = GaussianRSMaskCalculator(
+                    e.beam,
+                    e.detector,
+                    e.goniometer,
+                    e.sequence,
+                    e.profile.delta_b(deg=False),
+                    e.profile.delta_m(deg=False),
+                )
             result.append(alg)
         return result
 

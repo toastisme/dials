@@ -172,23 +172,20 @@ namespace dials {
      * @param s0_dash The incident beam vector
      * @returns The e1, e2, e3 coordinates
      */
-    vec3<double> from_beam_vector(
-      const vec3<double> &s_dash,
-      const vec3<double> &s0_dash
+    vec2<double> from_beam_vector(
+      const vec3<double> &s_dash
       ) const {
       double s1_length = s1_.length();
       double s0_length = s0_.length();
       DIALS_ASSERT(s1_length > 0);
       DIALS_ASSERT(s0_length > 0);
-      vec3<double> p_star0 = s_dash-s0_dash;
       vec3<double> e1 = e1_ / s1_length;
       vec3<double> e2 = e2_ / s1_length;
-      vec3<double> e3 = (s1_+s0_)/(s1_length + s0_length);
-      return vec3<double>(
+      return vec2<double>(
         e1 * (s_dash - s1_),
-        e2 * (s_dash - s1_),
-        e3 * (p_star0 - p_star_)/p_star_.length());
+        e2 * (s_dash - s1_));
     }
+
 
     /**
      * Transform the reciprocal space coordinate to get the beam vector.
@@ -223,6 +220,21 @@ namespace dials {
       DIALS_ASSERT(s1_length > 0);
       vec3<double> unit_s0 = s0_.normalize();
       return 1/((e3_*s_dash - c3*s1_length - e3_*p_star_)/(e3_*unit_s0));
+    }
+
+    /**
+     * Transform the wavelength to the reciprocal space coordinate system
+     * @param wavelength The rotation angle
+     * @param s_dash The beam vector from the e1 and e2 coordinates
+     * @returns The e3 coordinate.
+     */
+    double from_wavelength(double wavelength, vec3<double> s_dash) const {
+      double p_star_length = p_star_.length();
+      DIALS_ASSERT(p_star_length > 0);
+      vec3<double> scaled_e3 = e3_ / p_star_length;
+      vec3<double> unit_s0 = s0_.normalize();
+      vec3<double> p_star_0 = s_dash - (unit_s0/wavelength);
+      return scaled_e3 * (p_star_0 - p_star_);
     }
 
 

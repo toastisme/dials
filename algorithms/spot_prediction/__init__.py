@@ -36,8 +36,6 @@ __all__ = [
     "TOFReflectionPredictor",
 ]
 
-from scipy import interpolate
-
 import cctbx.array_family.flex
 
 
@@ -121,23 +119,21 @@ class TOFReflectionPredictorPy:
 
     def for_ub(self, ub):
         reflection_table = self.predictor.for_ub(ub)
-        wavelengths = list(self.experiment.sequence.get_wavelengths())
         image_range = self.experiment.sequence.get_image_range()
         frames = list(range(image_range[0], image_range[1]))
-        spline_coefficients = interpolate.splrep(wavelengths, frames)
-        x, y, z = reflection_table["xyzcal.px"].parts()
-        xyz = cctbx.array_family.flex.vec3_double(len(reflection_table))
+        px, py, pz = reflection_table["xyzcal.px"].parts()
+        xyz_px = cctbx.array_family.flex.vec3_double(len(reflection_table))
+        tof_vals = cctbx.array_family.flex.double(len(reflection_table))
         for i in range(len(reflection_table)):
             wavelength = reflection_table["wavelength_cal"][i]
-            frame = min(
-                max(
-                    frames[0], float(interpolate.splev(wavelength, spline_coefficients))
-                ),
-                frames[-1],
-            )
-            xyz[i] = (x[i], y[i], frame)
+            frame = self.experiment.sequence.get_frame_from_wavelength(wavelength)
+            frame = min(max(frame, frames[0]), frames[-1])
+            tof = self.experiment.sequence.get_tof_from_frame(frame)
+            xyz_px[i] = (px[i], py[i], frame)
+            tof_vals[i] = tof
 
-        reflection_table["xyzcal.px"] = xyz
+        reflection_table["xyzcal.px"] = xyz_px
+        reflection_table["tof_cal"] = tof_vals
         return reflection_table
 
     def for_reflection_table(self, reflections, UB):
