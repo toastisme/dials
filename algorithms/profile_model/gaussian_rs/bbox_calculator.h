@@ -362,9 +362,14 @@ namespace dials {
      */
     BBoxCalculatorTOF(const boost::python::object &beam,
                      const Detector &detector,
+                     const boost::python::object &scan,
                      double delta_divergence,
                      double delta_mosaicity)
-        : detector_(detector), delta_divergence_(delta_divergence) {
+        : detector_(detector), 
+          delta_divergence_(delta_divergence),
+          delta_mosaicity_(delta_mosaicity),
+          scan_(scan)
+          {
       DIALS_ASSERT(delta_divergence > 0.0);
       DIALS_ASSERT(delta_mosaicity >= 0.0);
     }
@@ -394,16 +399,13 @@ namespace dials {
       DIALS_ASSERT(s1.length_sq() > 0);
 
       // Create the coordinate system for the reflection
-      CoordinateSystem2d xcs(s0, s1);
+      CoordinateSystemTOF xcs(s0, s1);
 
       // Get the divergence and mosaicity for this point
       double delta_d = delta_divergence_;
+      double delta_m = delta_mosaicity_;
 
-      // Calculate the beam vectors at the following xds coordinates:
-      //   (-delta_d, -delta_d, 0)
-      //   (+delta_d, -delta_d, 0)
-      //   (-delta_d, +delta_d, 0)
-      //   (+delta_d, +delta_d, 0)
+      // Get xy coordinates
       double point = delta_d;
       double3 sdash1 = xcs.to_beam_vector(double2(-point, -point));
       double3 sdash2 = xcs.to_beam_vector(double2(+point, -point));
@@ -416,6 +418,14 @@ namespace dials {
       double2 xy3 = detector_[panel].get_ray_intersection_px(sdash3);
       double2 xy4 = detector_[panel].get_ray_intersection_px(sdash4);
 
+      // Get wavelength from e3
+      double wavelength1 = xcs.to_wavelength(-delta_m, xcs.s1());
+      double wavelength2 = xcs.to_wavelength(+delta_m, xcs.s1());
+
+      // Get the array indices at the rotation angles
+      double z1 = boost::python::extract<double>(scan_.attr("get_frame_from_wavelength")(wavelength1));
+      double z2 = boost::python::extract<double>(scan_.attr("get_frame_from_wavelength")(wavelength2));
+
       // Return the roi in the following form:
       // (minx, maxx, miny, maxy, minz, maxz)
       // Min's are rounded down to the nearest integer, Max's are rounded up
@@ -425,8 +435,8 @@ namespace dials {
                 (int)ceil(max(x)),
                 (int)floor(min(y)),
                 (int)ceil(max(y)),
-                (int)floor(frame),
-                (int)floor(frame) + 7);
+                (int)floor(z1),
+                (int)ceil(z2));
       DIALS_ASSERT(bbox[1] > bbox[0]);
       DIALS_ASSERT(bbox[3] > bbox[2]);
       DIALS_ASSERT(bbox[5] > bbox[4]);
@@ -457,6 +467,8 @@ namespace dials {
   private:
     Detector detector_;
     double delta_divergence_;
+    double delta_mosaicity_;
+    boost::python::object scan_;
   };
   /**
    * Class to help compute bbox for multiple experiments.

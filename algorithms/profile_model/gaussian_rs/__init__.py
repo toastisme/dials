@@ -61,7 +61,7 @@ __all__ = [
 def BBoxCalculator(crystal, beam, detector, goniometer, sequence, delta_b, delta_m):
     """Return the relevant bbox calculator."""
     if isinstance(sequence, TOFSequence):
-        algorithm = BBoxCalculatorTOF(beam, detector, delta_b, delta_m)
+        algorithm = BBoxCalculatorTOF(beam, detector, sequence, delta_b, delta_m)
     elif goniometer is None or sequence is None or sequence.is_still():
         algorithm = BBoxCalculator2D(beam, detector, delta_b, delta_m)
     else:

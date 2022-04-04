@@ -208,9 +208,10 @@ namespace dials {
            arg("delta_mosaicity"))));
 
       class_<BBoxCalculatorTOF>("BBoxCalculatorTOF", no_init)
-        .def(init<const boost::python::object&, const Detector&, double, double>(
+        .def(init<const boost::python::object&, const Detector&, boost::python::object&, double, double>(
           (arg("beam"),
            arg("detector"),
+           arg("scan"),
            arg("delta_divergence"),
            arg("delta_mosaicity"))))
         .def("__call__",
