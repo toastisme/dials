@@ -526,7 +526,7 @@ namespace dials {
         DIALS_ASSERT(delta_m >= 0.0);
         delta_b_r_ = 1.0 / delta_b;
         delta_m_r_ = 1.0 / delta_m;
-        vec2<int> array_range = boost::python::extract<vec2<int> >(scan.attr("get_array_range"));
+        vec2<int> array_range = boost::python::extract<vec2<int> >(scan.attr("get_array_range")());
         index0_ = array_range[0];
         index1_ = array_range[1];
     }

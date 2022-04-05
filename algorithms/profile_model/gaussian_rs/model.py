@@ -578,6 +578,14 @@ class Model(ProfileModelExt):
         mask_foreground = MaskCalculator(
             crystal, beam, detector, goniometer, scan, delta_b, delta_m
         )
+        if reflections.contains("s0_cal"):
+            return mask_foreground(
+                reflections["shoebox"],
+                reflections["s1"],
+                reflections["s0_cal"],
+                reflections["xyzcal.px"].parts()[2],
+                reflections["panel"],
+            )
 
         # Mask the foreground region
         if image_volume is None:
