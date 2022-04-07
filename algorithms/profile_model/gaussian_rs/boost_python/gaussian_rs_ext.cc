@@ -301,13 +301,19 @@ namespace dials {
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
 
-      class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF", no_init)
+      class_<MaskCalculatorTOF>("MaskCalculatorTOF", no_init)
         .def(init<const boost::python::object&, const Detector&, boost::python::object&, double, double>(
           (arg("beam"),
            arg("detector"),
            arg("scan"),
            arg("delta_divergence"),
-           arg("delta_mosaicity"))));
+           arg("delta_mosaicity"))))
+        .def("__call__",
+             &MaskCalculatorTOF::single,
+             (arg("shoebox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &MaskCalculatorTOF::array,
+             (arg("shoebox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")));
 
       class_<MaskMultiCalculator>("MaskMultiCalculator")
         .def("append", &MaskMultiCalculator::push_back)

@@ -578,7 +578,7 @@ class Model(ProfileModelExt):
         mask_foreground = MaskCalculator(
             crystal, beam, detector, goniometer, scan, delta_b, delta_m
         )
-        if reflections.contains("s0_cal"):
+        if reflections.contains_beam_data():
             return mask_foreground(
                 reflections["shoebox"],
                 reflections["s1"],

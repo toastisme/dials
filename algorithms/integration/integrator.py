@@ -483,6 +483,17 @@ def _initialize_tof(experiments, params, reflections):
         experiments, sigma_b_multiplier=params.profile.sigma_b_multiplier
     )
 
+    # Filter any bounding boxes that fall outside of frames
+    x1, x2, y1, y2, z1, z2 = reflections["bbox"].parts()
+    sel = z1 > 0
+    num_all_reflections = len(reflections)
+    reflections = reflections.select(sel)
+    num_valid_reflections = len(reflections)
+    num_removed_reflections = num_all_reflections - num_valid_reflections
+    logger.info(
+        f"Removing {num_removed_reflections} as they are outside the ToF range",
+    )
+
 
 def _initialize_stills(experiments, params, reflections):
     """
