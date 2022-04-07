@@ -586,6 +586,8 @@ def run_integration(params, experiments, reference=None):
 
     # Compute the bounding box
     predicted.compute_bbox(experiments)
+    zrange = experiments[0].sequence.get_image_range()
+    predicted = predicted.filter_bbox_by_zrange(zrange)
 
     # Create the integrator
     integrator = create_integrator(params, experiments, predicted)

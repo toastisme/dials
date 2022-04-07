@@ -1480,6 +1480,25 @@ Found %s"""
                 else:
                     self["rlp"].set_selected(sel, S)
 
+    def filter_bbox_by_zrange(self, zrange: Tuple[int, int]):
+
+        """
+        Removes any reflections with bounding boxes outside of zrange.
+        """
+
+        # Filter any bounding boxes that fall outside of frames
+        x1, x2, y1, y2, z1, z2 = self["bbox"].parts()
+        sel = (z1 >= zrange[0]) & (z2 <= zrange[1])
+        num_all_reflections = len(self)
+
+        reflections = self.select(sel)
+        num_valid_reflections = len(reflections)
+        num_removed_reflections = num_all_reflections - num_valid_reflections
+        logger.info(
+            f"Removing {num_removed_reflections} reflections outside zrange",
+        )
+        return reflections
+
     def calculate_entering_flags(self, experiments):
         """Calculate the entering flags for the reflections.
 
