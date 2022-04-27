@@ -1074,7 +1074,10 @@ class _:
 
         sel = self["panel"] == panel
         x0, x1, y0, y1, z0, z1 = self["bbox"].select(sel).parts()
-        centroids = self["shoebox"].select(sel).centroid_valid()
+        if "xyzobs.px.value" in self:
+            centroids = self["xyzobs.px.value"].select(sel)
+        else:
+            centroids = None
         py = int(pixel_pos[0])
         px = int(pixel_pos[1])
         bbox_pos = []
@@ -1083,7 +1086,11 @@ class _:
             if px >= x0[i] and px <= x1[i]:
                 if py >= y0[i] and py <= y1[i]:
                     bbox_pos.append([z0[i], z1[i]])
-                    centroid_pos.append(centroids[i].px.position[2])
+                    if centroids:
+                        centroid_pos.append(centroids[i][2])
+                        ci = centroids[i][2]
+                        x, y = z0[i], z1[i]
+                        assert ci >= x and ci <= y, f"{ci} {x} {y}"
         return bbox_pos, centroid_pos
 
     def find_overlaps(self, experiments=None, border=0):

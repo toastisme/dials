@@ -2770,6 +2770,10 @@ class PixelLinePlot(wx.Frame):
         Updates the plot with a line plot at coords from panel panel_idx.
         If bboxes or centroids are given, these are also added to the plot.
         """
+        for i in range(len(bboxes)):
+            ci = centroids[i]
+            x, y = bboxes[i]
+            assert ci >= x and ci <= y, f"{ci} {x} {y}"
         px = int(coords[0])
         py = int(coords[1])
         x, spectra = self.imageset.get_pixel_spectra(panel_idx, px, py)

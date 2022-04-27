@@ -139,10 +139,6 @@ def _copy_experiments_for_refining(experiments):
 
         # Ensure every 'refined' attribute is uniquely copied
 
-        # TOF hack
-        # print("TEST performing ToF hack")
-        # experiments[0].beam.set_wavelength(1)
-
         for model in ["beam", "goniometer", "detector", "crystal"]:
             original = getattr(experiment, model)
             if id(original) not in id_memo:
