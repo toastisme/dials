@@ -33,10 +33,11 @@ namespace dials { namespace algorithms {
      * @param volume_size The size of the volume to sample
      * @param grid_size The number of grid points
      */
-    GridSampler(int2 image_size, int2 scan_range, int3 grid_size)
+    GridSampler(int2 image_size, int2 scan_range, int3 grid_size, int num_panels=1)
         : image_size_(image_size),
           scan_range_(scan_range),
           scan_size_(scan_range[1] - scan_range[0]),
+          num_panels_(num_panels),
           grid_size_(grid_size) {
       // Check some input
       DIALS_ASSERT(image_size_.all_gt(0));
@@ -82,7 +83,7 @@ namespace dials { namespace algorithms {
      * @returns The total number of grid points
      */
     std::size_t size() const {
-      return grid_size_[0] * grid_size_[1] * grid_size_[2];
+      return grid_size_[0] * grid_size_[1] * grid_size_[2] * num_panels_;
     }
 
     /**
@@ -91,7 +92,6 @@ namespace dials { namespace algorithms {
      * @returns The index of the reference profile
      */
     std::size_t nearest(std::size_t panel, double3 xyz) const {
-      DIALS_ASSERT(panel == 0);
       DIALS_ASSERT(xyz[0] >= 0 && xyz[1] >= 0);
       DIALS_ASSERT(xyz[0] < image_size_[0]);
       DIALS_ASSERT(xyz[1] < image_size_[1]);
@@ -107,7 +107,7 @@ namespace dials { namespace algorithms {
       if (ix >= grid_size_[0]) ix = grid_size_[0] - 1;
       if (iy >= grid_size_[1]) iy = grid_size_[1] - 1;
       if (iz >= grid_size_[2]) iz = grid_size_[2] - 1;
-      return index(ix, iy, iz);
+      return index(ix, iy, iz, panel);
     }
 
     /**
@@ -117,7 +117,6 @@ namespace dials { namespace algorithms {
      * @returns A list of reference profile indices
      */
     af::shared<std::size_t> nearest_n(std::size_t panel, double3 xyz) const {
-      DIALS_ASSERT(panel == 0);
       std::size_t index = nearest(panel, xyz);
       af::shared<std::size_t> result = neighbours(index);
       result.push_back(index);
@@ -131,7 +130,6 @@ namespace dials { namespace algorithms {
      * @returns The weight (between 1.0 and 0.0)
      */
     double weight(std::size_t index, std::size_t panel, double3 xyz) const {
-      DIALS_ASSERT(panel == 0);
       double3 c = coord(index);
       double dx = (c[0] - xyz[0]) / step_size_[0];
       double dy = (c[1] - xyz[1]) / step_size_[1];
@@ -190,8 +188,12 @@ namespace dials { namespace algorithms {
     /**
      * Create a profile index
      */
-    std::size_t index(std::size_t ix, std::size_t iy, std::size_t iz) const {
-      return ix + iy * grid_size_[0] + iz * grid_size_[0] * grid_size_[1];
+    std::size_t index(
+      std::size_t ix, 
+      std::size_t iy, 
+      std::size_t iz,
+      std::size_t panel) const {
+      return (panel+1) * (ix + iy * grid_size_[0] + iz * grid_size_[0] * grid_size_[1]);
     }
 
     int2 image_size_;
@@ -199,6 +201,7 @@ namespace dials { namespace algorithms {
     int scan_size_;
     int3 grid_size_;
     double3 step_size_;
+    int num_panels_;
   };
 
 }}  // namespace dials::algorithms

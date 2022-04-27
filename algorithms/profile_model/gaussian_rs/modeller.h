@@ -89,7 +89,7 @@ namespace dials { namespace algorithms {
       int2 scan_range = boost::python::extract<int2>(scan.attr("get_array_range")());
       boost::shared_ptr<SamplerIface> sampler;
       if (grid_method == RegularGrid || grid_method == CircularGrid) {
-        if (detector.size() > 1) {
+        if (detector.size() < 1) {
           grid_method = Single;
         }
       }
@@ -98,9 +98,10 @@ namespace dials { namespace algorithms {
         sampler = boost::make_shared<SingleSampler>(scan_range, num_scan_points);
         break;
       case RegularGrid:
-        DIALS_ASSERT(detector.size() == 1);
+        //DIALS_ASSERT(detector.size() == 1);
         sampler = boost::make_shared<GridSampler>(
-          detector[0].get_image_size(), scan_range, int3(3, 3, num_scan_points));
+          detector[0].get_image_size(), scan_range, int3(3, 3, num_scan_points),
+          detector.size());
         break;
       case CircularGrid:
         DIALS_ASSERT(detector.size() == 1);
@@ -767,7 +768,7 @@ namespace dials { namespace algorithms {
             success[i] = true;
 
           } catch (dials::error const &e) {
-            std::cout << e.what() << std::endl; 
+            //std::cout << e.what() << std::endl; 
             continue;
           }
         }
@@ -802,6 +803,10 @@ namespace dials { namespace algorithms {
         }
       }
       return pointer(new GaussianRSProfileModeller(result));
+    }
+
+   void normalize_profiles() {
+      finalize();
     }
 
   private:
