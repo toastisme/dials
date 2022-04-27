@@ -314,7 +314,10 @@ namespace dials { namespace algorithms {
       }
 
       // Normalize the profile such that sum of signal pixels == 1
-      DIALS_ASSERT(signal_sum > 0);
+      //DIALS_ASSERT(signal_sum > 0);
+      if (signal_sum <= 0){
+        return;
+      }
       for (std::size_t i = 0; i < data.size(); ++i) {
         data[i] /= signal_sum;
       }
