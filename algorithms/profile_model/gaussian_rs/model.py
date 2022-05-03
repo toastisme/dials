@@ -581,6 +581,14 @@ class Model(ProfileModelExt):
 
         # Mask the foreground region
         if image_volume is None:
+            if reflections.contains_beam_data():
+                return mask_foreground(
+                    reflections["shoebox"],
+                    reflections["s1"],
+                    reflections["s0_cal"],
+                    reflections["xyzcal.px"].parts()[2],
+                    reflections["panel"],
+                )
             return mask_foreground(
                 reflections["shoebox"],
                 reflections["s1"],
@@ -588,6 +596,15 @@ class Model(ProfileModelExt):
                 reflections["panel"],
             )
         else:
+            if reflections.contains_beam_data():
+                return mask_foreground(
+                    image_volume,
+                    reflections["bbox"],
+                    reflections["s1"],
+                    reflections["s0_cal"],
+                    reflections["xyzcal.px"].parts()[2],
+                    reflections["panel"],
+                )
             return mask_foreground(
                 image_volume,
                 reflections["bbox"],
