@@ -193,6 +193,8 @@ def run(args=None):
     params, options = parser.parse_args(args, show_diff_phil=True)
     experiments = [x.data for x in params.input.experiments]
     reflections = flatten_reflections(params.input.reflections)
+    if len(experiments) == 1 and experiments[0].is_single_tof_experiment():
+        params.show_beam_center = False
 
     if len(experiments) == 0:
         parser.print_help()

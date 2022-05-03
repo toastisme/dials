@@ -244,7 +244,16 @@ namespace dials {
              (arg("shoebox"), arg("s1"), arg("frame"), arg("panel")))
         .def("__call__",
              &MaskCalculatorIface::volume,
-             (arg("volume"), arg("bbox"), arg("s1"), arg("frame"), arg("panel")));
+             (arg("volume"), arg("bbox"), arg("s1"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &MaskCalculatorIface::single_with_s0,
+             (arg("shoebox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &MaskCalculatorIface::array_with_s0,
+             (arg("shoebox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &MaskCalculatorIface::volume_with_s0,
+             (arg("volume"), arg("bbox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")));
 
       class_<PartialityCalculatorIface, boost::noncopyable>("PartialityCalculatorIface",
                                                             no_init)
@@ -310,9 +319,10 @@ namespace dials {
            arg("delta_mosaicity"))));
 
       class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF", no_init)
-        .def(init<const boost::python::object&, const Detector&, double, double>(
-          (arg("beam"),
+        .def(init<const Detector&, const boost::python::object&, double, double>(
+          (
            arg("detector"),
+           arg("scan"),
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
 
@@ -387,7 +397,8 @@ namespace dials {
         .def("e3_axis", &CoordinateSystemTOF::e3_axis)
         .def("from_beam_vector", &CoordinateSystemTOF::from_beam_vector)
         .def("to_beam_vector", &CoordinateSystemTOF::to_beam_vector)
-        .def("to_wavelength", &CoordinateSystemTOF::to_wavelength);
+        .def("to_wavelength", &CoordinateSystemTOF::to_wavelength)
+        .def("from_wavelength", &CoordinateSystemTOF::from_wavelength);
 
       boost_adaptbx::std_pair_conversions::to_tuple<vec3<double>, double>();
     }

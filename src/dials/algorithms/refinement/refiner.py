@@ -372,6 +372,15 @@ class RefinerFactory:
 
         if experiments.is_single_tof_experiment():
             obs["wavelength_resid"] = obs["wavelength_cal"] - obs["wavelength"]
+            sequence = experiments[0].sequence
+            frame_resid = flex.double(len(obs))
+            for i in range(len(obs)):
+                frame_cal = sequence.get_frame_from_wavelength(obs["wavelength_cal"][i])
+                frame = sequence.get_frame_from_wavelength(obs["wavelength"][i])
+                frame_resid[i] = frame_cal - frame
+
+            obs["wavelength_resid_frame"] = frame_resid
+
         else:
             obs["phi_resid"] = phi_calc - phi_obs
 
@@ -986,7 +995,7 @@ class Refiner:
                 ):  # convert radians to degrees for reporting of stills
                     header.append(name + "\n(deg)")
                 elif name == "RMSD_wavelength" and units == "A":
-                    header.append(name + f"\n({units})")
+                    header.append(name + "\n(frame)")
                 else:  # skip RMSDs that cannot be expressed in image/scan space
                     pass
 
@@ -1013,7 +1022,7 @@ class Refiner:
                         rmsds.append(rmsd * images_per_rad)
                     elif name == "RMSD_DeltaPsi" and units == "rad":
                         rmsds.append(rmsd * RAD2DEG)
-                    elif name == "RMSD_wavelength" and units == "A":
+                    elif name == "RMSD_wavelength_frame" and units == "frame":
                         rmsds.append(rmsd)
                 rows.append([str(ipanel), str(num)] + [f"{r:.5g}" for r in rmsds])
 
