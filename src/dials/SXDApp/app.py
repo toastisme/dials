@@ -5,7 +5,7 @@ import json
 import dash_bootstrap_components as dbc
 from algorithm_types import AlgorithmType
 from app_import_tab import ImportTab
-from dash import ALL, Dash, Input, Output, callback_context, dcc, html
+from dash import ALL, Dash, Input, Output, callback_context, dash_table, dcc, html
 from display_manager import DisplayManager
 from open_file_manager import OpenFileManager
 
@@ -183,6 +183,13 @@ crystal_table_row1 = html.Tr(
 
 crystal_table_body = [html.Tbody([crystal_table_row1])]
 
+beam_values = [{"Wavelength": "-", "Sample to Source Direction": "-"}]
+
+beam_headers = [
+    {"name": "Wavelength", "id": "Wavelength"},
+    {"name": "Sample to Source Direction", "id": "Sample to Source Direction"},
+]
+
 experiment_summary = dbc.Card(
     [
         dbc.Card(
@@ -203,12 +210,20 @@ experiment_summary = dbc.Card(
                 dbc.CardBody(
                     dbc.ListGroup(
                         [
-                            dbc.Table(
-                                children=beam_table_header + beam_table_body,
-                                bordered=True,
+                            dash_table.DataTable(
+                                beam_values,
+                                beam_headers,
                                 id="beam-params",
-                            )
-                        ]
+                                style_header={
+                                    "color": "white",
+                                    "backgroundColor": "black",
+                                },
+                                style_data={
+                                    "color": "white",
+                                    "backgroundColor": "black",
+                                },
+                            ),
+                        ],
                     )
                 ),
             ]
@@ -263,6 +278,7 @@ experiment_summary = dbc.Card(
         ),
     ],
     body=True,
+    id="experiment-summary",
 )
 
 find_spots_tab = dbc.Card(
@@ -444,95 +460,78 @@ app.layout = html.Div(
 
 
 @app.callback(
-    Output("beam-params", "children"),
-    Input("open-files", "children"),
-    Input("beam-params", "children"),
-)
-def update_experiment_info(open_files, beam_params_table):
-
-    return beam_params_table
-    if len(open_files) == 0:
-        return beam_params_table
-
-    # Get active file
-    active_file = None
-    for i in open_files:
-        if i["props"]["active"]:
-            active_file = i["props"]["children"]
-            break
-    assert active_file is not None
-
-    # experiment_params = file_manager.get_experiment_params()
-    print(beam_params_table)
-    return beam_params_table
-
-
-@app.callback(
     [
         Output("algorithm-tabs", "children"),
-        Output("dials-import-log", "children"),
         Output("open-files", "children"),
+        Output("beam-params", "data"),
+        Output("dials-import-log", "children"),
+        Output("dials-find-spots-log", "children"),
     ],
     [
-        Input("dials-import", "filename"),
-        Input("dials-import", "contents"),
+        Input({"type": "open-file", "index": ALL}, "n_clicks"),
         Input("open-files", "children"),
         Input("algorithm-tabs", "children"),
+        Input("dials-import", "filename"),
+        Input("dials-import", "contents"),
+        Input("dials-find-spots", "n_clicks"),
+        Input("beam-params", "data"),
     ],
 )
-def run_dials_import(filename, content, active_files_list, algorithm_tabs):
+def event_handler(
+    open_files_clicks_list,
+    open_files,
+    algorithm_tabs,
+    import_filename,
+    import_content,
+    find_spots_n_clicks,
+    beam_params,
+):
 
-    if filename is None:
-        return algorithm_tabs, None, active_files_list
+    triggered_id = callback_context.triggered_id
+    print(f"Triggered id : {triggered_id}")
+    logs = file_manager.get_logs()
 
-    file_manager.add_active_file(filename, content)
-    log = file_manager.run(AlgorithmType.dials_import)
+    ## Nothing triggered
+    if triggered_id is None:
+        return algorithm_tabs, open_files, beam_params, *logs
 
-    active_files_list = display_manager.add_file(
-        active_files_list,
-        filename=file_manager.get_selected_filename(),
+    ## Loading new file
+    if triggered_id == "dials-import":
+        file_manager.add_active_file(import_filename, import_content)
+        logs[0] = file_manager.run(AlgorithmType.dials_import)
+
+        open_files = display_manager.add_file(
+            open_files,
+            filename=file_manager.get_selected_filename(),
+        )
+        algorithm_tabs = display_manager.update_algorithm_tabs(
+            algorithm_tabs, file_manager.selected_file
+        )
+        beam_params = display_manager.update_beam_params(
+            beam_params, file_manager.selected_file
+        )
+        return algorithm_tabs, open_files, beam_params, *logs
+
+    ## Running find spots
+    if triggered_id == "dials-find-spots":
+        logs[1] = file_manager.run(AlgorithmType.dials_find_spots)
+        algorithm_tabs = display_manager.update_algorithm_tabs(
+            algorithm_tabs, file_manager.selected_file
+        )
+        return algorithm_tabs, open_files, beam_params, *logs
+
+    ## Clicked on file
+    clicked_id = callback_context.triggered[0]["prop_id"]
+    clicked_id = int(json.loads(clicked_id.split(".")[0])["index"])
+    open_files = display_manager.select_file(open_files, clicked_id)
+
+    # Update logs
+    file_manager.update_selected_file(clicked_id)
+    logs = file_manager.get_logs()
+    algorithm_tabs = display_manager.update_algorithm_tabs(
+        algorithm_tabs, file_manager.selected_file
     )
-
-    # Update disabled algorithm tabs
-    algorithm_tabs[1]["props"]["disabled"] = False
-
-    return algorithm_tabs, log, active_files_list
-
-
-@app.callback(
-    Output("dials-find-spots-log", "children"), Input("dials-find-spots", "n_clicks")
-)
-def run_find_spots(n_clicks):
-
-    if n_clicks == 0:
-        return None
-
-    log = file_manager.run(AlgorithmType.dials_find_spots)
-
-    # Update disabled algorithm tabs
-    # algorithm_tabs[2]["props"]["disabled"] = False
-
-    return log
-
-
-@app.callback(
-    Output({"type": "open-file", "index": ALL}, "active"),
-    Input({"type": "open-file", "index": ALL}, "n_clicks"),
-    Input("open-files", "children"),
-)
-def update_active_file_panel(n_clicks_list, open_files):
-    selected = [False for i in range(len(open_files))]
-    if (
-        callback_context.triggered_id is None
-        or callback_context.triggered_id == "open-files"
-    ):
-        selected[-1] = True
-    else:
-        clicked_id = callback_context.triggered[0]["prop_id"]
-        clicked_id = int(json.loads(clicked_id.split(".")[0])["index"])
-
-        selected[clicked_id] = True
-    return selected
+    return algorithm_tabs, open_files, beam_params, *logs
 
 
 if __name__ == "__main__":

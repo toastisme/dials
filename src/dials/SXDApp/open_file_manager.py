@@ -62,3 +62,12 @@ class OpenFileManager:
 
     def get_experiment_params(self):
         return self.selected_file.get_experiment_params()
+
+    def update_selected_file(self, idx: int) -> None:
+        name = list(self.active_files.keys())[idx]
+        self.selected_file = self.active_files[name]
+
+    def get_logs(self):
+        if self.selected_file is not None:
+            return self.selected_file.get_logs()
+        return ["" for i in AlgorithmType][:2]

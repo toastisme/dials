@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from os.path import isfile, join
 from typing import List
@@ -31,47 +32,61 @@ class ActiveFile:
     Manages all data relating to a file imported in the via the GUI
     """
 
-    algorithms = {
-        AlgorithmType.dials_import: DIALSAlgorithm(
-            name=AlgorithmType.dials_import,
-            command="dials.import",
-            log="",
-            required_files=[],
-        ),
-        AlgorithmType.dials_find_spots: DIALSAlgorithm(
-            name=AlgorithmType.dials_find_spots,
-            command="dials.find_spots",
-            log="",
-            required_files=["imported.expt"],
-        ),
-        AlgorithmType.dials_index: DIALSAlgorithm(
-            name=AlgorithmType.dials_index,
-            command="dials.index",
-            log="",
-            required_files=["imported.expt", "strong.refl"],
-        ),
-        AlgorithmType.dials_refine: DIALSAlgorithm(
-            name=AlgorithmType.dials_refine,
-            command="dials.refine",
-            log="",
-            required_files=["indexed.expt", "indexed.refl"],
-        ),
-        AlgorithmType.dials_integrate: DIALSAlgorithm(
-            name=AlgorithmType.dials_integrate,
-            command="dials.integrate",
-            log="",
-            required_files=["refined.expt", "refined.refl"],
-        ),
-    }
-
     def __init__(self, file_dir: str, filename: str) -> None:
         self.file_dir = file_dir
         self.filename = filename
         self.file_path = join(file_dir, filename)
-        self.algorithms[AlgorithmType.dials_import].required_files = [self.filename]
+        self.setup_algorithms(filename)
+
+    def setup_algorithms(self, filename):
+        self.algorithms = {
+            AlgorithmType.dials_import: DIALSAlgorithm(
+                name=AlgorithmType.dials_import,
+                command="dials.import",
+                log="",
+                required_files=[filename],
+            ),
+            AlgorithmType.dials_find_spots: DIALSAlgorithm(
+                name=AlgorithmType.dials_find_spots,
+                command="dials.find_spots",
+                log="",
+                required_files=["imported.expt"],
+            ),
+            AlgorithmType.dials_index: DIALSAlgorithm(
+                name=AlgorithmType.dials_index,
+                command="dials.index",
+                log="",
+                required_files=["imported.expt", "strong.refl"],
+            ),
+            AlgorithmType.dials_refine: DIALSAlgorithm(
+                name=AlgorithmType.dials_refine,
+                command="dials.refine",
+                log="",
+                required_files=["indexed.expt", "indexed.refl"],
+            ),
+            AlgorithmType.dials_integrate: DIALSAlgorithm(
+                name=AlgorithmType.dials_integrate,
+                command="dials.integrate",
+                log="",
+                required_files=["refined.expt", "refined.refl"],
+            ),
+            AlgorithmType.dials_scale: DIALSAlgorithm(
+                name=AlgorithmType.dials_scale,
+                command="dials.scale",
+                log="",
+                required_files=["integrated.expt", "integrated.refl"],
+            ),
+            AlgorithmType.dials_export: DIALSAlgorithm(
+                name=AlgorithmType.dials_scale,
+                command="dials.export",
+                log="",
+                required_files=["scaled.expt", "scaled.refl"],
+            ),
+        }
 
     def _get_experiment(self) -> Experiment:
-        experiment = load.experiment_list(self.file_path)[0]
+        file_path = join(self.file_dir, "imported.expt")
+        experiment = load.experiment_list(file_path)[0]
         assert experiment is not None
         return experiment
 
@@ -80,15 +95,14 @@ class ActiveFile:
         experiment_params = {}
         beam_params = {}
         beam_str = str(experiment.beam).split("\n")
-        for i in beam_str:
+        for i in beam_str[:-1]:
             name, val = i.split(":")
-            beam_params[name.lstrip()] = val.lstrip()
+            beam_params[name.strip()] = val.strip()
         experiment_params["beam"] = beam_params
         return experiment_params
 
     def can_run(self, algorithm_type: AlgorithmType) -> bool:
         for i in self.algorithms[algorithm_type].required_files:
-            print(i)
             if not isfile(join(self.file_dir, i)):
                 return False
         return True
@@ -109,11 +123,14 @@ class ActiveFile:
             return text
 
         assert self.can_run(algorithm_type)
+
+        cwd = os.getcwd()
+        os.chdir(self.file_dir)
         algorithm = self.algorithms[algorithm_type]
         dials_command = [algorithm.command]
 
         for i in algorithm.required_files:
-            dials_command.append(join(self.file_dir, i))
+            dials_command.append(i)
 
         for arg in args:
             dials_command.append(arg)
@@ -121,6 +138,7 @@ class ActiveFile:
         result = procrunner.run((dials_command))
         log = get_log_text(result)
         self.algorithms[algorithm_type].log = log
+        os.chdir(cwd)
         return log
 
     def get_available_algorithms(self):
@@ -133,3 +151,6 @@ class ActiveFile:
         for i in self.algorithms.keys():
             available_algorithms[i] = self.can_run(i)
         return available_algorithms
+
+    def get_logs(self):
+        return [self.algorithms[i].log for i in AlgorithmType][:2]
