@@ -103,7 +103,9 @@ def get_flex_image_multipanel(
     npanels = 0
     for panel in detector:
         try:
-            beam_center += scitbx.matrix.col(panel.get_beam_centre_lab(beam.get_s0()))
+            beam_center += scitbx.matrix.col(
+                panel.get_beam_centre_lab(beam.get_unit_s0())
+            )
             npanels += 1
         except RuntimeError:  # catch DXTBX_ASSERT for no intersection
             pass

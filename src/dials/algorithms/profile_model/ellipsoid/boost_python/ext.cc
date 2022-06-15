@@ -37,9 +37,9 @@ namespace dials { namespace algorithms { namespace boost_python {
   using dials::model::Overlapped;
   using dials::model::Shoebox;
   using dials::model::Valid;
-  using dxtbx::model::BeamBase;
   using dxtbx::model::Detector;
   using dxtbx::model::Experiment;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Panel;
   using scitbx::mat2;
   using scitbx::mat3;
@@ -159,7 +159,8 @@ namespace dials { namespace algorithms { namespace boost_python {
 
       // Get stuff from experiment
       mat3<double> A = experiment_.get_crystal()->get_A();
-      vec3<double> s0 = experiment_.get_beam()->get_s0();
+      vec3<double> s0 =
+        boost::python::extract<vec3<double> >(experiment_.get_beam().attr("get_s0"));
       Panel panel = detector[0];
 
       // Initialise some arrays
@@ -383,7 +384,8 @@ namespace dials { namespace algorithms { namespace boost_python {
       Detector detector = *experiment_.get_detector();
 
       // The the indicident beam vector
-      vec3<double> s0 = experiment_.get_beam()->get_s0();
+      vec3<double> s0 =
+        boost::python::extract<vec3<double> >(experiment_.get_beam().attr("get_s0"));
       double s0_length = s0.length();
       DIALS_ASSERT(std::abs(s0_length - s1.length()) < TINY);
 
@@ -594,7 +596,8 @@ namespace dials { namespace algorithms { namespace boost_python {
       Detector detector = *experiment_.get_detector();
 
       // The the indicident beam vector
-      vec3<double> s0 = experiment_.get_beam()->get_s0();
+      vec3<double> s0 =
+        boost::python::extract<vec3<double> >(experiment_.get_beam().attr("get_s0"));
       double s0_length = s0.length();
       DIALS_ASSERT(std::abs(s0_length - s1.length()) < TINY);
 

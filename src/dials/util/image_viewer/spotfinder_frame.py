@@ -115,260 +115,6 @@ class RadialProfileThresholdDebug:
         self._i_panel += 1
         return dispersion
 
-class PixelLinePlot(wx.Frame):
-    def __init__(self, parent, experiment, **kwargs):
-
-        wx.Frame.__init__(self, parent=parent)
-        self.experiment = experiment
-        self.properties = self.get_properties(**kwargs)
-
-        # Setup blank plot
-        self.figure = Figure(
-            figsize=(self.properties["figsize"]), facecolor=self.properties["facecolor"]
-        )
-        self.axes = self.figure.add_subplot(111)
-        self.canvas = FigureCanvas(self, -1, self.figure)
-        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.sizer.Add(self.canvas, 1, wx.EXPAND)
-        self.SetSizer(self.sizer)
-        self.axes.set_xlabel(self.properties["xlabel"])
-        self.axes.set_ylabel(self.properties["ylabel"])
-        self.axes.set_ylim(self.properties["default_ylim"])
-        self.axes.set_xlim(self.properties["default_xlim"])
-        self.axes.patch.set_facecolor(self.properties["facecolor"])
-
-        # Params for zooming
-        self.base_zoom_level = 2.0
-
-        # Params for panning
-        self.press = None
-        self.xpress = None
-        self.ypress = None
-        self.x0 = None
-        self.y0 = None
-        self.x1 = None
-        self.y1 = None
-
-        # Bookkeeping to avoid zooming/pannning out of range
-        self.x_range = None
-        self.y_range = None
-
-        # Binding for event handlers
-        self.figure.canvas.mpl_connect("scroll_event", self.zoom_handler)
-        self.figure.canvas.mpl_connect("button_press_event", self.on_press_handler)
-        self.figure.canvas.mpl_connect("button_release_event", self.on_release_handler)
-        self.figure.canvas.mpl_connect("motion_notify_event", self.on_motion_handler)
-        self.Bind(wx.EVT_CLOSE, self.close_window_handler)
-
-        self.Show()
-
-    def close_window_handler(self, event) -> None:
-        self.GetParent().pixel_line_plot_closed()
-        self.Destroy()
-
-    def on_press_handler(self, event) -> None:
-
-        """
-        Press handler for panning
-        """
-
-        if event.inaxes != self.axes:
-            return
-        self.press = self.x0, self.y0, event.xdata, event.ydata
-        self.x0, self.y0, self.xpress, self.ypress = self.press
-
-    def on_release_handler(self, event) -> None:
-
-        """
-        Release handler for panning
-        """
-
-        self.press = None
-        self.canvas.draw()
-
-    def on_motion_handler(self, event, x_only: bool = True) -> None:
-
-        """
-        Motion handler for panning.
-        If x_only, panning is disabled for the y axis.
-        """
-
-        # Sanity check the event should be processed
-        if self.x_range is None or self.y_range is None:
-            return
-        if self.press is None:
-            return
-        if event.inaxes != self.axes:
-            return
-
-        # Handle x axis
-        dx = event.xdata - self.xpress
-        new_x = self.axes.get_xlim() - dx
-        # Only pan if within the range of data
-        if new_x[0] > self.x_range[0] and new_x[1] < self.x_range[1]:
-            self.axes.set_xlim(new_x)
-        if x_only:
-            self.canvas.draw()
-            return
-
-        # Handle y axis
-        dy = event.ydata - self.ypress
-        new_y = self.axes.get_ylim() - dy
-        # Only pan if within the range of data
-        if new_y[0] > self.yrange[0] and new_y[1] < self.y_range[1]:
-            self.axes.set_ylim(new_y)
-
-        self.canvas.draw()
-
-    def zoom_handler(self, event, x_only: bool = True) -> None:
-
-        """
-        Handles all zooming events, bound to the mouse wheel.
-        If x_only, ylim remains constant.
-        """
-
-        # Sanity check event should be processed
-        if self.x_range is None or self.y_range is None:
-            return
-
-        xdata = event.xdata
-        ydata = event.ydata
-
-        if xdata is None or ydata is None:
-            return
-
-        # Get current limits
-        cur_xlim = self.axes.get_xlim()
-        cur_ylim = self.axes.get_ylim()
-
-        # Zoom in
-        if event.button == "down":
-            scale_factor = 1 / self.base_zoom_level
-        # Zoom out
-        elif event.button == "up":
-            scale_factor = self.base_zoom_level
-        # Should never happen
-        else:
-            scale_factor = 1
-
-        # Get new x range and clamp to max x range
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
-
-        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
-
-        new_xmin = xdata - new_width * (1 - relx)
-
-        # Clamp to maximum zoom out level
-        if new_xmin < self.x_range[0]:
-            new_xmin = self.x_range[0]
-        new_xmax = xdata + new_width * (relx)
-        if new_xmax > self.x_range[1]:
-            new_xmax = self.x_range[1]
-
-        # Do nothing if trying to zoom in beyond maximum level
-        if new_xmax - new_xmin < self.properties["min_delta_x_range"]:
-            return
-
-        if x_only:
-            self.axes.set_xlim([new_xmin, new_xmax])
-            self.canvas.draw()
-            return
-
-        # Get new y range and clamp to max y range
-        new_ymin = ydata - new_height * (1 - rely)
-        if new_ymin < self.y_range[0]:
-            new_ymin = self.y_range[0]
-        new_ymax = ydata + new_height * (rely)
-        if new_ymax > self.y_range[1]:
-            new_ymax = self.y_range[1]
-
-        # Do nothing if trying to zoom in beyond maximum level
-        if new_ymax - new_ymin < self.properties["min_delta_y_range"]:
-            return
-
-        self.axes.set_ylim([new_ymin, new_ymax])
-
-    def get_properties(self, **kwargs) -> Dict[str, Union[str, int, Tuple]]:
-
-        """
-        Where all plot params are set.
-        """
-
-        default_values = {
-            "facecolor": "#FFE4E4",
-            "linecolor": "black",
-            "bboxcolor": "blue",
-            "centroid_marker_color": "red",
-            "centroid_marker": "x",
-            "centroid_markersize": 15,
-            "figsize": (10, 0.5),
-            "xlabel": "ToF (usec)",
-            "ylabel": "Intensity (AU)",
-            "min_delta_y_range": 1,
-            "min_delta_x_range": 500,
-            "default_xlim": (0, 17500),
-            "default_ylim": (0, 1000),
-        }
-        graph_properties = dict(default_values)
-        graph_properties.update(kwargs)
-        return graph_properties
-
-    def draw(
-        self,
-        panel_idx: int,
-        coords: Tuple,
-        bboxes: Tuple = None,
-        centroids: Tuple = None,
-    ) -> None:
-
-        """
-        Updates the plot with a line plot at coords from panel panel_idx.
-        If bboxes or centroids are given, these are also added to the plot.
-        """
-        px = int(coords[0])
-        py = int(coords[1])
-        x, spectra = self.experiment.imageset.get_pixel_spectra(panel_idx, px, py)
-        self.x_range = (min(x), max(x))
-        self.y_range = (min(spectra), max(spectra))
-        self.axes.cla()
-        self.axes.plot(x, spectra, c=self.properties["linecolor"])
-        if bboxes:
-            for bbox in bboxes:
-                x0 = x[bbox[0]]
-                x1 = x[bbox[1]]
-                y0 = min(spectra[bbox[0] : bbox[1]])
-                y1 = max(spectra[bbox[0] : bbox[1]])
-                self.axes.plot(
-                    [x0, x0, x1, x1],
-                    [y0, y1, y1, y0],
-                    lw=1,
-                    c=self.properties["bboxcolor"],
-                )
-        if centroids:
-            for centroid in centroids:
-                cx = x[int(centroid)]
-                cy = spectra[int(centroid)]
-                self.axes.plot(
-                    [cx],
-                    [cy],
-                    self.properties["centroid_marker"],
-                    markersize=self.properties["centroid_markersize"],
-                    c=self.properties["centroid_marker_color"],
-                )
-
-        self.axes.set_title(f"panel {panel_idx} at ({px}, {py})")
-        self.axes.set_xlabel(self.properties["xlabel"])
-        self.axes.set_ylabel(self.properties["ylabel"])
-        self.axes.set_xlim(self.x_range)
-        if self.y_range[1] < self.properties["default_ylim"][1]:
-            self.axes.set_ylim(self.properties["default_ylim"])
-        else:
-            self.axes.set_ylim(self.y_range)
-        self.axes.patch.set_facecolor(self.properties["facecolor"])
-        self.canvas.draw()
-
 
 class SpotFrame(XrayFrame):
     def __init__(self, *args, **kwds):
@@ -1920,7 +1666,7 @@ class SpotFrame(XrayFrame):
     def _rotation_axis_overlay_data(self):
         imageset = self.images.selected.image_set
         detector = self.pyslip.tiles.raw_image.get_detector()
-        scan = imageset.get_scan()
+        scan = imageset.get_sequence()
         beam = imageset.get_beam()
         gonio = imageset.get_goniometer()
         still = scan is None or gonio is None
@@ -1990,14 +1736,7 @@ class SpotFrame(XrayFrame):
         strong_code = MaskCode.Valid | MaskCode.Strong
         shoebox_dict = {"width": 2, "color": "#0000FFA0", "closed": False}
         ctr_mass_dict = {"width": 2, "color": "#FF0000", "closed": False}
-        vector_dict = {"width": 4, "color": "#F62817", "closed": False}
-        if self.viewing_stills:
-            i_frame = self.images.selected_index  # NOTE, the underbar is intentional
-        else:
-            i_frame = self.images.selected.index
-        imageset = self.images.selected.image_set
-        if imageset.get_sequence() is not None:
-            i_frame += imageset.get_sequence().get_array_range()[0]
+
         shoebox_data = []
         all_pix_data = {}
         all_foreground_circles = {}
@@ -2006,26 +1745,6 @@ class SpotFrame(XrayFrame):
         max_pix_data = []
         predictions_data = []
         miller_indices_data = []
-        vector_data = []
-        vector_text_data = []
-        detector = self.pyslip.tiles.raw_image.get_detector()
-        scan = self.pyslip.tiles.raw_image.get_sequence()
-        to_degrees = 180 / math.pi
-        # self.prediction_colours = ["#a6cee3", "#1f78b4", "#b2df8a", "#33a02c",
-        # "#fb9a99", "#e31a1c", "#fdbf6f", "#ff7f00",
-        # "#cab2d6"] * 10
-        # alternative colour scheme
-        self.prediction_colours = [
-            "#e41a1c",
-            "#377eb8",
-            "#4daf4a",
-            "#984ea3",
-            "#ff7f00",
-            "#ffff33",
-            "#a65628",
-            "#f781bf",
-            "#999999",
-        ] * 10
 
         for ref_list_id, ref_list in enumerate(self.reflections):
             if self.viewing_stills and ref_list_id != i_frame:
@@ -2201,7 +1920,7 @@ class SpotFrame(XrayFrame):
                     frame_numbers = ref_list["xyzcal.px"].parts()[2]
                 else:
                     phi = ref_list["xyzcal.mm"].parts()[2]
-                    scan = self.pyslip.tiles.raw_image.get_scan()
+                    scan = self.pyslip.tiles.raw_image.get_sequence()
                     frame_numbers = scan.get_array_index_from_angle(math.degrees(phi))
                 n = self.params.stack_images
                 for i_expt in range(flex.max(ref_list["id"]) + 1):
@@ -2283,7 +2002,7 @@ class SpotFrame(XrayFrame):
         cb_op = cs.change_of_basis_op_to_reference_setting()
         crystal_model = crystal_model.change_basis(cb_op)
         A = matrix.sqr(crystal_model.get_A())
-        scan = imageset.get_scan()
+        scan = imageset.get_sequence()
         beam = imageset.get_beam()
         gonio = imageset.get_goniometer()
         still = scan is None or gonio is None
@@ -2345,6 +2064,14 @@ class SpotFrame(XrayFrame):
             )
         return vector_data, label_data
 
+    def get_imageset_reflection_table_list(self, imageset: ImageSet):
+        reflection_table_list = []
+        for reflection_table in self.reflections:
+            exp_filter = self.__get_imageset_filter(reflection_table, imageset)
+            if exp_filter is not None:
+                reflection_table_list.append(reflection_table.select(exp_filter))
+        return reflection_table_list
+
     def get_spotfinder_data(self):
 
         self.prediction_colours = [
@@ -2364,8 +2091,8 @@ class SpotFrame(XrayFrame):
         else:
             i_frame = self.images.selected.index
         imageset = self.images.selected.image_set
-        if imageset.get_scan() is not None:
-            i_frame += imageset.get_scan().get_array_range()[0]
+        if imageset.get_sequence() is not None:
+            i_frame += imageset.get_sequence().get_array_range()[0]
 
         refl_data = self._reflection_overlay_data(i_frame)
 
@@ -2389,68 +2116,8 @@ class SpotFrame(XrayFrame):
                     basis_vector_data = self._basis_vector_overlay_data(
                         i_expt, i_frame, experiment
                     )
-                    cb_op = cs.change_of_basis_op_to_reference_setting()
-                    crystal_model = crystal_model.change_basis(cb_op)
-                    A = matrix.sqr(crystal_model.get_A())
-                    scan = imageset.get_sequence()
-                    beam = imageset.get_beam()
-                    gonio = imageset.get_goniometer()
-                    still = scan is None or gonio is None
-                    if not still:
-                        phi = scan.get_angle_from_array_index(
-                            i_frame - imageset.get_array_range()[0], deg=True
-                        )
-                        axis = matrix.col(imageset.get_goniometer().get_rotation_axis())
-                    try:
-                        panel, beam_centre = detector.get_ray_intersection(
-                            beam.get_s0()
-                        )
-                    except RuntimeError as e:
-                        if "DXTBX_ASSERT(w_max > 0)" in str(e):
-                            # direct beam didn't hit a panel
-                            panel = 0
-                            beam_centre = detector[panel].get_ray_intersection(
-                                beam.get_s0()
-                            )
-                        else:
-                            raise
-                    beam_x, beam_y = detector[panel].millimeter_to_pixel(beam_centre)
-                    beam_x, beam_y = map_coords(beam_x, beam_y, panel)
-                    for i, h in enumerate(((1, 0, 0), (0, 1, 0), (0, 0, 1))):
-                        r = A * matrix.col(h) * self.settings.basis_vector_scale
-
-                        if still:
-                            s1 = matrix.col(beam.get_s0()) + r
-                        else:
-                            r_phi = r.rotate_around_origin(axis, phi, deg=True)
-                            s1 = matrix.col(beam.get_s0()) + r_phi
-                        panel = detector.get_panel_intersection(s1)
-                        if panel < 0:
-                            continue
-                        x, y = detector[panel].get_ray_intersection_px(s1)
-                        x, y = map_coords(x, y, panel)
-                        vector_data.append(
-                            (
-                                ((beam_x, beam_y), (x, y)),
-                                {
-                                    **vector_dict,
-                                    "color": self.prediction_colours[i_expt],
-                                },
-                            ),
-                        )
-
-                        vector_text_data.append(
-                            (
-                                x,
-                                y,
-                                ("a*", "b*", "c*")[i],
-                                {
-                                    "placement": "ne",
-                                    "fontsize": self.settings.fontsize,
-                                    "textcolor": self.prediction_colours[i_expt],
-                                },
-                            )
-                        )
+                    vector_data.extend(basis_vector_data[0])
+                    vector_text_data.extend(basis_vector_data[1])
 
         return SpotfinderData(
             all_pix_data=refl_data["all_pix_data"],
