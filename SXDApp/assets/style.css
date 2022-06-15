@@ -1,0 +1,43 @@
+.load-data{
+	width: 30%;
+	height: 60px;
+	lineHeight: 60px;
+	borderWidth: 1px;
+	borderStyle: dashed;
+	borderRadius: 5px;
+	textAlign: center;
+	margin: 10px;
+}
+.rc-slider{
+  color: rgb(27, 18, 18);
+}
+
+.rc-slider-step{
+  color: rgb(27, 18, 18);
+}
+
+.rc-slider-track {
+  background-color: rgb(182, 172, 172);
+}
+
+.rc-slider-rail {
+  background-color: rgb(129, 126, 126);
+}
+
+.rc-slider-dot-active {  
+  border-color: rgb(136, 136, 136);
+  border: solid 2px rgb(88, 86, 86);
+}
+
+.rc-slider-handle {
+  background-color: rgb(88, 86, 86);
+  border-color: rgb(88, 86, 86);
+}
+
+.rc-slider-handle:hover {
+  border-color: rgb(182,172,172);
+}
+
+.rc-slider-handle:active {
+  border-color: red;
+}
