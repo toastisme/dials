@@ -192,55 +192,65 @@ beam_headers = [
 
 experiment_summary = dbc.Card(
     [
-        dbc.Card(
-            [
-                dbc.CardHeader("Detector"),
-                dbc.CardBody(
-                    dbc.Table(
-                        detector_table_header + detector_table_body,
-                        bordered=True,
-                        id="detector-params",
-                    )
-                ),
-            ]
+        dbc.Row(
+            dbc.Card(
+                [
+                    dbc.CardHeader("Detector"),
+                    dbc.CardBody(
+                        dbc.Table(
+                            detector_table_header + detector_table_body,
+                            bordered=True,
+                            id="detector-params",
+                        )
+                    ),
+                ]
+            )
         ),
-        dbc.Card(
+        dbc.Row(
             [
-                dbc.CardHeader("Beam"),
-                dbc.CardBody(
-                    dbc.ListGroup(
+                dbc.Col(
+                    dbc.Card(
                         [
-                            dash_table.DataTable(
-                                beam_values,
-                                beam_headers,
-                                id="beam-params",
-                                style_header={
-                                    "color": "white",
-                                    "backgroundColor": "black",
-                                },
-                                style_data={
-                                    "color": "white",
-                                    "backgroundColor": "black",
-                                },
+                            dbc.CardHeader("Beam"),
+                            dbc.CardBody(
+                                dbc.ListGroup(
+                                    [
+                                        dash_table.DataTable(
+                                            beam_values,
+                                            beam_headers,
+                                            id="beam-params",
+                                            style_header={
+                                                "color": "white",
+                                                "backgroundColor": "black",
+                                            },
+                                            style_data={
+                                                "color": "white",
+                                                "backgroundColor": "black",
+                                            },
+                                        ),
+                                    ],
+                                )
                             ),
-                        ],
-                    )
-                ),
-            ]
-        ),
-        dbc.Card(
-            [
-                dbc.CardHeader("Scan"),
-                dbc.CardBody(
-                    dbc.ListGroup(
-                        [
-                            dbc.Table(
-                                scan_table_header + scan_table_body,
-                                bordered=True,
-                                id="scan-params",
-                            )
                         ]
                     )
+                ),
+                dbc.Col(
+                    dbc.Card(
+                        [
+                            dbc.CardHeader("Scan"),
+                            dbc.CardBody(
+                                dbc.ListGroup(
+                                    [
+                                        dbc.Table(
+                                            scan_table_header + scan_table_body,
+                                            bordered=True,
+                                            id="scan-params",
+                                        )
+                                    ]
+                                )
+                            ),
+                        ]
+                    ),
                 ),
             ]
         ),
@@ -308,34 +318,62 @@ find_spots_tab = dbc.Card(
                     dbc.Col(
                         [
                             html.P(
-                                dbc.DropdownMenu(
-                                    label="Threshold Algorithm",
-                                    children=[
-                                        dbc.DropdownMenuItem("dispersion"),
-                                        dbc.DropdownMenuItem("dispersion extended"),
-                                        dbc.DropdownMenuItem("radial profile"),
-                                    ],
-                                ),
+                                [
+                                    dbc.Label("Algorithm"),
+                                    dcc.Dropdown(
+                                        id="find-spots-threshold-algorithm",
+                                        options=[
+                                            {
+                                                "label": "dispersion",
+                                                "value": "dispersion",
+                                            },
+                                            {
+                                                "label": "dispersion extended",
+                                                "value": "dispersion extended",
+                                            },
+                                            {
+                                                "label": "radial profile",
+                                                "value": "radial profile",
+                                            },
+                                        ],
+                                        value="dispersion extended",
+                                    ),
+                                    html.Div(
+                                        id="find-spots-threshold-algorithm-placeholder",
+                                        style={"display": "none"},
+                                    ),
+                                ],
                                 style={"margin-top": "25px"},
-                            ),
-                            dbc.Accordion(
-                                [dbc.AccordionItem([], title="Advanced")],
-                                start_collapsed=True,
                             ),
                         ]
                     ),
                     dbc.Col(
                         html.P(
-                            dcc.RangeSlider(
-                                1,
-                                20,
-                                1,
-                                marks=None,
-                                allowCross=False,
-                                tooltip={"placement": "bottom", "always_visible": True},
-                            ),
-                            style={"margin-top": "25px"},
+                            [
+                                dbc.Label("Image Range"),
+                                dcc.RangeSlider(
+                                    1,
+                                    20,
+                                    1,
+                                    id="image-range",
+                                    marks=None,
+                                    allowCross=False,
+                                    tooltip={
+                                        "placement": "bottom",
+                                        "always_visible": True,
+                                    },
+                                ),
+                            ],
+                            style={"margin-top": "25px", "color": "white"},
                         )
+                    ),
+                    dbc.Label("Advanced Options"),
+                    html.P(
+                        dbc.Input(
+                            id="input",
+                            placeholder="See Documentation for full list of options",
+                            type="text",
+                        ),
                     ),
                 ]
             ),
@@ -460,9 +498,22 @@ app.layout = html.Div(
 
 
 @app.callback(
+    Output("find-spots-threshold-algorithm-placeholder", "children"),
+    Input("find-spots-threshold-algorithm", "value"),
+)
+def update_find_spots_threshold_algorithm(threshold_algorithm):
+    if file_manager.selected_file is not None:
+        file_manager.update_selected_file_arg(
+            AlgorithmType.dials_find_spots, "threshold.algorithm", threshold_algorithm
+        )
+
+
+@app.callback(
     [
         Output("algorithm-tabs", "children"),
         Output("open-files", "children"),
+        Output("image-range", "min"),
+        Output("image-range", "max"),
         Output("beam-params", "data"),
         Output("dials-import-log", "children"),
         Output("dials-find-spots-log", "children"),
@@ -493,7 +544,7 @@ def event_handler(
 
     ## Nothing triggered
     if triggered_id is None:
-        return algorithm_tabs, open_files, beam_params, *logs
+        return algorithm_tabs, open_files, 1, 20, beam_params, *logs
 
     ## Loading new file
     if triggered_id == "dials-import":
@@ -510,7 +561,8 @@ def event_handler(
         beam_params = display_manager.update_beam_params(
             beam_params, file_manager.selected_file
         )
-        return algorithm_tabs, open_files, beam_params, *logs
+        min_image, max_image = file_manager.get_selected_file_image_range()
+        return algorithm_tabs, open_files, min_image, max_image, beam_params, *logs
 
     ## Running find spots
     if triggered_id == "dials-find-spots":
@@ -518,20 +570,24 @@ def event_handler(
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )
-        return algorithm_tabs, open_files, beam_params, *logs
+        return algorithm_tabs, open_files, 1, 20, beam_params, *logs
 
     ## Clicked on file
     clicked_id = callback_context.triggered[0]["prop_id"]
     clicked_id = int(json.loads(clicked_id.split(".")[0])["index"])
     open_files = display_manager.select_file(open_files, clicked_id)
 
-    # Update logs
+    # Update display
     file_manager.update_selected_file(clicked_id)
     logs = file_manager.get_logs()
     algorithm_tabs = display_manager.update_algorithm_tabs(
         algorithm_tabs, file_manager.selected_file
     )
-    return algorithm_tabs, open_files, beam_params, *logs
+    beam_params = display_manager.update_beam_params(
+        beam_params, file_manager.selected_file
+    )
+    min_image, max_image = file_manager.get_selected_file_image_range()
+    return algorithm_tabs, open_files, min_image, max_image, beam_params, *logs
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from os.path import isfile, join
-from typing import List
+from typing import Dict, List
 
 import procrunner
 from algorithm_types import AlgorithmType
@@ -22,6 +22,7 @@ class DIALSAlgorithm:
 
     name: AlgorithmType
     command: str
+    args: Dict[str, str]
     log: str
     required_files: List[str]
 
@@ -43,42 +44,49 @@ class ActiveFile:
             AlgorithmType.dials_import: DIALSAlgorithm(
                 name=AlgorithmType.dials_import,
                 command="dials.import",
+                args={},
                 log="",
                 required_files=[filename],
             ),
             AlgorithmType.dials_find_spots: DIALSAlgorithm(
                 name=AlgorithmType.dials_find_spots,
                 command="dials.find_spots",
+                args={},
                 log="",
                 required_files=["imported.expt"],
             ),
             AlgorithmType.dials_index: DIALSAlgorithm(
                 name=AlgorithmType.dials_index,
                 command="dials.index",
+                args={},
                 log="",
                 required_files=["imported.expt", "strong.refl"],
             ),
             AlgorithmType.dials_refine: DIALSAlgorithm(
                 name=AlgorithmType.dials_refine,
                 command="dials.refine",
+                args={},
                 log="",
                 required_files=["indexed.expt", "indexed.refl"],
             ),
             AlgorithmType.dials_integrate: DIALSAlgorithm(
                 name=AlgorithmType.dials_integrate,
                 command="dials.integrate",
+                args={},
                 log="",
                 required_files=["refined.expt", "refined.refl"],
             ),
             AlgorithmType.dials_scale: DIALSAlgorithm(
                 name=AlgorithmType.dials_scale,
                 command="dials.scale",
+                args={},
                 log="",
                 required_files=["integrated.expt", "integrated.refl"],
             ),
             AlgorithmType.dials_export: DIALSAlgorithm(
                 name=AlgorithmType.dials_scale,
                 command="dials.export",
+                args={},
                 log="",
                 required_files=["scaled.expt", "scaled.refl"],
             ),
@@ -89,6 +97,13 @@ class ActiveFile:
         experiment = load.experiment_list(file_path)[0]
         assert experiment is not None
         return experiment
+
+    def get_image_range(self):
+        try:
+            image_range = self._get_experiment().imageset.get_array_range()
+            return (image_range[0] + 1, image_range[1])
+        except AttributeError:
+            return (1, len(self._get_experiment().imageset))
 
     def get_experiment_params(self):
         experiment = self._get_experiment()
@@ -107,7 +122,7 @@ class ActiveFile:
                 return False
         return True
 
-    def run(self, algorithm_type: AlgorithmType, *args):
+    def run(self, algorithm_type: AlgorithmType):
 
         """
         procrunner wrapper for dials commands.
@@ -132,8 +147,9 @@ class ActiveFile:
         for i in algorithm.required_files:
             dials_command.append(i)
 
-        for arg in args:
-            dials_command.append(arg)
+        for arg in algorithm.args:
+            print(f" TESTESTESTESTESTESTEST {arg}={algorithm.args[arg]}")
+            dials_command.append(f"{arg}={algorithm.args[arg]}")
 
         result = procrunner.run((dials_command))
         log = get_log_text(result)
@@ -154,3 +170,8 @@ class ActiveFile:
 
     def get_logs(self):
         return [self.algorithms[i].log for i in AlgorithmType][:2]
+
+    def update_arg(
+        self, algorithm_type: AlgorithmType, param_name: str, param_value: str
+    ) -> None:
+        self.algorithms[algorithm_type].args[param_name] = param_value
