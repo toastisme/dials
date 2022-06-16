@@ -935,7 +935,7 @@ def do_import(
         logger.debug(experiment.imageset.get_beam())
         logger.debug(experiment.imageset.get_goniometer())
         logger.debug(experiment.imageset.get_detector())
-        logger.debug(experiment.imageset.get_scan())
+        logger.debug(experiment.imageset.get_sequence())
 
     # Only allow a single sequence
     if params.input.allow_multiple_sequences is False:

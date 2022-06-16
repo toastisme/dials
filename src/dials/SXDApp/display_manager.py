@@ -58,14 +58,5 @@ class DisplayManager:
 
         return algorithm_tabs
 
-    def update_beam_params(self, beam_params, active_file):
-        params = active_file.get_experiment_params()["beam"]
-        print(params.keys())
-        print(beam_params)
-        beam_params[0]["Sample to Moderator Distance"] = params[
-            "sample to moderator distance"
-        ]
-        beam_params[0]["Sample to Source Direction"] = params[
-            "sample to source direction"
-        ]
-        return beam_params
+    def get_experiment_params(self, active_file):
+        return active_file.get_experiment_params()

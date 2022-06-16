@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from os.path import isfile, join
@@ -25,6 +26,8 @@ class DIALSAlgorithm:
     args: Dict[str, str]
     log: str
     required_files: List[str]
+    output_experiment_file: str
+    output_reflections_file: str
 
 
 class ActiveFile:
@@ -37,6 +40,8 @@ class ActiveFile:
         self.file_dir = file_dir
         self.filename = filename
         self.file_path = join(file_dir, filename)
+        self.current_expt_file = None
+        self.current_refl_file = None
         self.setup_algorithms(filename)
 
     def setup_algorithms(self, filename):
@@ -47,6 +52,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=[filename],
+                output_experiment_file="imported.expt",
+                output_reflections_file=None,
             ),
             AlgorithmType.dials_find_spots: DIALSAlgorithm(
                 name=AlgorithmType.dials_find_spots,
@@ -54,6 +61,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=["imported.expt"],
+                output_experiment_file="imported.expt",
+                output_reflections_file="strong.refl",
             ),
             AlgorithmType.dials_index: DIALSAlgorithm(
                 name=AlgorithmType.dials_index,
@@ -61,6 +70,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=["imported.expt", "strong.refl"],
+                output_experiment_file="indexed.expt",
+                output_reflections_file="indexed.refl",
             ),
             AlgorithmType.dials_refine: DIALSAlgorithm(
                 name=AlgorithmType.dials_refine,
@@ -68,6 +79,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=["indexed.expt", "indexed.refl"],
+                output_experiment_file="refined.expt",
+                output_reflections_file="refined.refl",
             ),
             AlgorithmType.dials_integrate: DIALSAlgorithm(
                 name=AlgorithmType.dials_integrate,
@@ -75,6 +88,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=["refined.expt", "refined.refl"],
+                output_experiment_file="integrated.expt",
+                output_reflections_file="integrated.refl",
             ),
             AlgorithmType.dials_scale: DIALSAlgorithm(
                 name=AlgorithmType.dials_scale,
@@ -82,6 +97,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=["integrated.expt", "integrated.refl"],
+                output_experiment_file="scaled.expt",
+                output_reflections_file="scaled.refl",
             ),
             AlgorithmType.dials_export: DIALSAlgorithm(
                 name=AlgorithmType.dials_scale,
@@ -89,6 +106,8 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=["scaled.expt", "scaled.refl"],
+                output_experiment_file="exported.expt",
+                output_reflections_file="exported.refl",
             ),
         }
 
@@ -105,15 +124,72 @@ class ActiveFile:
         except AttributeError:
             return (1, len(self._get_experiment().imageset))
 
+    def get_beam_params(self, expt_file):
+        beam = expt_file["beam"][0]
+        params = {}
+        params["Sample to Source Direction"] = str(tuple(beam["direction"]))
+        params["Sample to Moderator Distance (mm)"] = str(
+            beam["sample_to_moderator_distance"]
+        )
+        return [params]
+
+    def get_detector_params(self, expt_file):
+        panels = expt_file["detector"][0]["panels"]
+        params = []
+        for i in range(len(panels)):
+            panels[i]["fast_axis"] = [round(j, 3) for j in panels[i]["fast_axis"]]
+            panels[i]["slow_axis"] = [round(j, 3) for j in panels[i]["slow_axis"]]
+            panels[i]["origin"] = [round(j, 3) for j in panels[i]["origin"]]
+            params.append(
+                {
+                    "Name": panels[i]["name"],
+                    "Origin (mm)": str(tuple(panels[i]["origin"])),
+                    "Fast Axis": str(tuple(panels[i]["fast_axis"])),
+                    "Slow Axis": str(tuple(panels[i]["slow_axis"])),
+                    "Pixels": str(tuple(panels[i]["image_size"])),
+                    "Pixel Size (mm)": str(tuple(panels[i]["pixel_size"])),
+                }
+            )
+        return params
+
+    def get_sequence_params(self, expt_file):
+        sequence = expt_file["sequence"][0]
+        params = {}
+        params["Image Range"] = str(tuple(sequence["image_range"]))
+        min_tof = round(sequence["tof_in_seconds"][0], 3)
+        max_tof = round(sequence["tof_in_seconds"][-1], 3)
+        min_wavelength = round(sequence["wavelengths"][0], 3)
+        max_wavelength = round(sequence["wavelengths"][-1], 3)
+        params["ToF Range (s)"] = str((min_tof, max_tof))
+        params["Wavelength Range (A)"] = str((min_wavelength, max_wavelength))
+        return [params]
+
+    def get_goniometer_params(self, expt_file):
+        return [{"Orientation (deg)": "0"}]
+
+    def get_crystal_params(self, expt_file):
+        return [
+            {
+                "a": "-",
+                "b": "-",
+                "c": "-",
+                "alpha": "-",
+                "beta": "-",
+                "gamma": "-",
+                "Orientation": "-",
+                "Space Group": "-",
+            }
+        ]
+
     def get_experiment_params(self):
-        experiment = self._get_experiment()
-        experiment_params = {}
-        beam_params = {}
-        beam_str = str(experiment.beam).split("\n")
-        for i in beam_str[:-1]:
-            name, val = i.split(":")
-            beam_params[name.strip()] = val.strip()
-        experiment_params["beam"] = beam_params
+        with open(self.current_expt_file, "r") as g:
+            expt_file = json.load(g)
+            experiment_params = []
+            experiment_params.append(self.get_beam_params(expt_file))
+            experiment_params.append(self.get_detector_params(expt_file))
+            experiment_params.append(self.get_sequence_params(expt_file))
+            experiment_params.append(self.get_goniometer_params(expt_file))
+            experiment_params.append(self.get_crystal_params(expt_file))
         return experiment_params
 
     def can_run(self, algorithm_type: AlgorithmType) -> bool:
@@ -153,7 +229,16 @@ class ActiveFile:
         result = procrunner.run((dials_command))
         log = get_log_text(result)
         self.algorithms[algorithm_type].log = log
+        expt_file = self.algorithms[algorithm_type].output_experiment_file
+        self.current_expt_file = join(self.file_dir, expt_file)
+        refl_file = self.algorithms[algorithm_type].output_reflections_file
+        if refl_file is not None:
+            self.current_refl_file = join(self.file_dir, refl_file)
+        else:
+            self.current_refl_file = None
+
         os.chdir(cwd)
+        print(f"Ran command {dials_command}")
         return log
 
     def get_available_algorithms(self):

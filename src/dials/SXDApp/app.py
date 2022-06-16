@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import dash_bootstrap_components as dbc
+import experiment_params
 from algorithm_types import AlgorithmType
 from app_import_tab import ImportTab
 from dash import ALL, Dash, Input, Output, callback_context, dash_table, dcc, html
@@ -65,131 +66,6 @@ generic_tab = dbc.Card(
     ),
 )
 
-detector_table_header = [
-    html.Thead(
-        html.Tr(
-            [
-                html.Th("Panel Name"),
-                html.Th("Origin (mm)"),
-                html.Th("Fast Axis"),
-                html.Th("Slow Axis"),
-                html.Th("Pixels"),
-                html.Th("Pixel Size (mm)"),
-            ]
-        )
-    )
-]
-
-detector_table_row1 = html.Tr(
-    [
-        html.Td("1"),
-        html.Td("(0, 0, 0)"),
-        html.Td("(0, 0, 0)"),
-        html.Td("(0, 0, 0)"),
-        html.Td("(64, 64)"),
-        html.Td("(3, 3)"),
-    ]
-)
-
-detector_table_body = [html.Tbody([detector_table_row1])]
-
-beam_table_header = [
-    html.Thead(
-        html.Tr(
-            [
-                html.Th("Sample to Source Direction"),
-                html.Th("Sample to Moderator Distance (m)"),
-                html.Th("Wavelength Range (A)"),
-            ]
-        )
-    )
-]
-
-beam_table_row1 = html.Tr([html.Td("(0, 0, -1)"), html.Td("8.3"), html.Td("(0.2 - 8)")])
-
-beam_table_body = [html.Tbody([beam_table_row1])]
-
-scan_table_header = [
-    html.Thead(
-        html.Tr(
-            [
-                html.Th("Image Range"),
-                html.Th("Sample to Moderator Distance (m)"),
-                html.Th("Wavelength Range (A)"),
-                html.Th("Time of Flight Channels"),
-            ]
-        )
-    )
-]
-
-scan_table_row1 = html.Tr(
-    [
-        html.Td("(0, 0, -1)"),
-        html.Td("8.3"),
-        html.Td("(0.2 - 8)"),
-        html.Td("1821"),
-    ]
-)
-
-scan_table_body = [html.Tbody([scan_table_row1])]
-
-goniometer_table_header = [
-    html.Thead(
-        html.Tr(
-            [
-                html.Th("Starting Orientation"),
-            ]
-        )
-    )
-]
-
-goniometer_table_row1 = html.Tr(
-    [
-        html.Td("(0, 0, 0)"),
-    ]
-)
-
-goniometer_table_body = [html.Tbody([goniometer_table_row1])]
-
-crystal_table_header = [
-    html.Thead(
-        html.Tr(
-            [
-                html.Th("a"),
-                html.Th("b"),
-                html.Th("c"),
-                html.Th("alpha"),
-                html.Th("beta"),
-                html.Th("gamma"),
-                html.Th("Orientation"),
-                html.Th("Space Group"),
-            ]
-        )
-    )
-]
-
-crystal_table_row1 = html.Tr(
-    [
-        html.Td("-"),
-        html.Td("-"),
-        html.Td("-"),
-        html.Td("-"),
-        html.Td("-"),
-        html.Td("-"),
-        html.Td("-"),
-        html.Td("-"),
-    ]
-)
-
-crystal_table_body = [html.Tbody([crystal_table_row1])]
-
-beam_values = [{"Sample to Moderator Distance": "-", "Sample to Source Direction": "-"}]
-
-beam_headers = [
-    {"name": "Sample to Moderator Distance", "id": "Sample to Moderator Distance"},
-    {"name": "Sample to Source Direction", "id": "Sample to Source Direction"},
-]
-
 experiment_summary = dbc.Card(
     [
         dbc.Row(
@@ -197,10 +73,16 @@ experiment_summary = dbc.Card(
                 [
                     dbc.CardHeader("Detector"),
                     dbc.CardBody(
-                        dbc.Table(
-                            detector_table_header + detector_table_body,
-                            bordered=True,
-                            id="detector-params",
+                        dbc.ListGroup(
+                            [
+                                dash_table.DataTable(
+                                    experiment_params.detector_values,
+                                    experiment_params.detector_headers,
+                                    id="detector-params",
+                                    style_header=experiment_params.style_header[0],
+                                    style_data=experiment_params.style_data[0],
+                                ),
+                            ],
                         )
                     ),
                 ]
@@ -216,17 +98,13 @@ experiment_summary = dbc.Card(
                                 dbc.ListGroup(
                                     [
                                         dash_table.DataTable(
-                                            beam_values,
-                                            beam_headers,
+                                            experiment_params.beam_values,
+                                            experiment_params.beam_headers,
                                             id="beam-params",
-                                            style_header={
-                                                "color": "white",
-                                                "backgroundColor": "black",
-                                            },
-                                            style_data={
-                                                "color": "white",
-                                                "backgroundColor": "black",
-                                            },
+                                            style_header=experiment_params.style_header[
+                                                0
+                                            ],
+                                            style_data=experiment_params.style_data[0],
                                         ),
                                     ],
                                 )
@@ -237,16 +115,20 @@ experiment_summary = dbc.Card(
                 dbc.Col(
                     dbc.Card(
                         [
-                            dbc.CardHeader("Scan"),
+                            dbc.CardHeader("Sequence"),
                             dbc.CardBody(
                                 dbc.ListGroup(
                                     [
-                                        dbc.Table(
-                                            scan_table_header + scan_table_body,
-                                            bordered=True,
-                                            id="scan-params",
-                                        )
-                                    ]
+                                        dash_table.DataTable(
+                                            experiment_params.sequence_values,
+                                            experiment_params.sequence_headers,
+                                            id="sequence-params",
+                                            style_header=experiment_params.style_header[
+                                                0
+                                            ],
+                                            style_data=experiment_params.style_data[0],
+                                        ),
+                                    ],
                                 )
                             ),
                         ]
@@ -260,11 +142,13 @@ experiment_summary = dbc.Card(
                 dbc.CardBody(
                     dbc.ListGroup(
                         [
-                            dbc.Table(
-                                goniometer_table_header + goniometer_table_body,
-                                bordered=True,
+                            dash_table.DataTable(
+                                experiment_params.goniometer_values,
+                                experiment_params.goniometer_headers,
                                 id="goniometer-params",
-                            )
+                                style_header=experiment_params.style_header[0],
+                                style_data=experiment_params.style_data[0],
+                            ),
                         ]
                     )
                 ),
@@ -276,17 +160,24 @@ experiment_summary = dbc.Card(
                 dbc.CardBody(
                     dbc.ListGroup(
                         [
-                            dbc.Table(
-                                crystal_table_header + crystal_table_body,
-                                bordered=True,
+                            dash_table.DataTable(
+                                experiment_params.crystal_values,
+                                experiment_params.crystal_headers,
                                 id="crystal-params",
-                            )
+                                style_header=experiment_params.style_header[0],
+                                style_data=experiment_params.style_data[0],
+                            ),
                         ]
                     )
                 ),
             ]
         ),
     ],
+    style={
+        "height": "85.5vh",
+        "maxHeight": "85.5vh",
+        "overflow": "scroll",
+    },
     body=True,
     id="experiment-summary",
 )
@@ -329,11 +220,7 @@ find_spots_tab = dbc.Card(
                                             },
                                             {
                                                 "label": "dispersion extended",
-                                                "value": "dispersion extended",
-                                            },
-                                            {
-                                                "label": "radial profile",
-                                                "value": "radial profile",
+                                                "value": "dispersion_extended",
                                             },
                                         ],
                                         value="dispersion extended",
@@ -363,9 +250,13 @@ find_spots_tab = dbc.Card(
                                         "always_visible": True,
                                     },
                                 ),
+                                html.Div(
+                                    id="image-range-placeholder",
+                                    style={"display": "none"},
+                                ),
                             ],
                             style={"margin-top": "25px", "color": "white"},
-                        )
+                        ),
                     ),
                     dbc.Label("Advanced Options"),
                     html.P(
@@ -403,7 +294,12 @@ find_spots_tab = dbc.Card(
 )
 
 image_viewer_tab = dbc.Card(
-    dbc.CardImg(src=app.get_asset_url("image_viewer_with_line_plot.png"), top=True)
+    dbc.CardImg(src=app.get_asset_url("image_viewer_with_line_plot.png"), top=True),
+    style={
+        "height": "85.5vh",
+        "maxHeight": "85.5vh",
+        "overflow": "scroll",
+    },
 )
 
 app.layout = html.Div(
@@ -440,8 +336,8 @@ app.layout = html.Div(
                                     html.Div(
                                         dbc.ListGroup(id="open-files", children=[]),
                                         style={
-                                            "height": "84vh",
-                                            "maxHeight": "84vh",
+                                            "height": "83.5vh",
+                                            "maxHeight": "83.5vh",
                                             "overflow": "scroll",
                                         },
                                     ),
@@ -487,7 +383,6 @@ app.layout = html.Div(
                                 dbc.Tab(generic_tab, label="Scale", disabled=True),
                             ],
                             id="algorithm-tabs",
-                            style={},
                         ),
                     )
                 ),
@@ -509,12 +404,29 @@ def update_find_spots_threshold_algorithm(threshold_algorithm):
 
 
 @app.callback(
+    Output("image-range-placeholder", "children"),
+    Input("image-range", "value"),
+)
+def update_image_range(image_range):
+    if file_manager.selected_file is None or image_range is None:
+        return
+    val = f"{image_range[0]},{image_range[1]}"
+    file_manager.update_selected_file_arg(
+        AlgorithmType.dials_find_spots, "scan_range", val
+    )
+
+
+@app.callback(
     [
         Output("algorithm-tabs", "children"),
         Output("open-files", "children"),
         Output("image-range", "min"),
         Output("image-range", "max"),
         Output("beam-params", "data"),
+        Output("detector-params", "data"),
+        Output("sequence-params", "data"),
+        Output("goniometer-params", "data"),
+        Output("crystal-params", "data"),
         Output("dials-import-log", "children"),
         Output("dials-find-spots-log", "children"),
     ],
@@ -526,6 +438,10 @@ def update_find_spots_threshold_algorithm(threshold_algorithm):
         Input("dials-import", "contents"),
         Input("dials-find-spots", "n_clicks"),
         Input("beam-params", "data"),
+        Input("detector-params", "data"),
+        Input("sequence-params", "data"),
+        Input("goniometer-params", "data"),
+        Input("crystal-params", "data"),
     ],
 )
 def event_handler(
@@ -535,7 +451,7 @@ def event_handler(
     import_filename,
     import_content,
     find_spots_n_clicks,
-    beam_params,
+    *experiment_params,
 ):
 
     triggered_id = callback_context.triggered_id
@@ -544,7 +460,7 @@ def event_handler(
 
     ## Nothing triggered
     if triggered_id is None:
-        return algorithm_tabs, open_files, 1, 20, beam_params, *logs
+        return algorithm_tabs, open_files, 1, 20, *experiment_params, *logs
 
     ## Loading new file
     if triggered_id == "dials-import":
@@ -558,11 +474,18 @@ def event_handler(
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )
-        beam_params = display_manager.update_beam_params(
-            beam_params, file_manager.selected_file
+        experiment_params = display_manager.get_experiment_params(
+            file_manager.selected_file
         )
         min_image, max_image = file_manager.get_selected_file_image_range()
-        return algorithm_tabs, open_files, min_image, max_image, beam_params, *logs
+        return (
+            algorithm_tabs,
+            open_files,
+            min_image,
+            max_image,
+            *experiment_params,
+            *logs,
+        )
 
     ## Running find spots
     if triggered_id == "dials-find-spots":
@@ -570,7 +493,15 @@ def event_handler(
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )
-        return algorithm_tabs, open_files, 1, 20, beam_params, *logs
+        min_image, max_image = file_manager.get_selected_file_image_range()
+        return (
+            algorithm_tabs,
+            open_files,
+            min_image,
+            max_image,
+            *experiment_params,
+            *logs,
+        )
 
     ## Clicked on file
     clicked_id = callback_context.triggered[0]["prop_id"]
@@ -583,11 +514,11 @@ def event_handler(
     algorithm_tabs = display_manager.update_algorithm_tabs(
         algorithm_tabs, file_manager.selected_file
     )
-    beam_params = display_manager.update_beam_params(
-        beam_params, file_manager.selected_file
+    experiment_params = display_manager.get_experiment_params(
+        file_manager.selected_file
     )
     min_image, max_image = file_manager.get_selected_file_image_range()
-    return algorithm_tabs, open_files, min_image, max_image, beam_params, *logs
+    return algorithm_tabs, open_files, min_image, max_image, *experiment_params, *logs
 
 
 if __name__ == "__main__":
