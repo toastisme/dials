@@ -79,7 +79,7 @@ class OpenFileManager:
     def get_logs(self):
         if self.selected_file is not None:
             return self.selected_file.get_logs()
-        return ["" for i in AlgorithmType][:2]
+        return ["" for i in AlgorithmType][:3]
 
     def get_reflection_table(self):
         if self.selected_file is not None:

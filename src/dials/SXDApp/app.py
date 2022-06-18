@@ -228,9 +228,9 @@ find_spots_tab = [
                                             id="find-spots-threshold-algorithm",
                                             options=[
                                                 "dispersion",
-                                                "dispersion extended",
+                                                "dispersion_extended",
                                             ],
-                                            value="dispersion extended",
+                                            value="dispersion_extended",
                                             clearable=False,
                                         ),
                                         html.Div(
@@ -269,7 +269,7 @@ find_spots_tab = [
                         dbc.Label("Advanced Options"),
                         html.P(
                             dbc.Input(
-                                id="input",
+                                id="find-spots-advanced-input",
                                 placeholder="See Documentation for full list of options",
                                 type="text",
                             ),
@@ -292,6 +292,97 @@ find_spots_tab = [
                                 style={
                                     "height": "46.5vh",
                                     "maxHeight": "46.5vh",
+                                    "width": "26.5vh",
+                                    "maxWidth": "26.5vh",
+                                    "overflow": "scroll",
+                                },
+                            )
+                        )
+                    )
+                ),
+            ]
+        )
+    ),
+]
+
+index_tab = [
+    dbc.Card(
+        dbc.CardBody(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            dbc.Button("Run", n_clicks=0, id="dials-index"),
+                            width=8,
+                        ),
+                        dbc.Col(
+                            html.P(
+                                dcc.Link(
+                                    dbc.Button("Documentation", color="secondary"),
+                                    href="https://dials.github.io/documentation/programs/dials_index.html",
+                                    target="_blank",
+                                ),
+                                style={"margin-left": "65px"},
+                            ),
+                            width=1,
+                            align="end",
+                        ),
+                    ]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.P(
+                                    [
+                                        dbc.Label("Algorithm"),
+                                        dcc.Dropdown(
+                                            id="index-algorithm",
+                                            options=[
+                                                "fft3d",
+                                                "fft1d",
+                                                "real_space_grid_search",
+                                            ],
+                                            value="fft3d",
+                                            clearable=False,
+                                        ),
+                                        html.Div(
+                                            id="index-algorithm-placeholder",
+                                            style={"display": "none"},
+                                        ),
+                                    ],
+                                    style={"margin-top": "25px"},
+                                ),
+                            ]
+                        ),
+                        dbc.Label("Advanced Options"),
+                        html.P(
+                            dbc.Input(
+                                id="index-advanced-input",
+                                placeholder="See Documentation for full list of options",
+                                type="text",
+                            ),
+                        ),
+                    ]
+                ),
+            ],
+        )
+    ),
+    dbc.Card(
+        dbc.CardBody(
+            [
+                html.H6("Output"),
+                dbc.Card(
+                    dbc.CardBody(
+                        dbc.Spinner(
+                            html.Div(
+                                id="dials-index-log",
+                                children=[],
+                                style={
+                                    "height": "46.5vh",
+                                    "maxHeight": "46.5vh",
+                                    "width": "66.5vh",
+                                    "maxWidth": "66.5vh",
                                     "overflow": "scroll",
                                 },
                             )
@@ -388,7 +479,7 @@ app.layout = html.Div(
                                         label="Find Spots",
                                         disabled=True,
                                     ),
-                                    dbc.Tab(generic_tab, label="Index", disabled=True),
+                                    dbc.Tab(index_tab, label="Index", disabled=True),
                                     dbc.Tab(generic_tab, label="Refine", disabled=True),
                                     dbc.Tab(
                                         generic_tab, label="Integrate", disabled=True
@@ -475,6 +566,17 @@ def update_image_range(image_range):
 
 
 @app.callback(
+    Output("index-algorithm-placeholder", "children"),
+    Input("index-algorithm", "value"),
+)
+def update_index_algorithm(index_algorithm):
+    if file_manager.selected_file is not None:
+        file_manager.update_selected_file_arg(
+            AlgorithmType.dials_index, "indexing.method", index_algorithm
+        )
+
+
+@app.callback(
     [
         Output("algorithm-tabs", "children"),
         Output("open-files", "children"),
@@ -488,6 +590,7 @@ def update_image_range(image_range):
         Output("crystal-params", "data"),
         Output("dials-import-log", "children"),
         Output("dials-find-spots-log", "children"),
+        Output("dials-index-log", "children"),
     ],
     [
         Input({"type": "open-file", "index": ALL}, "n_clicks"),
@@ -496,6 +599,7 @@ def update_image_range(image_range):
         Input("dials-import", "filename"),
         Input("dials-import", "contents"),
         Input("dials-find-spots", "n_clicks"),
+        Input("dials-index", "n_clicks"),
         Input("beam-params", "data"),
         Input("detector-params", "data"),
         Input("sequence-params", "data"),
@@ -510,6 +614,7 @@ def event_handler(
     import_filename,
     import_content,
     find_spots_n_clicks,
+    index_n_clicks,
     *experiment_params,
 ):
 
@@ -559,6 +664,24 @@ def event_handler(
     ## Running find spots
     if triggered_id == "dials-find-spots":
         logs[1] = file_manager.run(AlgorithmType.dials_find_spots)
+        algorithm_tabs = display_manager.update_algorithm_tabs(
+            algorithm_tabs, file_manager.selected_file
+        )
+        min_image, max_image = file_manager.get_selected_file_image_range()
+        reflection_table = file_manager.get_reflection_table()
+        return (
+            algorithm_tabs,
+            open_files,
+            min_image,
+            max_image,
+            reflection_table,
+            *experiment_params,
+            *logs,
+        )
+
+    ## Running index
+    if triggered_id == "dials-index":
+        logs[2] = file_manager.run(AlgorithmType.dials_index)
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )

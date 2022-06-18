@@ -256,7 +256,7 @@ class ActiveFile:
         return available_algorithms
 
     def get_logs(self):
-        return [self.algorithms[i].log for i in AlgorithmType][:2]
+        return [self.algorithms[i].log for i in AlgorithmType][:3]
 
     def update_arg(
         self, algorithm_type: AlgorithmType, param_name: str, param_value: str
