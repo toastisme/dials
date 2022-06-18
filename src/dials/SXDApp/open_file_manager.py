@@ -5,6 +5,7 @@ from io import FileIO
 from os import mkdir, rmdir
 from os.path import isdir, join, splitext
 
+import experiment_params
 from active_file import ActiveFile
 from algorithm_types import AlgorithmType
 
@@ -79,3 +80,8 @@ class OpenFileManager:
         if self.selected_file is not None:
             return self.selected_file.get_logs()
         return ["" for i in AlgorithmType][:2]
+
+    def get_reflection_table(self):
+        if self.selected_file is not None:
+            return self.selected_file.get_reflection_table()
+        return experiment_params.reflection_table_values

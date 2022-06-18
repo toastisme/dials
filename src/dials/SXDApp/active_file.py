@@ -6,12 +6,15 @@ from dataclasses import dataclass
 from os.path import isfile, join
 from typing import Dict, List
 
+import experiment_params
 import procrunner
 from algorithm_types import AlgorithmType
 from dash import html
 
 from dxtbx.model import Experiment
 from dxtbx.serialize import load
+
+from dials.array_family import flex
 
 
 @dataclass
@@ -259,3 +262,42 @@ class ActiveFile:
         self, algorithm_type: AlgorithmType, param_name: str, param_value: str
     ) -> None:
         self.algorithms[algorithm_type].args[param_name] = param_value
+
+    def _get_reflection_table_raw(self):
+        reflection_table_raw = flex.reflection_table.from_msgpack_file(
+            self.current_refl_file
+        )
+
+        reflection_table_raw.map_centroids_to_reciprocal_space([self._get_experiment()])
+        return reflection_table_raw
+
+    def get_reflection_table(self):
+        if self.current_refl_file is None:
+            return experiment_params.reflection_table_values
+
+        reflection_table_raw = self._get_reflection_table_raw()
+        reflection_table = []
+        optional_columns = ["miller_index"]
+        for idx in range(len(reflection_table_raw)):
+            i = reflection_table_raw[idx]
+            optional = {}
+            for j in optional_columns:
+                if j in i:
+                    optional[j] = str(i[j])
+                else:
+                    optional[j] = "-"
+            r = {
+                "Panel": str(i["panel"]),
+                "xy (px)": str(tuple([round(j, 3) for j in i["xyzobs.px.value"][:2]])),
+                "xy (mm)": str(tuple([round(j, 3) for j in i["xyzobs.mm.value"][:2]])),
+                "ToF (usec)": str(round(i["tof"] * 10**6, 3)),
+                "Wavelength (A)": str(round(i["wavelength"], 3)),
+                "Frame": str(round(i["xyzobs.px.value"][2], 3)),
+                "s1": str(tuple([round(j, 3) for j in i["s1"]])),
+                "Miller Index": optional["miller_index"],
+                "rlp": str(tuple([round(j, 3) for j in i["rlp"]])),
+                "Bounding Box": str(i["bbox"]),
+                "Intensity Sum (AU)": str(round(i["intensity.sum.value"], 3)),
+            }
+            reflection_table.append(r)
+        return reflection_table

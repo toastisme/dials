@@ -6,7 +6,18 @@ import dash_bootstrap_components as dbc
 import experiment_params
 from algorithm_types import AlgorithmType
 from app_import_tab import ImportTab
-from dash import ALL, Dash, Input, Output, callback_context, dash_table, dcc, html
+from app_reflection_table import reflection_table
+from dash import (
+    ALL,
+    Dash,
+    Input,
+    Output,
+    State,
+    callback_context,
+    dash_table,
+    dcc,
+    html,
+)
 from display_manager import DisplayManager
 from open_file_manager import OpenFileManager
 
@@ -182,117 +193,115 @@ experiment_summary = dbc.Card(
     id="experiment-summary",
 )
 
-find_spots_tab = dbc.Card(
-    dbc.CardBody(
-        [
-            dbc.Row(
-                [
-                    dbc.Col(
-                        dbc.Button("Run", n_clicks=0, id="dials-find-spots"), width=8
-                    ),
-                    dbc.Col(
-                        html.P(
-                            dcc.Link(
-                                dbc.Button("Documentation", color="secondary"),
-                                href="https://dials.github.io/documentation/programs/dials_find_spots.html",
-                                target="_blank",
-                            ),
-                            style={"margin-left": "65px"},
+find_spots_tab = [
+    dbc.Card(
+        dbc.CardBody(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            dbc.Button("Run", n_clicks=0, id="dials-find-spots"),
+                            width=8,
                         ),
-                        width=1,
-                        align="end",
-                    ),
-                ]
-            ),
-            dbc.Row(
-                [
-                    dbc.Col(
-                        [
+                        dbc.Col(
+                            html.P(
+                                dcc.Link(
+                                    dbc.Button("Documentation", color="secondary"),
+                                    href="https://dials.github.io/documentation/programs/dials_find_spots.html",
+                                    target="_blank",
+                                ),
+                                style={"margin-left": "65px"},
+                            ),
+                            width=1,
+                            align="end",
+                        ),
+                    ]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.P(
+                                    [
+                                        dbc.Label("Algorithm"),
+                                        dcc.Dropdown(
+                                            id="find-spots-threshold-algorithm",
+                                            options=[
+                                                "dispersion",
+                                                "dispersion extended",
+                                            ],
+                                            value="dispersion extended",
+                                            clearable=False,
+                                        ),
+                                        html.Div(
+                                            id="find-spots-threshold-algorithm-placeholder",
+                                            style={"display": "none"},
+                                        ),
+                                    ],
+                                    style={"margin-top": "25px"},
+                                ),
+                            ]
+                        ),
+                        dbc.Col(
                             html.P(
                                 [
-                                    dbc.Label("Algorithm"),
-                                    dcc.Dropdown(
-                                        id="find-spots-threshold-algorithm",
-                                        options=[
-                                            {
-                                                "label": "dispersion",
-                                                "value": "dispersion",
-                                            },
-                                            {
-                                                "label": "dispersion extended",
-                                                "value": "dispersion_extended",
-                                            },
-                                        ],
-                                        value="dispersion extended",
+                                    dbc.Label("Image Range"),
+                                    dcc.RangeSlider(
+                                        1,
+                                        20,
+                                        1,
+                                        id="image-range",
+                                        marks=None,
+                                        allowCross=False,
+                                        tooltip={
+                                            "placement": "bottom",
+                                            "always_visible": True,
+                                        },
                                     ),
                                     html.Div(
-                                        id="find-spots-threshold-algorithm-placeholder",
+                                        id="image-range-placeholder",
                                         style={"display": "none"},
                                     ),
                                 ],
-                                style={"margin-top": "25px"},
+                                style={"margin-top": "25px", "color": "white"},
                             ),
-                        ]
-                    ),
-                    dbc.Col(
+                        ),
+                        dbc.Label("Advanced Options"),
                         html.P(
-                            [
-                                dbc.Label("Image Range"),
-                                dcc.RangeSlider(
-                                    1,
-                                    20,
-                                    1,
-                                    id="image-range",
-                                    marks=None,
-                                    allowCross=False,
-                                    tooltip={
-                                        "placement": "bottom",
-                                        "always_visible": True,
-                                    },
-                                ),
-                                html.Div(
-                                    id="image-range-placeholder",
-                                    style={"display": "none"},
-                                ),
-                            ],
-                            style={"margin-top": "25px", "color": "white"},
-                        ),
-                    ),
-                    dbc.Label("Advanced Options"),
-                    html.P(
-                        dbc.Input(
-                            id="input",
-                            placeholder="See Documentation for full list of options",
-                            type="text",
-                        ),
-                    ),
-                ]
-            ),
-            dbc.Card(
-                dbc.CardBody(
-                    [
-                        html.H6("Output"),
-                        dbc.Card(
-                            dbc.CardBody(
-                                dbc.Spinner(
-                                    html.Div(
-                                        id="dials-find-spots-log",
-                                        children=[],
-                                        style={
-                                            "maxHeight": "500px",
-                                            "overflow": "scroll",
-                                        },
-                                    )
-                                )
-                            )
+                            dbc.Input(
+                                id="input",
+                                placeholder="See Documentation for full list of options",
+                                type="text",
+                            ),
                         ),
                     ]
-                )
-            ),
-        ]
+                ),
+            ],
+        )
     ),
-)
-
+    dbc.Card(
+        dbc.CardBody(
+            [
+                html.H6("Output"),
+                dbc.Card(
+                    dbc.CardBody(
+                        dbc.Spinner(
+                            html.Div(
+                                id="dials-find-spots-log",
+                                children=[],
+                                style={
+                                    "height": "46.5vh",
+                                    "maxHeight": "46.5vh",
+                                    "overflow": "scroll",
+                                },
+                            )
+                        )
+                    )
+                ),
+            ]
+        )
+    ),
+]
 image_viewer_tab = dbc.Card(
     dbc.CardImg(src=app.get_asset_url("image_viewer_with_line_plot.png"), top=True),
     style={
@@ -301,6 +310,7 @@ image_viewer_tab = dbc.Card(
         "overflow": "scroll",
     },
 )
+
 
 app.layout = html.Div(
     [
@@ -364,32 +374,80 @@ app.layout = html.Div(
                 ),
                 dbc.Col(
                     html.Div(
-                        dbc.Tabs(
-                            children=[
-                                dbc.Tab(
-                                    import_tab.content(),
-                                    label="Import",
-                                    tab_style={"color": "#9E9E9E"},
-                                    active_tab_style={"color": "#9E9E9E"},
-                                ),
-                                dbc.Tab(
-                                    find_spots_tab,
-                                    label="Find Spots",
-                                    disabled=True,
-                                ),
-                                dbc.Tab(generic_tab, label="Index", disabled=True),
-                                dbc.Tab(generic_tab, label="Refine", disabled=True),
-                                dbc.Tab(generic_tab, label="Integrate", disabled=True),
-                                dbc.Tab(generic_tab, label="Scale", disabled=True),
-                            ],
-                            id="algorithm-tabs",
-                        ),
+                        [
+                            dbc.Tabs(
+                                children=[
+                                    dbc.Tab(
+                                        import_tab.content(),
+                                        label="Import",
+                                        tab_style={"color": "#9E9E9E"},
+                                        active_tab_style={"color": "#9E9E9E"},
+                                    ),
+                                    dbc.Tab(
+                                        find_spots_tab,
+                                        label="Find Spots",
+                                        disabled=True,
+                                    ),
+                                    dbc.Tab(generic_tab, label="Index", disabled=True),
+                                    dbc.Tab(generic_tab, label="Refine", disabled=True),
+                                    dbc.Tab(
+                                        generic_tab, label="Integrate", disabled=True
+                                    ),
+                                    dbc.Tab(generic_tab, label="Scale", disabled=True),
+                                ],
+                                id="algorithm-tabs",
+                            ),
+                            dbc.Button(
+                                id="open-reflection-table",
+                                n_clicks=0,
+                                style={
+                                    "position": "absolute",
+                                    "left": "11vw",
+                                    "top": "88vh",
+                                    "width": "20vw",
+                                    "height": "2vh",
+                                    "backgroundColor": "rgb(48,48,48)",
+                                    "line-color": "rgb(48,48,48)",
+                                },
+                                children=[
+                                    html.Img(
+                                        src=app.get_asset_url("expand_less2.png"),
+                                        style={
+                                            "position": "relative",
+                                            "left": "-9vw",
+                                            "top": "-1.25vh",
+                                        },
+                                    ),
+                                    html.P(
+                                        "Reflection Table",
+                                        style={
+                                            "position": "relative",
+                                            "left": "0vw",
+                                            "top": "-3.75vh",
+                                        },
+                                    ),
+                                ],
+                            ),
+                            reflection_table,
+                        ],
+                        style={"position": "relative"},
                     )
                 ),
             ]
         ),
     ]
 )
+
+
+@app.callback(
+    Output("reflection-table-window", "is_open"),
+    Input("open-reflection-table", "n_clicks"),
+    [State("reflection-table-window", "is_open")],
+)
+def toggle_offcanvas(n1, is_open):
+    if n1:
+        return not is_open
+    return is_open
 
 
 @app.callback(
@@ -422,6 +480,7 @@ def update_image_range(image_range):
         Output("open-files", "children"),
         Output("image-range", "min"),
         Output("image-range", "max"),
+        Output("reflection-table", "data"),
         Output("beam-params", "data"),
         Output("detector-params", "data"),
         Output("sequence-params", "data"),
@@ -457,10 +516,19 @@ def event_handler(
     triggered_id = callback_context.triggered_id
     print(f"Triggered id : {triggered_id}")
     logs = file_manager.get_logs()
+    reflection_table = file_manager.get_reflection_table()
 
     ## Nothing triggered
     if triggered_id is None:
-        return algorithm_tabs, open_files, 1, 20, *experiment_params, *logs
+        return (
+            algorithm_tabs,
+            open_files,
+            1,
+            20,
+            reflection_table,
+            *experiment_params,
+            *logs,
+        )
 
     ## Loading new file
     if triggered_id == "dials-import":
@@ -483,6 +551,7 @@ def event_handler(
             open_files,
             min_image,
             max_image,
+            reflection_table,
             *experiment_params,
             *logs,
         )
@@ -494,11 +563,13 @@ def event_handler(
             algorithm_tabs, file_manager.selected_file
         )
         min_image, max_image = file_manager.get_selected_file_image_range()
+        reflection_table = file_manager.get_reflection_table()
         return (
             algorithm_tabs,
             open_files,
             min_image,
             max_image,
+            reflection_table,
             *experiment_params,
             *logs,
         )
@@ -518,7 +589,16 @@ def event_handler(
         file_manager.selected_file
     )
     min_image, max_image = file_manager.get_selected_file_image_range()
-    return algorithm_tabs, open_files, min_image, max_image, *experiment_params, *logs
+    reflection_table = file_manager.get_reflection_table()
+    return (
+        algorithm_tabs,
+        open_files,
+        min_image,
+        max_image,
+        reflection_table,
+        *experiment_params,
+        *logs,
+    )
 
 
 if __name__ == "__main__":

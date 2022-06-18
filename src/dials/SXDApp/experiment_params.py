@@ -103,3 +103,35 @@ crystal_values = [
         "Space Group": "-",
     }
 ]
+
+# Reflection table
+
+reflection_table_headers = [
+    {"name": "Panel", "id": "Panel"},
+    {"name": "xy (px)", "id": "xy (px)"},
+    {"name": "ToF (usec)", "id": "ToF (usec)"},
+    {"name": "Bounding Box", "id": "Bounding Box"},
+    {"name": "Intensity Sum (AU)", "id": "Intensity Sum (AU)"},
+    {"name": "xy (mm)", "id": "xy (mm)"},
+    {"name": "Wavelength (A)", "id": "Wavelength (A)"},
+    {"name": "Frame", "id": "Frame"},
+    {"name": "s1", "id": "s1"},
+    {"name": "rlp", "id": "rlp"},
+    {"name": "Miller Index", "id": "Miller Index"},
+]
+
+reflection_table_values = [
+    {
+        "Panel": "-",
+        "xy (px)": "-",
+        "xy (mm)": "-",
+        "ToF (usec)": "-",
+        "Wavelength (A)": "-",
+        "Intensity Sum (AU)": "-",
+        "Frame": "-",
+        "s1": "-",
+        "Miller Index": "-",
+        "rlp": "-",
+        "Bounding Box": "-",
+    }
+]

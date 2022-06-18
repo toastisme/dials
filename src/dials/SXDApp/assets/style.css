@@ -31,3 +31,8 @@
 .rc-slider-handle:active {
   border-color: red;
 }
+
+.VirtualizedSelectOption {
+    background-color: rgb(48,48,48);
+    color: white;
+}
