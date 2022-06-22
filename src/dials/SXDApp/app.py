@@ -92,6 +92,7 @@ experiment_summary = dbc.Card(
                                     id="detector-params",
                                     style_header=experiment_params.style_header[0],
                                     style_data=experiment_params.style_data[0],
+                                    style_table={"overflowX": "scroll"},
                                 ),
                             ],
                         )
@@ -295,10 +296,12 @@ find_spots_tab = [
                                     "width": "26.5vh",
                                     "maxWidth": "26.5vh",
                                     "overflow": "scroll",
+                                    "backgroundColor": "rgb(34,34,34)",
                                 },
                             )
-                        )
-                    )
+                        ),
+                    ),
+                    style={"backgroundColor": "rgb(34,34,34)"},
                 ),
             ]
         )
@@ -353,7 +356,8 @@ index_tab = [
                                     ],
                                     style={"margin-top": "25px"},
                                 ),
-                            ]
+                            ],
+                            width=6,
                         ),
                         dbc.Label("Advanced Options"),
                         html.P(
@@ -384,17 +388,171 @@ index_tab = [
                                     "width": "66.5vh",
                                     "maxWidth": "66.5vh",
                                     "overflow": "scroll",
+                                    "backgroundColor": "rgb(34,34,34)",
                                 },
                             )
                         )
-                    )
+                    ),
+                    style={"backgroundColor": "rgb(34,34,34)"},
                 ),
             ]
         )
     ),
 ]
+
+refine_bravais_panel = html.Div(
+    [
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Refine Bravais Settings")),
+                dbc.ModalBody(
+                    dbc.ListGroup(
+                        [
+                            dash_table.DataTable(
+                                experiment_params.bravais_lattices_table_values,
+                                experiment_params.bravais_lattices_table_headers,
+                                id="dials-refine-bravais-table",
+                                style_header=experiment_params.style_header[0],
+                                style_data=experiment_params.style_data[0],
+                                row_selectable="single",
+                                selected_row_ids=[],
+                                page_size=50,
+                            ),
+                            html.Div(
+                                id="refine-bravais-table-placeholder",
+                                style={"display": "none"},
+                            ),
+                        ],
+                        className="dbc-row-selectable",
+                        style={
+                            "height": "78vh",
+                            "maxHeight": "78vh",
+                            "width": "78vh",
+                            "maxWidth": "78vh",
+                            "overflow": "scroll",
+                        },
+                    )
+                ),
+                dbc.ModalFooter(dbc.Button("Refine", id="dials-refine", n_clicks=0)),
+            ],
+            id="dials-refine-bravais-panel",
+            is_open=False,
+            size="xl",
+            backdrop="static",
+            scrollable=True,
+        )
+    ]
+)
+
+refine_tab = [
+    refine_bravais_panel,
+    dbc.Card(
+        dbc.CardBody(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            dbc.Button("Run", n_clicks=0, id="dials-refine-bravais"),
+                            width=8,
+                        ),
+                        dbc.Col(
+                            html.P(
+                                dcc.Link(
+                                    dbc.Button("Documentation", color="secondary"),
+                                    href="https://dials.github.io/documentation/programs/dials_refine.html",
+                                    target="_blank",
+                                ),
+                                style={"margin-left": "65px"},
+                            ),
+                            width=1,
+                            align="end",
+                        ),
+                    ]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.P(
+                                    [
+                                        dbc.Label("Outlier Algorithm"),
+                                        dcc.Dropdown(
+                                            id="refine-outlier-algorithm",
+                                            options=[
+                                                "auto",
+                                                "mcd",
+                                                "tukey",
+                                                "sauter_poon",
+                                            ],
+                                            value="auto",
+                                            clearable=False,
+                                        ),
+                                        html.Div(
+                                            id="refine-outlier-placeholder",
+                                            style={"display": "none"},
+                                        ),
+                                    ],
+                                    style={"margin-top": "25px"},
+                                ),
+                            ]
+                        ),
+                        dbc.Label("Advanced Options"),
+                        html.P(
+                            dbc.Input(
+                                id="refine-advanced-input",
+                                placeholder="See Documentation for full list of options",
+                                type="text",
+                            ),
+                        ),
+                    ]
+                ),
+            ],
+        )
+    ),
+    dbc.Card(
+        dbc.CardBody(
+            [
+                html.H6("Output"),
+                dbc.Card(
+                    dbc.CardBody(
+                        dbc.Spinner(
+                            html.Div(
+                                id="dials-refine-log",
+                                children=[],
+                                style={
+                                    "height": "46.5vh",
+                                    "maxHeight": "46.5vh",
+                                    "width": "66.5vh",
+                                    "maxWidth": "66.5vh",
+                                    "overflow": "scroll",
+                                    "backgroundColor": "rgb(34,34,34)",
+                                },
+                            )
+                        )
+                    ),
+                    style={"backgroundColor": "rgb(34,34,34)"},
+                ),
+            ]
+        )
+    ),
+]
+
+
 image_viewer_tab = dbc.Card(
-    dbc.CardImg(src=app.get_asset_url("image_viewer_with_line_plot.png"), top=True),
+    dbc.CardImg(src=None, top=True, id="image-viewer-image"),
+    style={
+        "height": "85.5vh",
+        "maxHeight": "85.5vh",
+        "overflow": "scroll",
+    },
+)
+
+reciprocal_lattice_viewer_tab = dbc.Card(
+    dbc.CardImg(
+        src=app.get_asset_url("reciprocal_lattice_viewer_before_indexing.png"),
+        top=True,
+        id="reciprocal-lattice-viewer-image",
+    ),
     style={
         "height": "85.5vh",
         "maxHeight": "85.5vh",
@@ -430,20 +588,28 @@ app.layout = html.Div(
             [
                 dbc.Col(
                     html.Div(
-                        dbc.Card(
-                            dbc.CardBody(
-                                [
-                                    html.H6("Files"),
-                                    html.Div(
-                                        dbc.ListGroup(id="open-files", children=[]),
-                                        style={
-                                            "height": "83.5vh",
-                                            "maxHeight": "83.5vh",
-                                            "overflow": "scroll",
-                                        },
+                        dbc.Tabs(
+                            children=[
+                                dbc.Tab(
+                                    dbc.Card(
+                                        dbc.CardBody(
+                                            html.Div(
+                                                dbc.ListGroup(
+                                                    id="open-files", children=[]
+                                                ),
+                                                style={
+                                                    "height": "83.5vh",
+                                                    "maxHeight": "83.5vh",
+                                                    "overflow": "scroll",
+                                                },
+                                            ),
+                                        ),
                                     ),
-                                ]
-                            )
+                                    label="Files",
+                                    tab_style={"color": "rgb(48,48,48)"},
+                                    active_tab_style={"color": "rgb(48,48,48)"},
+                                ),
+                            ]
                         )
                     ),
                     width=2,
@@ -454,14 +620,20 @@ app.layout = html.Div(
                             [
                                 dbc.Tab(image_viewer_tab, label="Image Viewer"),
                                 dbc.Tab(
-                                    generic_tab,
+                                    reciprocal_lattice_viewer_tab,
                                     label="Reciprocal Lattice Viewer",
                                     disabled=True,
                                 ),
-                                dbc.Tab(experiment_summary, label="Experiment"),
+                                dbc.Tab(
+                                    experiment_summary,
+                                    label="Experiment",
+                                    disabled=True,
+                                ),
                             ],
+                            id="state-tabs",
                         )
-                    )
+                    ),
+                    width=5,
                 ),
                 dbc.Col(
                     html.Div(
@@ -471,8 +643,8 @@ app.layout = html.Div(
                                     dbc.Tab(
                                         import_tab.content(),
                                         label="Import",
-                                        tab_style={"color": "#9E9E9E"},
-                                        active_tab_style={"color": "#9E9E9E"},
+                                        tab_style={"color": "rgb(48,48,48)"},
+                                        active_tab_style={"color": "rgb(48,48,48)"},
                                     ),
                                     dbc.Tab(
                                         find_spots_tab,
@@ -480,7 +652,7 @@ app.layout = html.Div(
                                         disabled=True,
                                     ),
                                     dbc.Tab(index_tab, label="Index", disabled=True),
-                                    dbc.Tab(generic_tab, label="Refine", disabled=True),
+                                    dbc.Tab(refine_tab, label="Refine", disabled=True),
                                     dbc.Tab(
                                         generic_tab, label="Integrate", disabled=True
                                     ),
@@ -491,43 +663,110 @@ app.layout = html.Div(
                             dbc.Button(
                                 id="open-reflection-table",
                                 n_clicks=0,
+                                disabled=True,
+                                outline=False,
                                 style={
                                     "position": "absolute",
-                                    "left": "11vw",
-                                    "top": "88vh",
-                                    "width": "20vw",
+                                    "left": ".9vw",
+                                    "top": "87vh",
+                                    "width": "39.1vw",
                                     "height": "2vh",
-                                    "backgroundColor": "rgb(48,48,48)",
-                                    "line-color": "rgb(48,48,48)",
+                                    "backgroundColor": "rgb(34, 34, 34)",
+                                    "lineColor": "rgb(34, 34, 34)",
                                 },
                                 children=[
                                     html.Img(
                                         src=app.get_asset_url("expand_less2.png"),
+                                        hidden=True,
                                         style={
                                             "position": "relative",
-                                            "left": "-9vw",
+                                            "left": "-18.5vw",
                                             "top": "-1.25vh",
                                         },
+                                        id="reflection-table-arrow",
                                     ),
                                     html.P(
                                         "Reflection Table",
+                                        hidden=True,
                                         style={
                                             "position": "relative",
                                             "left": "0vw",
                                             "top": "-3.75vh",
                                         },
+                                        id="reflection-table-label",
                                     ),
                                 ],
                             ),
                             reflection_table,
                         ],
                         style={"position": "relative"},
-                    )
+                    ),
+                    width=5,
                 ),
             ]
         ),
     ]
 )
+
+
+@app.callback(
+    [
+        Output("dials-refine-bravais-panel", "is_open"),
+        Output("dials-refine-bravais-table", "data"),
+    ],
+    [
+        Input("dials-refine-bravais", "n_clicks"),
+        Input("dials-refine", "n_clicks"),
+        Input("dials-refine-bravais-table", "data"),
+    ],
+    [State("dials-refine-bravais-panel", "is_open")],
+)
+def show_refine_bravais_settings_panel(n1, n2, bravais_table, is_open):
+
+    triggered_id = callback_context.triggered_id
+
+    # Table updated
+    if triggered_id == "dials-refine-bravais-table":
+        return is_open, bravais_table
+
+    # Refine_bravais_settings run button pressed
+    if triggered_id == "dials-refine-bravais":
+        _ = file_manager.run(AlgorithmType.dials_refine_bravais_settings)
+        bravais_table = file_manager.get_bravais_lattices_table()
+        is_open = True
+        return is_open, bravais_table
+
+    # Refine run button pressed
+    elif triggered_id == "dials-refine":
+        is_open = False
+        return is_open, bravais_table
+    else:
+        is_open = False
+        return is_open, bravais_table
+
+
+@app.callback(
+    Output("refine-bravais-table-placeholder", "children"),
+    Input("dials-refine-bravais-table", "selected_rows"),
+)
+def update_refine_selected_files(selected_rows):
+    if selected_rows:
+
+        # Update dials.reindex args
+        basis = file_manager.get_change_of_basis(f"{selected_rows[0]+1}")
+        file_manager.update_selected_file_arg(
+            algorithm_type=AlgorithmType.dials_reindex,
+            param_name="change_of_basis_op",
+            param_value=basis,
+        )
+
+        # Update dials.refine input
+        refine_expt_filename = f"bravais_setting_{selected_rows[0]+1}.expt"
+        refine_refl_filename = "reindexed.refl"
+        file_manager.set_selected_input_files(
+            selected_files=[refine_expt_filename, refine_refl_filename],
+            algorithm_type=AlgorithmType.dials_refine,
+        )
 
 
 @app.callback(
@@ -549,6 +788,19 @@ def update_find_spots_threshold_algorithm(threshold_algorithm):
     if file_manager.selected_file is not None:
         file_manager.update_selected_file_arg(
             AlgorithmType.dials_find_spots, "threshold.algorithm", threshold_algorithm
+        )
+
+
+@app.callback(
+    Output("refine-outlier-placeholder", "children"),
+    Input("refine-outlier-algorithm", "value"),
+)
+def update_refine_outlier_algorithm(outlier_algorithm):
+    if file_manager.selected_file is not None:
+        file_manager.update_selected_file_arg(
+            AlgorithmType.dials_refine,
+            "reflections.outlier.algorithm",
+            outlier_algorithm,
         )
 
 
@@ -577,8 +829,45 @@ def update_index_algorithm(index_algorithm):
 
 
 @app.callback(
+    [Output("image-viewer-image", "src")],
+    [
+        Input("open-files", "children"),
+    ],
+)
+def update_placeholder_images(open_files):
+    if file_manager.can_run(AlgorithmType.dials_index):
+        return [app.get_asset_url("image_viewer_after_find_spots.png")]
+    if file_manager.can_run(AlgorithmType.dials_find_spots):
+        return [app.get_asset_url("image_viewer_before_find_spots.png")]
+    return [[]]
+
+
+@app.callback(
+    [
+        Output("open-reflection-table", "disabled"),
+        Output("reflection-table-label", "hidden"),
+        Output("reflection-table-arrow", "hidden"),
+        Output("open-reflection-table", "style"),
+    ],
+    [
+        Input("open-files", "children"),
+        Input("open-reflection-table", "style"),
+    ],
+)
+def update_reflection_table_button(open_files, button_style):
+    if file_manager.can_run(AlgorithmType.dials_index):
+        button_style["backgroundColor"] = "rgb(55, 90, 127)"
+        button_style["lineColor"] = "rgb(55, 90, 127)"
+        return [False, False, False, button_style]
+    button_style["backgroundColor"] = "rgb(34, 34, 34)"
+    button_style["lineColor"] = "rgb(34, 34, 34)"
+    return [True, True, True, button_style]
+
+
+@app.callback(
     [
         Output("algorithm-tabs", "children"),
+        Output("state-tabs", "children"),
         Output("open-files", "children"),
         Output("image-range", "min"),
         Output("image-range", "max"),
@@ -591,15 +880,18 @@ def update_index_algorithm(index_algorithm):
         Output("dials-import-log", "children"),
         Output("dials-find-spots-log", "children"),
         Output("dials-index-log", "children"),
+        Output("dials-refine-log", "children"),
     ],
     [
         Input({"type": "open-file", "index": ALL}, "n_clicks"),
         Input("open-files", "children"),
         Input("algorithm-tabs", "children"),
+        Input("state-tabs", "children"),
         Input("dials-import", "filename"),
         Input("dials-import", "contents"),
         Input("dials-find-spots", "n_clicks"),
         Input("dials-index", "n_clicks"),
+        Input("dials-refine", "n_clicks"),
         Input("beam-params", "data"),
         Input("detector-params", "data"),
         Input("sequence-params", "data"),
@@ -611,10 +903,12 @@ def event_handler(
     open_files_clicks_list,
     open_files,
     algorithm_tabs,
+    state_tabs,
     import_filename,
     import_content,
     find_spots_n_clicks,
     index_n_clicks,
+    refine_n_clicks,
     *experiment_params,
 ):
 
@@ -622,14 +916,17 @@ def event_handler(
     print(f"Triggered id : {triggered_id}")
     logs = file_manager.get_logs()
     reflection_table = file_manager.get_reflection_table()
+    min_image_range = 1
+    max_image_range = 1
 
     ## Nothing triggered
     if triggered_id is None:
         return (
             algorithm_tabs,
+            state_tabs,
             open_files,
-            1,
-            20,
+            min_image_range,
+            max_image_range,
             reflection_table,
             *experiment_params,
             *logs,
@@ -647,15 +944,19 @@ def event_handler(
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )
+        state_tabs = display_manager.update_state_tabs(
+            state_tabs, file_manager.selected_file
+        )
         experiment_params = display_manager.get_experiment_params(
             file_manager.selected_file
         )
-        min_image, max_image = file_manager.get_selected_file_image_range()
+        min_image_range, max_image_range = file_manager.get_selected_file_image_range()
         return (
             algorithm_tabs,
+            state_tabs,
             open_files,
-            min_image,
-            max_image,
+            min_image_range,
+            max_image_range,
             reflection_table,
             *experiment_params,
             *logs,
@@ -667,13 +968,20 @@ def event_handler(
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )
-        min_image, max_image = file_manager.get_selected_file_image_range()
+        state_tabs = display_manager.update_state_tabs(
+            state_tabs, file_manager.selected_file
+        )
+        min_image_range, max_image_range = file_manager.get_selected_file_image_range()
         reflection_table = file_manager.get_reflection_table()
+        experiment_params = display_manager.get_experiment_params(
+            file_manager.selected_file
+        )
         return (
             algorithm_tabs,
+            state_tabs,
             open_files,
-            min_image,
-            max_image,
+            min_image_range,
+            max_image_range,
             reflection_table,
             *experiment_params,
             *logs,
@@ -685,13 +993,46 @@ def event_handler(
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )
-        min_image, max_image = file_manager.get_selected_file_image_range()
+        state_tabs = display_manager.update_state_tabs(
+            state_tabs, file_manager.selected_file
+        )
+        min_image_range, max_image_range = file_manager.get_selected_file_image_range()
         reflection_table = file_manager.get_reflection_table()
+        experiment_params = display_manager.get_experiment_params(
+            file_manager.selected_file
+        )
         return (
             algorithm_tabs,
+            state_tabs,
             open_files,
-            min_image,
-            max_image,
+            min_image_range,
+            max_image_range,
+            reflection_table,
+            *experiment_params,
+            *logs,
+        )
+
+    ## Running refine
+    if triggered_id == "dials-refine":
+        if file_manager.has_selected_input_files(AlgorithmType.dials_refine):
+            logs[3] = file_manager.run(AlgorithmType.dials_reindex)
+        logs[3] += file_manager.run(AlgorithmType.dials_refine)
+        algorithm_tabs = display_manager.update_algorithm_tabs(
+            algorithm_tabs, file_manager.selected_file
+        )
+        state_tabs = display_manager.update_state_tabs(
+            state_tabs, file_manager.selected_file
+        )
+        experiment_params = display_manager.get_experiment_params(
+            file_manager.selected_file
+        )
+        min_image_range, max_image_range = file_manager.get_selected_file_image_range()
+        return (
+            algorithm_tabs,
+            state_tabs,
+            open_files,
+            min_image_range,
+            max_image_range,
             reflection_table,
             *experiment_params,
             *logs,
@@ -708,6 +1049,9 @@ def event_handler(
     algorithm_tabs = display_manager.update_algorithm_tabs(
         algorithm_tabs, file_manager.selected_file
     )
+    state_tabs = display_manager.update_state_tabs(
+        state_tabs, file_manager.selected_file
+    )
     experiment_params = display_manager.get_experiment_params(
         file_manager.selected_file
     )
@@ -715,6 +1059,7 @@ def event_handler(
     reflection_table = file_manager.get_reflection_table()
     return (
         algorithm_tabs,
+        state_tabs,
         open_files,
         min_image,
         max_image,

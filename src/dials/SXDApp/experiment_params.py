@@ -5,7 +5,7 @@ from __future__ import annotations
 style_header = (
     {
         "color": "white",
-        "backgroundColor": "rgb(30, 30, 30)",
+        "backgroundColor": "rgb(68, 68, 68)",
         "font_size": "12px",
         "text_align": "center",
         "fontWeight": "bold",
@@ -87,7 +87,6 @@ crystal_headers = [
     {"name": "alpha", "id": "alpha"},
     {"name": "beta", "id": "beta"},
     {"name": "gamma", "id": "gamma"},
-    {"name": "Orientation", "id": "Orientation"},
     {"name": "Space Group", "id": "Space Group"},
 ]
 
@@ -99,7 +98,6 @@ crystal_values = [
         "alpha": "-",
         "beta": "-",
         "gamma": "-",
-        "Orientation": "-",
         "Space Group": "-",
     }
 ]
@@ -133,5 +131,27 @@ reflection_table_values = [
         "Miller Index": "-",
         "rlp": "-",
         "Bounding Box": "-",
+    }
+]
+
+bravais_lattices_table_headers = [
+    {"name": "Candidate", "id": "Candidate"},
+    {"name": "Metric Fit", "id": "Metric Fit"},
+    {"name": "RMSD", "id": "RMSD"},
+    {"name": "Min/Max CC", "id": "Min/Max CC"},
+    {"name": "#Spots", "id": "#Spots"},
+    {"name": "Lattice", "id": "Lattice"},
+    {"name": "Unit Cell", "id": "Unit Cell"},
+]
+
+bravais_lattices_table_values = [
+    {
+        "Candidate": "-",
+        "Metric Fit": "-",
+        "RMSD": "-",
+        "Min/Max CC": "-",
+        "#Spots": "-",
+        "Lattice": "-",
+        "Unit Cell": "-",
     }
 ]

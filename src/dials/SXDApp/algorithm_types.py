@@ -11,3 +11,5 @@ class AlgorithmType(Enum):
     dials_integrate = 5
     dials_scale = 6
     dials_export = 7
+    dials_refine_bravais_settings = 8
+    dials_reindex = 9

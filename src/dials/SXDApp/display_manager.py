@@ -41,6 +41,16 @@ class DisplayManager:
                     active_files_list[i]["props"]["active"] = False
         return active_files_list
 
+    """
+    def get_selected_file(self, active_files_list):
+        for i in active_files_list:
+            try:
+                if active_files_list[i].active == True:
+                    return active_files_list[i].
+            except AttributeError:
+                status = active_files_list[i]["props"]["active"] = True
+    """
+
     def update_algorithm_tabs(self, algorithm_tabs, active_file):
 
         algorithms = {
@@ -57,6 +67,24 @@ class DisplayManager:
                 algorithm_tabs[i]["props"]["disabled"] = True
 
         return algorithm_tabs
+
+    def update_state_tabs(self, state_tabs, active_file):
+
+        # Image viewer and Experiment
+        if active_file.can_run(AlgorithmType.dials_find_spots):
+            state_tabs[0]["props"]["disabled"] = False
+            state_tabs[2]["props"]["disabled"] = False
+        else:
+            state_tabs[0]["props"]["disabled"] = True
+            state_tabs[2]["props"]["disabled"] = True
+
+        # Reciprocal lattice viewer
+        if active_file.can_run(AlgorithmType.dials_index):
+            state_tabs[1]["props"]["disabled"] = False
+        else:
+            state_tabs[1]["props"]["disabled"] = True
+
+        return state_tabs
 
     def get_experiment_params(self, active_file):
         return active_file.get_experiment_params()

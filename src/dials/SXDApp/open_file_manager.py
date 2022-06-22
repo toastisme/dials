@@ -79,9 +79,35 @@ class OpenFileManager:
     def get_logs(self):
         if self.selected_file is not None:
             return self.selected_file.get_logs()
-        return ["" for i in AlgorithmType][:3]
+        return ["" for i in AlgorithmType][:4]
 
     def get_reflection_table(self):
         if self.selected_file is not None:
             return self.selected_file.get_reflection_table()
         return experiment_params.reflection_table_values
+
+    def get_bravais_lattices_table(self):
+        if self.selected_file is not None:
+            return self.selected_file.get_bravais_lattices_table()
+        return experiment_params.bravais_lattices_table_values
+
+    def set_selected_input_files(self, selected_files, algorithm_type: AlgorithmType):
+        if self.selected_file is not None:
+            self.selected_file.algorithms[
+                algorithm_type
+            ].selected_files = selected_files
+
+    def has_selected_input_files(self, algorithm_type: AlgorithmType) -> bool:
+        if self.selected_file is not None:
+            return self.selected_file.has_selected_files(algorithm_type)
+        return False
+
+    def get_change_of_basis(self, solution_number: str) -> str:
+        if self.selected_file is not None:
+            return self.selected_file.get_change_of_basis(solution_number)
+        return ""
+
+    def can_run(self, algorithm_type: AlgorithmType) -> bool:
+        if self.selected_file is not None:
+            return self.selected_file.can_run(algorithm_type)
+        return False

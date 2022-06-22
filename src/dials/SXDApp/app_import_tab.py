@@ -46,7 +46,6 @@ class ImportTab:
                         )
                     ]
                 ),
-                style={"backgroundColor": backgroundColor},
             ),
             dbc.Card(
                 dbc.CardBody(
@@ -62,13 +61,14 @@ class ImportTab:
                                             "height": "66.5vh",
                                             "maxHeight": "66.5vh",
                                             "overflow": "scroll",
+                                            "backgroundColor": "rgb(34,34,34)",
                                         },
                                     )
                                 )
                             ),
+                            style={"backgroundColor": "rgb(34,34,34)"},
                         ),
                     ]
                 ),
-                style={"backgroundColor": backgroundColor},
             ),
         ]

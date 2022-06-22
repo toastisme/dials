@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from math import acos
 from os.path import isfile, join
 from typing import Dict, List
 
 import experiment_params
+import numpy as np
 import procrunner
 from algorithm_types import AlgorithmType
 from dash import html
@@ -28,6 +30,7 @@ class DIALSAlgorithm:
     command: str
     args: Dict[str, str]
     log: str
+    selected_files: List[str]  # optional override to use in place of required_files
     required_files: List[str]
     output_experiment_file: str
     output_reflections_file: str
@@ -55,6 +58,7 @@ class ActiveFile:
                 args={},
                 log="",
                 required_files=[filename],
+                selected_files=[],
                 output_experiment_file="imported.expt",
                 output_reflections_file=None,
             ),
@@ -63,6 +67,7 @@ class ActiveFile:
                 command="dials.find_spots",
                 args={},
                 log="",
+                selected_files=[],
                 required_files=["imported.expt"],
                 output_experiment_file="imported.expt",
                 output_reflections_file="strong.refl",
@@ -72,15 +77,37 @@ class ActiveFile:
                 command="dials.index",
                 args={},
                 log="",
+                selected_files=[],
                 required_files=["imported.expt", "strong.refl"],
                 output_experiment_file="indexed.expt",
                 output_reflections_file="indexed.refl",
+            ),
+            AlgorithmType.dials_refine_bravais_settings: DIALSAlgorithm(
+                name=AlgorithmType.dials_refine_bravais_settings,
+                command="dials.refine_bravais_settings",
+                args={},
+                log="",
+                selected_files=[],
+                required_files=["indexed.expt", "indexed.refl"],
+                output_experiment_file="indexed.expt",
+                output_reflections_file="indexed.refl",
+            ),
+            AlgorithmType.dials_reindex: DIALSAlgorithm(
+                name=AlgorithmType.dials_reindex,
+                command="dials.reindex",
+                args={},
+                log="",
+                selected_files=[],
+                required_files=["indexed.refl"],
+                output_experiment_file=None,
+                output_reflections_file="reindexed.refl",
             ),
             AlgorithmType.dials_refine: DIALSAlgorithm(
                 name=AlgorithmType.dials_refine,
                 command="dials.refine",
                 args={},
                 log="",
+                selected_files=[],
                 required_files=["indexed.expt", "indexed.refl"],
                 output_experiment_file="refined.expt",
                 output_reflections_file="refined.refl",
@@ -90,6 +117,7 @@ class ActiveFile:
                 command="dials.integrate",
                 args={},
                 log="",
+                selected_files=[],
                 required_files=["refined.expt", "refined.refl"],
                 output_experiment_file="integrated.expt",
                 output_reflections_file="integrated.refl",
@@ -99,6 +127,7 @@ class ActiveFile:
                 command="dials.scale",
                 args={},
                 log="",
+                selected_files=[],
                 required_files=["integrated.expt", "integrated.refl"],
                 output_experiment_file="scaled.expt",
                 output_reflections_file="scaled.refl",
@@ -108,6 +137,7 @@ class ActiveFile:
                 command="dials.export",
                 args={},
                 log="",
+                selected_files=[],
                 required_files=["scaled.expt", "scaled.refl"],
                 output_experiment_file="exported.expt",
                 output_reflections_file="exported.refl",
@@ -171,6 +201,35 @@ class ActiveFile:
         return [{"Orientation (deg)": "0"}]
 
     def get_crystal_params(self, expt_file):
+        crystals = expt_file["crystal"]
+        if crystals:
+            crystal = crystals[0]
+            a = np.array(crystal["real_space_a"])
+            b = np.array(crystal["real_space_b"])
+            c = np.array(crystal["real_space_c"])
+            a_mag = round(np.linalg.norm(a), 3)
+            b_mag = round(np.linalg.norm(b), 3)
+            c_mag = round(np.linalg.norm(c), 3)
+            unit_a = a / a_mag
+            unit_b = b / b_mag
+            unit_c = c / c_mag
+            gamma = str(round(acos(np.dot(unit_a, unit_b)) * (180 / np.pi), 3))
+            beta = str(round(acos(np.dot(unit_a, unit_c)) * (180 / np.pi), 3))
+            alpha = str(round(acos(np.dot(unit_c, unit_b)) * (180 / np.pi), 3))
+
+            return [
+                {
+                    "a": a_mag,
+                    "b": b_mag,
+                    "c": c_mag,
+                    "alpha": alpha,
+                    "beta": beta,
+                    "gamma": gamma,
+                    "Space Group": "".join(
+                        crystal["space_group_hall_symbol"].strip().split()
+                    ),
+                }
+            ]
         return [
             {
                 "a": "-",
@@ -179,7 +238,6 @@ class ActiveFile:
                 "alpha": "-",
                 "beta": "-",
                 "gamma": "-",
-                "Orientation": "-",
                 "Space Group": "-",
             }
         ]
@@ -200,6 +258,12 @@ class ActiveFile:
             if not isfile(join(self.file_dir, i)):
                 return False
         return True
+
+    def get_input_files(self, algorithm_type: AlgorithmType):
+        algorithm = self.algorithms[algorithm_type]
+        if algorithm.selected_files:
+            return algorithm.selected_files
+        return algorithm.required_files
 
     def run(self, algorithm_type: AlgorithmType):
 
@@ -223,7 +287,7 @@ class ActiveFile:
         algorithm = self.algorithms[algorithm_type]
         dials_command = [algorithm.command]
 
-        for i in algorithm.required_files:
+        for i in self.get_input_files(algorithm_type):
             dials_command.append(i)
 
         for arg in algorithm.args:
@@ -233,7 +297,8 @@ class ActiveFile:
         log = get_log_text(result)
         self.algorithms[algorithm_type].log = log
         expt_file = self.algorithms[algorithm_type].output_experiment_file
-        self.current_expt_file = join(self.file_dir, expt_file)
+        if expt_file is not None:
+            self.current_expt_file = join(self.file_dir, expt_file)
         refl_file = self.algorithms[algorithm_type].output_reflections_file
         if refl_file is not None:
             self.current_refl_file = join(self.file_dir, refl_file)
@@ -256,7 +321,7 @@ class ActiveFile:
         return available_algorithms
 
     def get_logs(self):
-        return [self.algorithms[i].log for i in AlgorithmType][:3]
+        return [self.algorithms[i].log for i in AlgorithmType][:4]
 
     def update_arg(
         self, algorithm_type: AlgorithmType, param_name: str, param_value: str
@@ -301,3 +366,41 @@ class ActiveFile:
             }
             reflection_table.append(r)
         return reflection_table
+
+    def get_change_of_basis(self, solution_number: str) -> str:
+        summary_file = join(self.file_dir, "bravais_summary.json")
+        with open(summary_file, "r") as g:
+            f = json.load(g)
+        return f[solution_number]["cb_op"]
+
+    def get_bravais_lattices_table(self):
+        summary_file = join(self.file_dir, "bravais_summary.json")
+        with open(summary_file, "r") as g:
+            f = json.load(g)
+
+        results_table = []
+        for i in range(1, len(f) + 1):
+            raw_result = f[str(i)]
+            if raw_result["min_cc"] is None:
+                min_cc = "-"
+            else:
+                min_cc = round(raw_result["min_cc"], 3)
+            if raw_result["max_cc"] is None:
+                max_cc = ("-",)
+            else:
+                max_cc = round(raw_result["max_cc"], 3)
+            unit_cell = [round(i, 2) for i in raw_result["unit_cell"]]
+            result = {
+                "Candidate": str(i),
+                "Metric Fit": str(round(raw_result["max_angular_difference"], 3)),
+                "RMSD": str(round(raw_result["rmsd"], 3)),
+                "Min/Max CC": f"{min_cc}/{max_cc}",
+                "#Spots": str(raw_result["nspots"]),
+                "Lattice": raw_result["bravais"],
+                "Unit Cell": str(tuple(unit_cell)),
+            }
+            results_table.append(result)
+        return results_table
+
+    def has_selected_files(self, algorithm_type: AlgorithmType) -> bool:
+        return len(self.algorithms[algorithm_type].selected_files) > 0
