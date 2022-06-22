@@ -4,6 +4,7 @@ import json
 
 import dash_bootstrap_components as dbc
 import experiment_params
+import plotly.express as px
 from algorithm_types import AlgorithmType
 from app_import_tab import ImportTab
 from app_reflection_table import reflection_table
@@ -293,8 +294,6 @@ find_spots_tab = [
                                 style={
                                     "height": "46.5vh",
                                     "maxHeight": "46.5vh",
-                                    "width": "26.5vh",
-                                    "maxWidth": "26.5vh",
                                     "overflow": "scroll",
                                     "backgroundColor": "rgb(34,34,34)",
                                 },
@@ -385,8 +384,6 @@ index_tab = [
                                 style={
                                     "height": "46.5vh",
                                     "maxHeight": "46.5vh",
-                                    "width": "66.5vh",
-                                    "maxWidth": "66.5vh",
                                     "overflow": "scroll",
                                     "backgroundColor": "rgb(34,34,34)",
                                 },
@@ -404,34 +401,62 @@ refine_bravais_panel = html.Div(
     [
         dbc.Modal(
             [
-                dbc.ModalHeader(dbc.ModalTitle("Refine Bravais Settings")),
+                dbc.ModalHeader(dbc.ModalTitle("Select Candidate Lattice")),
                 dbc.ModalBody(
-                    dbc.ListGroup(
-                        [
-                            dash_table.DataTable(
-                                experiment_params.bravais_lattices_table_values,
-                                experiment_params.bravais_lattices_table_headers,
-                                id="dials-refine-bravais-table",
-                                style_header=experiment_params.style_header[0],
-                                style_data=experiment_params.style_data[0],
-                                row_selectable="single",
-                                selected_row_ids=[],
-                                page_size=50,
-                            ),
-                            html.Div(
-                                id="refine-bravais-table-placeholder",
-                                style={"display": "none"},
-                            ),
-                        ],
-                        className="dbc-row-selectable",
-                        style={
-                            "height": "78vh",
-                            "maxHeight": "78vh",
-                            "width": "78vh",
-                            "maxWidth": "78vh",
-                            "overflow": "scroll",
-                        },
-                    )
+                    [
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    dbc.ListGroup(
+                                        [
+                                            dash_table.DataTable(
+                                                experiment_params.bravais_lattices_table_values,
+                                                experiment_params.bravais_lattices_table_headers,
+                                                id="dials-refine-bravais-table",
+                                                style_header=experiment_params.style_header[
+                                                    0
+                                                ],
+                                                style_data=experiment_params.style_data[
+                                                    0
+                                                ],
+                                                row_selectable="single",
+                                                selected_row_ids=[],
+                                                page_size=50,
+                                            ),
+                                            html.Div(
+                                                id="refine-bravais-table-placeholder",
+                                                style={"display": "none"},
+                                            ),
+                                        ],
+                                        className="dbc-row-selectable",
+                                        style={
+                                            "height": "78vh",
+                                            "maxHeight": "78vh",
+                                            "width": "78vh",
+                                            "maxWidth": "78vh",
+                                            "overflow": "scroll",
+                                        },
+                                    ),
+                                    width=8,
+                                ),
+                                dbc.Col(
+                                    html.Div(
+                                        [
+                                            dcc.Graph(id="lattice-rmsd-plot"),
+                                            dcc.Graph(id="lattice-metric-fit-plot"),
+                                        ],
+                                        style={
+                                            "display": "inline-block",
+                                            "width": "120%",
+                                            "height": "10%",
+                                            "backgroundColor": "black",
+                                        },
+                                    ),
+                                    width=4,
+                                ),
+                            ]
+                        ),
+                    ]
                 ),
                 dbc.ModalFooter(dbc.Button("Refine", id="dials-refine", n_clicks=0)),
             ],
@@ -522,8 +547,6 @@ refine_tab = [
                                 style={
                                     "height": "46.5vh",
                                     "maxHeight": "46.5vh",
-                                    "width": "66.5vh",
-                                    "maxWidth": "66.5vh",
                                     "overflow": "scroll",
                                     "backgroundColor": "rgb(34,34,34)",
                                 },
@@ -713,6 +736,8 @@ app.layout = html.Div(
     [
         Output("dials-refine-bravais-panel", "is_open"),
         Output("dials-refine-bravais-table", "data"),
+        Output("lattice-rmsd-plot", "figure"),
+        Output("lattice-metric-fit-plot", "figure"),
     ],
     [
         Input("dials-refine-bravais", "n_clicks"),
@@ -722,27 +747,61 @@ app.layout = html.Div(
     [State("dials-refine-bravais-panel", "is_open")],
 )
 def show_refine_bravais_settings_panel(n1, n2, bravais_table, is_open):
+    def get_plots(bravais_table):
+        if bravais_table is not None:
+            rmsd = [i["RMSD"] for i in bravais_table]
+            mf = [i["Metric Fit"] for i in bravais_table]
+            x = [idx + 1 for idx, i in enumerate(bravais_table)]
+            rmsd = {"Candidate": x, "RMSD": rmsd}
+            mf = {"Candidate": x, "Metric Fit": mf}
+            rmsd_fig = px.scatter(rmsd, x="Candidate", y="RMSD", height=340)
+            rmsd_fig.update_traces(
+                mode="lines+markers", marker_color="white", textfont_color="white"
+            )
+            rmsd_fig.layout.plot_bgcolor = "rgb(48,48,48)"
+            rmsd_fig.layout.paper_bgcolor = "rgb(48,48,48)"
+            rmsd_fig.update_xaxes(showgrid=False, color="white")
+            rmsd_fig.update_yaxes(showgrid=False, color="white")
+            mf_fig = px.scatter(mf, x="Candidate", y="Metric Fit", height=340)
+            mf_fig.update_traces(
+                mode="lines+markers",
+                marker_color="white",
+            )
+            mf_fig.layout.plot_bgcolor = "rgb(48,48,48)"
+            mf_fig.layout.paper_bgcolor = "rgb(48,48,48)"
+            mf_fig.update_xaxes(showgrid=False, color="white")
+            mf_fig.update_yaxes(showgrid=False, color="white")
+
+        else:
+            rmsd = {"Candidate": [], "RMSD": []}
+            mf = {"Candidate": [], "Metric Fit": []}
+            rmsd_fig = px.scatter(rmsd, x="Candidate", y="RMSD")
+            mf_fig = px.scatter(mf, x="Candidate", y="Metric Fit")
+
+        return rmsd_fig, mf_fig
 
     triggered_id = callback_context.triggered_id
+    rmsd_fig, mf_fig = get_plots(None)
 
     # Table updated
     if triggered_id == "dials-refine-bravais-table":
-        return is_open, bravais_table
+        return is_open, bravais_table, rmsd_fig, mf_fig
 
     # Refine_bravais_settings run button pressed
     if triggered_id == "dials-refine-bravais":
         _ = file_manager.run(AlgorithmType.dials_refine_bravais_settings)
         bravais_table = file_manager.get_bravais_lattices_table()
+        rmsd_fig, mf_fig = get_plots(bravais_table)
         is_open = True
-        return is_open, bravais_table
+        return is_open, bravais_table, rmsd_fig, mf_fig
 
     # Refine run button pressed
     elif triggered_id == "dials-refine":
         is_open = False
-        return is_open, bravais_table
+        return is_open, bravais_table, rmsd_fig, mf_fig
     else:
         is_open = False
-        return is_open, bravais_table
+        return is_open, bravais_table, rmsd_fig, mf_fig
 
 
 @app.callback(
@@ -1016,7 +1075,7 @@ def event_handler(
     if triggered_id == "dials-refine":
         if file_manager.has_selected_input_files(AlgorithmType.dials_refine):
             logs[3] = file_manager.run(AlgorithmType.dials_reindex)
-        logs[3] += file_manager.run(AlgorithmType.dials_refine)
+        logs[3] = file_manager.run(AlgorithmType.dials_refine)
         algorithm_tabs = display_manager.update_algorithm_tabs(
             algorithm_tabs, file_manager.selected_file
         )

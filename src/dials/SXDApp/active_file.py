@@ -386,7 +386,7 @@ class ActiveFile:
             else:
                 min_cc = round(raw_result["min_cc"], 3)
             if raw_result["max_cc"] is None:
-                max_cc = ("-",)
+                max_cc = "-"
             else:
                 max_cc = round(raw_result["max_cc"], 3)
             unit_cell = [round(i, 2) for i in raw_result["unit_cell"]]
