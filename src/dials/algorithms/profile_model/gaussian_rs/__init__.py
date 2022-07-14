@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dxtbx.model import TOFSequence
 
 import dials.algorithms.profile_model.modeller  # noqa: F401; lgtm; true import dependency

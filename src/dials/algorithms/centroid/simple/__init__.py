@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dxtbx.model import Scan
 
 import dials_algorithms_centroid_simple_ext

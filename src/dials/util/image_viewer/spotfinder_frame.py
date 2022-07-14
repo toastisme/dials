@@ -1736,7 +1736,6 @@ class SpotFrame(XrayFrame):
         strong_code = MaskCode.Valid | MaskCode.Strong
         shoebox_dict = {"width": 2, "color": "#0000FFA0", "closed": False}
         ctr_mass_dict = {"width": 2, "color": "#FF0000", "closed": False}
-
         shoebox_data = []
         all_pix_data = {}
         all_foreground_circles = {}

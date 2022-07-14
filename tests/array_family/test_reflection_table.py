@@ -1604,7 +1604,8 @@ def test_concat():
     assert list(table1["id"]) == [0, 0, 1, 1, 2, 2, 3, 3]
     assert list(ids1.keys()) == [0, 1, 2, 3]
     assert list(ids1.values()) == ["a", "b", "c", "d"]
-def test_contains_valid_tof_data():
+
+
 def test_contains_beam_data():
 
     # Test empty table
