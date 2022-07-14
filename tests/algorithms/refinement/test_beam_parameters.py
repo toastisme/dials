@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 from math import pi
 
@@ -65,3 +67,14 @@ def test_beam_parameters():
                 print("so that difference fd_ds_dp - an_ds_dp =")
                 print(fd_ds_dp[j] - an_ds_dp[j])
                 raise
+
+        # Ensure the polarization normal vector remains orthogonal to the beam
+        # (https://github.com/dials/dials/issues/1939)
+        assert (
+            abs(
+                matrix.col(beam.get_unit_s0()).dot(
+                    matrix.col(beam.get_polarization_normal())
+                )
+            )
+            < 1e-10
+        )
