@@ -41,6 +41,7 @@ namespace dials {
   using dxtbx::model::Goniometer;
   using dxtbx::model::Panel;
   using dxtbx::model::Scan;
+  using dxtbx::model::TOFSequence;
   using scitbx::vec2;
   using scitbx::vec3;
   using scitbx::af::int6;
@@ -71,17 +72,17 @@ namespace dials {
       const af::const_ref<std::size_t> &panel) const = 0;
 
     virtual void single_with_s0(Shoebox<> &shoebox,
-                        vec3<double> s1,
-                        vec3<double> s0,
-                        double frame,
-                        std::size_t panel,
-                        bool adjacent = false) const = 0;
+                                vec3<double> s1,
+                                vec3<double> s0,
+                                double frame,
+                                std::size_t panel,
+                                bool adjacent = false) const = 0;
 
     virtual void array_with_s0(af::ref<Shoebox<> > shoebox,
-                       const af::const_ref<vec3<double> > &s1,
-                       const af::const_ref<vec3<double> > &s0,
-                       const af::const_ref<double> &frame,
-                       const af::const_ref<std::size_t> &panel) const = 0;
+                               const af::const_ref<vec3<double> > &s1,
+                               const af::const_ref<vec3<double> > &s0,
+                               const af::const_ref<double> &frame,
+                               const af::const_ref<std::size_t> &panel) const = 0;
 
     virtual af::shared<double> volume_with_s0(
       MultiPanelImageVolume<> image_volume,
@@ -190,11 +191,11 @@ namespace dials {
      * @param panel The panel number
      */
     virtual void single_with_s0(Shoebox<> &shoebox,
-                        vec3<double> s1,
-                        vec3<double> s0,
-                        double frame,
-                        std::size_t panel,
-                        bool adjacent = false) const {
+                                vec3<double> s1,
+                                vec3<double> s0,
+                                double frame,
+                                std::size_t panel,
+                                bool adjacent = false) const {
       DIALS_ASSERT(shoebox.is_consistent());
       if (shoebox.flat) {
         single_flat(shoebox, s1, frame, panel);
@@ -230,10 +231,10 @@ namespace dials {
      * @param panel The list of panel numbers
      */
     virtual void array_with_s0(af::ref<Shoebox<> > shoeboxes,
-                       const af::const_ref<vec3<double> > &s1,
-                       const af::const_ref<vec3<double> > &s0,
-                       const af::const_ref<double> &frame,
-                       const af::const_ref<std::size_t> &panel) const {
+                               const af::const_ref<vec3<double> > &s1,
+                               const af::const_ref<vec3<double> > &s0,
+                               const af::const_ref<double> &frame,
+                               const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
       DIALS_ASSERT(shoeboxes.size() == panel.size());
@@ -258,12 +259,13 @@ namespace dials {
       return fraction;
     }
 
-    virtual af::shared<double> volume_with_s0(MultiPanelImageVolume<> volume,
-                                      const af::const_ref<int6> &bbox,
-                                      const af::const_ref<vec3<double> > &s1,
-                                      const af::const_ref<vec3<double> > &s0,
-                                      const af::const_ref<double> &frame,
-                                      const af::const_ref<std::size_t> &panel) const {
+    virtual af::shared<double> volume_with_s0(
+      MultiPanelImageVolume<> volume,
+      const af::const_ref<int6> &bbox,
+      const af::const_ref<vec3<double> > &s1,
+      const af::const_ref<vec3<double> > &s0,
+      const af::const_ref<double> &frame,
+      const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(bbox.size() == s1.size());
       DIALS_ASSERT(bbox.size() == frame.size());
       DIALS_ASSERT(bbox.size() == panel.size());
@@ -274,6 +276,7 @@ namespace dials {
       }
       return fraction;
     }
+
   private:
     template <typename FloatType>
     double volume_single(ImageVolume<FloatType> volume,
@@ -589,14 +592,13 @@ namespace dials {
      * @param delta_m nsigma * mosaicity
      */
     MaskCalculatorTOF(const Detector &detector,
-                     const boost::python::object &scan,
-                     double delta_b,
-                     double delta_m)
-        : detector_(detector),
-          scan_(scan){
+                      const boost::python::object &scan,
+                      double delta_b,
+                      double delta_m)
+        : detector_(detector), scan_(boost::python::extract<TOFSequence>(scan)) {
       DIALS_ASSERT(delta_b > 0.0);
       DIALS_ASSERT(delta_m > 0.0);
-      vec2<int> array_range = boost::python::extract<vec2<int> >(scan.attr("get_array_range")());
+      vec2<int> array_range = scan_.get_array_range();
       index0_ = array_range[0];
       index1_ = array_range[1];
       delta_b_r_.resize(1);
@@ -628,11 +630,11 @@ namespace dials {
      * @param panel The panel number
      */
     virtual void single_with_s0(Shoebox<> &shoebox,
-                        vec3<double> s1,
-                        vec3<double> s0,
-                        double frame,
-                        std::size_t panel,
-                        bool adjacent = false) const {
+                                vec3<double> s1,
+                                vec3<double> s0,
+                                double frame,
+                                std::size_t panel,
+                                bool adjacent = false) const {
       DIALS_ASSERT(shoebox.is_consistent());
       if (shoebox.flat) {
         single_flat(shoebox, s1, s0, frame, panel);
@@ -663,10 +665,10 @@ namespace dials {
      * @param panel The list of panel numbers
      */
     virtual void array_with_s0(af::ref<Shoebox<> > shoeboxes,
-                       const af::const_ref<vec3<double> > &s1,
-                       const af::const_ref<vec3<double> > &s0,
-                       const af::const_ref<double> &frame,
-                       const af::const_ref<std::size_t> &panel) const {
+                               const af::const_ref<vec3<double> > &s1,
+                               const af::const_ref<vec3<double> > &s0,
+                               const af::const_ref<double> &frame,
+                               const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
       DIALS_ASSERT(shoeboxes.size() == panel.size());
@@ -685,23 +687,23 @@ namespace dials {
       return fraction;
     }
 
-    virtual af::shared<double> volume_with_s0(MultiPanelImageVolume<> volume,
-                                      const af::const_ref<int6> &bbox,
-                                      const af::const_ref<vec3<double> > &s1,
-                                      const af::const_ref<vec3<double> > &s0,
-                                      const af::const_ref<double> &frame,
-                                      const af::const_ref<std::size_t> &panel) const {
+    virtual af::shared<double> volume_with_s0(
+      MultiPanelImageVolume<> volume,
+      const af::const_ref<int6> &bbox,
+      const af::const_ref<vec3<double> > &s1,
+      const af::const_ref<vec3<double> > &s0,
+      const af::const_ref<double> &frame,
+      const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(bbox.size() == s1.size());
       DIALS_ASSERT(bbox.size() == frame.size());
       DIALS_ASSERT(bbox.size() == panel.size());
       af::shared<double> fraction(bbox.size());
       for (std::size_t i = 0; i < bbox.size(); ++i) {
-        fraction[i] =
-          volume_single(volume.get(panel[i]), bbox[i], s1[i], s0[i], frame[i], panel[i], i);
+        fraction[i] = volume_single(
+          volume.get(panel[i]), bbox[i], s1[i], s0[i], frame[i], panel[i], i);
       }
       return fraction;
     }
-
 
   private:
     template <typename FloatType>
@@ -887,12 +889,11 @@ namespace dials {
           double dxy = std::min(std::min(dxy1, dxy2), std::min(dxy3, dxy4));
           for (std::size_t k = 0; k < zsize; ++k) {
             if (z0 + (int)k >= index0_ && z0 + (int)k < index1_) {
-              double wavelength1 = boost::python::extract<double>(scan_.attr("get_wavelength_from_frame")(z0+k-index0_));
-              double wavelength2 = boost::python::extract<double>(scan_.attr("get_wavelength_from_frame")(z0+k+1-index0_));
-              double gz1 =
-                cs.from_wavelength(wavelength1);
-              double gz2 =
-                cs.from_wavelength(wavelength2);
+              double wavelength1 = scan_.get_wavelength_from_frame(z0 + k - index0_);
+              double wavelength2 =
+                scan_.get_wavelength_from_frame(z0 + k + 1 - index0_);
+              double gz1 = cs.from_wavelength(wavelength1);
+              double gz2 = cs.from_wavelength(wavelength2);
               double gz = std::abs(gz1) < std::abs(gz2) ? gz1 : gz2;
               double gzc2 = gz * gz * delta_m_r2;
               if (!adjacent) {
@@ -991,7 +992,7 @@ namespace dials {
     }
 
     Detector detector_;
-    boost::python::object scan_;
+    TOFSequence scan_;
     int index0_;
     int index1_;
     af::shared<double> delta_b_r_;
@@ -1016,8 +1017,8 @@ namespace dials {
                      const Detector &detector,
                      double delta_b,
                      double delta_m)
-        : detector_(detector), 
-        s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0")())) {
+        : detector_(detector),
+          s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0")())) {
       DIALS_ASSERT(delta_b > 0.0);
       DIALS_ASSERT(delta_m >= 0.0);
       delta_b_r_ = 1.0 / delta_b;
@@ -1101,11 +1102,11 @@ namespace dials {
      * @param panel The panel number
      */
     virtual void single_with_s0(Shoebox<> &shoebox,
-                        vec3<double> s1,
-                        vec3<double> s0,
-                        double frame,
-                        std::size_t panel_number,
-                        bool adjacent = false) const {
+                                vec3<double> s1,
+                                vec3<double> s0,
+                                double frame,
+                                std::size_t panel_number,
+                                bool adjacent = false) const {
       DIALS_ASSERT(shoebox.is_consistent());
       // Get some bits from the shoebox
       af::ref<int, af::c_grid<3> > mask = shoebox.mask.ref();
@@ -1190,10 +1191,10 @@ namespace dials {
      * @param panel The list of panel numbers
      */
     virtual void array_with_s0(af::ref<Shoebox<> > shoeboxes,
-                       const af::const_ref<vec3<double> > &s1,
-                       const af::const_ref<vec3<double> > &s0,
-                       const af::const_ref<double> &frame,
-                       const af::const_ref<std::size_t> &panel) const {
+                               const af::const_ref<vec3<double> > &s1,
+                               const af::const_ref<vec3<double> > &s0,
+                               const af::const_ref<double> &frame,
+                               const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
       DIALS_ASSERT(shoeboxes.size() == panel.size());
@@ -1218,12 +1219,13 @@ namespace dials {
       return fraction;
     }
 
-    virtual af::shared<double> volume_with_s0(MultiPanelImageVolume<> volume,
-                                      const af::const_ref<int6> &bbox,
-                                      const af::const_ref<vec3<double> > &s1,
-                                      const af::const_ref<vec3<double> > &s0,
-                                      const af::const_ref<double> &frame,
-                                      const af::const_ref<std::size_t> &panel) const {
+    virtual af::shared<double> volume_with_s0(
+      MultiPanelImageVolume<> volume,
+      const af::const_ref<int6> &bbox,
+      const af::const_ref<vec3<double> > &s1,
+      const af::const_ref<vec3<double> > &s0,
+      const af::const_ref<double> &frame,
+      const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(bbox.size() == s1.size());
       DIALS_ASSERT(bbox.size() == frame.size());
       DIALS_ASSERT(bbox.size() == panel.size());

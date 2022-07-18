@@ -27,18 +27,19 @@
 #include <dials/algorithms/spot_prediction/scan_varying_ray_predictor.h>
 #include <dials/algorithms/spot_prediction/stills_ray_predictor.h>
 #include <dials/algorithms/spot_prediction/ray_intersection.h>
+#include <iostream>
 
 namespace dials { namespace algorithms {
 
   using boost::shared_ptr;
   using dials::model::Ray;
-  using dxtbx::model::MonoBeam;
-  using dxtbx::model::PolyBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::is_angle_in_range;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Panel;
   using dxtbx::model::plane_ray_intersection;
+  using dxtbx::model::PolyBeam;
   using dxtbx::model::Scan;
   using scitbx::constants::pi;
   using scitbx::constants::pi_180;
@@ -76,11 +77,11 @@ namespace dials { namespace algorithms {
     }
   };
 
-  struct tof_prediction_data : prediction_data{
+  struct tof_prediction_data : prediction_data {
     af::shared<double> wavelength_cal;
     af::shared<vec3<double> > s0_cal;
 
-    tof_prediction_data(af::reflection_table &table) : prediction_data(table){
+    tof_prediction_data(af::reflection_table &table) : prediction_data(table) {
       wavelength_cal = table.get<double>("wavelength_cal");
       s0_cal = table.get<vec3<double> >("s0_cal");
     }
@@ -1332,13 +1333,12 @@ namespace dials { namespace algorithms {
     /**
      * Initialise the predictor
      */
-    TOFReflectionPredictor(
-      const PolyBeam &beam,
-      const Detector &detector,
-      mat3<double> ub,
-      const cctbx::uctbx::unit_cell &unit_cell,
-      const cctbx::sgtbx::space_group_type &space_group_type,
-      const double &dmin)
+    TOFReflectionPredictor(const PolyBeam &beam,
+                           const Detector &detector,
+                           mat3<double> ub,
+                           const cctbx::uctbx::unit_cell &unit_cell,
+                           const cctbx::sgtbx::space_group_type &space_group_type,
+                           const double &dmin)
         : beam_(beam),
           detector_(detector),
           ub_(ub),
@@ -1473,7 +1473,7 @@ namespace dials { namespace algorithms {
     void for_reflection_table_with_individual_ub(
       af::reflection_table table,
       const af::const_ref<mat3<double> > &ub) {
-      DIALS_ASSERT(ub.size() ==table.nrows());
+      DIALS_ASSERT(ub.size() == table.nrows());
       af::reflection_table new_table =
         for_hkl_with_individual_ub(table["miller_index"], table["panel"], ub);
       DIALS_ASSERT(new_table.nrows() == table.nrows());
@@ -1510,7 +1510,7 @@ namespace dials { namespace algorithms {
       ray = predict_ray_(h, ub);
       double wavelength = predict_ray_.get_wavelength();
       vec2<double> r = beam_.get_wavelength_range();
-      if (wavelength >= r[0] && wavelength <= r[1]){
+      if (wavelength >= r[0] && wavelength <= r[1]) {
         vec3<double> s0 = predict_ray_.get_s0();
         append_for_ray(p, h, ray, panel, wavelength, s0);
       }
