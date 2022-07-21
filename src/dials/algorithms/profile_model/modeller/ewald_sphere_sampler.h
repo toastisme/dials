@@ -24,9 +24,9 @@
 
 namespace dials { namespace algorithms {
 
-  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Panel;
   using dxtbx::model::Scan;
   using scitbx::vec2;
@@ -296,6 +296,11 @@ namespace dials { namespace algorithms {
      * @returns The x, y, z coordinate of the profile
      */
     double3 coord(std::size_t index) const {
+      throw DIALS_ERROR("Not implemented");
+      return double3();
+    }
+
+    double3 coord_with_panel(std::size_t index, std::size_t panel) const {
       throw DIALS_ERROR("Not implemented");
       return double3();
     }

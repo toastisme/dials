@@ -2011,14 +2011,16 @@ class SpotFrame(XrayFrame):
             )
             axis = matrix.col(imageset.get_goniometer().get_rotation_axis())
         try:
-            panel, beam_centre = detector.get_ray_intersection(beam.get_s0())
+            panel, beam_centre = detector.get_ray_intersection(beam.get_unit_s0())
         except RuntimeError as e:
             if "DXTBX_ASSERT(w_max > 0)" in str(e):
                 # direct beam didn't hit a panel
                 panel = 0
-                beam_centre = detector[panel].get_ray_intersection(beam.get_s0())
+                beam_centre = (0, 0)
+                # beam_centre = detector[panel].get_ray_intersection(beam.get_unit_s0())
             else:
-                raise
+                beam_centre = (0, 0)
+                # raise
         beam_x, beam_y = detector[panel].millimeter_to_pixel(beam_centre)
         beam_x, beam_y = self.map_coords(beam_x, beam_y, panel)
 
@@ -2028,7 +2030,7 @@ class SpotFrame(XrayFrame):
             r = A * matrix.col(h) * self.settings.basis_vector_scale
 
             if still:
-                s1 = matrix.col(beam.get_s0()) + r
+                s1 = matrix.col(beam.get_unit_s0()) + r
             else:
                 r_phi = r.rotate_around_origin(axis, phi, deg=True)
                 s1 = matrix.col(beam.get_s0()) + r_phi

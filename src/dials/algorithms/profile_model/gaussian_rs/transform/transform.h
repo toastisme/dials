@@ -23,6 +23,7 @@
 #include <dials/algorithms/profile_model/gaussian_rs/transform/map_frames.h>
 #include <dials/algorithms/profile_model/gaussian_rs/transform/beam_vector_map.h>
 #include <dials/model/data/shoebox.h>
+#include <iostream>
 
 namespace dials {
   namespace algorithms {
@@ -41,9 +42,9 @@ namespace dials {
     using dials::model::Foreground;
     using dials::model::Shoebox;
     using dials::model::Valid;
-    using dxtbx::model::MonoBeam;
     using dxtbx::model::Detector;
     using dxtbx::model::Goniometer;
+    using dxtbx::model::MonoBeam;
     using dxtbx::model::Scan;
     using dxtbx::model::TOFSequence;
     using scitbx::vec2;
@@ -70,7 +71,7 @@ namespace dials {
     class TransformSpec {
     public:
       /*
-       * Initialise the class
+       * Initialise the classTOFReflectionPredictorPy
        * @param beam The beam model
        * @param detector The detector model
        * @param gonio The goniometer model
@@ -255,10 +256,10 @@ namespace dials {
         // Calculate the fraction of intensity contributed from each data
         // frame to each grid coordinate
         vec2<int> zrange(bbox[4], bbox[5]);
-        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        std::string sequence_type = boost::python::extract<std::string>(
+          spec.scan().attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "Scan");
         Scan scan = boost::python::extract<Scan>(spec.scan());
-
 
         // Create the frame mapper
         MapFramesForward<FloatType> map_frames_forward(scan.get_array_range()[0],
@@ -269,13 +270,12 @@ namespace dials {
                                                        spec.grid_size()[2] / 2);
         zfraction_arr_ = map_frames_forward(zrange, cs.phi(), cs.zeta());
 
-        MapFramesReverse<FloatType> map_frames_backward(
-          scan.get_array_range()[0],
-          scan.get_oscillation()[0],
-          scan.get_oscillation()[1],
-          spec.sigma_m(),
-          spec.n_sigma(),
-          spec.grid_size()[2] / 2);
+        MapFramesReverse<FloatType> map_frames_backward(scan.get_array_range()[0],
+                                                        scan.get_oscillation()[0],
+                                                        scan.get_oscillation()[1],
+                                                        spec.sigma_m(),
+                                                        spec.n_sigma(),
+                                                        spec.grid_size()[2] / 2);
         efraction_arr_ = map_frames_backward(zrange, cs.phi(), cs.zeta());
       }
 
@@ -620,7 +620,8 @@ namespace dials {
           }
         }
 
-        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        std::string sequence_type = boost::python::extract<std::string>(
+          spec.scan().attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "Scan");
         Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
@@ -729,8 +730,7 @@ namespace dials {
           background_ = af::versa<double, af::c_grid<3> >(accessor, 0);
         }
 
-
-        for (std::size_t k=0; k< grid_size[0]; ++k){
+        for (std::size_t k = 0; k < grid_size[0]; ++k) {
           for (std::size_t j = 0; j < grid_size[1]; ++j) {
             for (std::size_t i = 0; i < grid_size[2]; ++i) {
               mask_(k, j, i) = true;
@@ -762,7 +762,8 @@ namespace dials {
         af::versa<vec2<double>, af::c_grid<2> > xy(
           af::c_grid<2>(data_.accessor()[1] + 1, data_.accessor()[2] + 1));
 
-        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        std::string sequence_type = boost::python::extract<std::string>(
+          spec.scan().attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "TOFSequence");
         TOFSequence scan = boost::python::extract<TOFSequence>(spec.scan());
         // Compute the frame numbers of each slice on the grid
@@ -777,10 +778,11 @@ namespace dials {
             xyp[0] -= bbox[0];
             xyp[1] -= bbox[2];
             xy(j, i) = xyp;
-            for (std::size_t k = 0; k <= data_.accessor()[0]; ++k){
+            for (std::size_t k = 0; k <= data_.accessor()[0]; ++k) {
               double c3 = zoff + k * zstep;
               double wavelength = cs.to_wavelength(c3, s1p);
-              double frame = boost::python::extract<double>(spec.scan().attr("get_frame_from_wavelength")(wavelength));
+              double frame = boost::python::extract<double>(
+                spec.scan().attr("get_frame_from_wavelength")(wavelength));
               z[k] = frame - bbox[4];
             }
           }
@@ -834,7 +836,7 @@ namespace dials {
                     int z1 = std::min((int)zs, (int)std::ceil(f01));
                     DIALS_ASSERT(z0 >= 0 && z1 <= (int)zs);
                     for (int kk = z0; kk < z1; ++kk) {
-                      if (mask(kk, jj, ii)) {
+                      if (mask_(kk, jj, ii)) {
                         std::size_t f10 = kk;
                         std::size_t f11 = kk + 1;
                         double f0 = std::max(f00, (double)f10);
@@ -927,7 +929,8 @@ namespace dials {
             xy(j, i) = xyp;
           }
         }
-        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        std::string sequence_type = boost::python::extract<std::string>(
+          spec.scan().attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "Scan");
         Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid
@@ -1077,7 +1080,8 @@ namespace dials {
             xy(j, i) = xyp;
           }
         }
-        std::string sequence_type = boost::python::extract<std::string>(spec.scan().attr("__class__").attr("__name__"));
+        std::string sequence_type = boost::python::extract<std::string>(
+          spec.scan().attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "Scan");
         Scan scan = boost::python::extract<Scan>(spec.scan());
         // Compute the frame numbers of each slice on the grid

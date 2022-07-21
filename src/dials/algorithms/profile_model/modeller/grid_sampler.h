@@ -16,6 +16,7 @@
 #include <dials/algorithms/profile_model/modeller/sampler_interface.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
 #include <dials/error.h>
+#include <iostream>
 
 namespace dials { namespace algorithms {
 
@@ -33,7 +34,7 @@ namespace dials { namespace algorithms {
      * @param volume_size The size of the volume to sample
      * @param grid_size The number of grid points
      */
-    GridSampler(int2 image_size, int2 scan_range, int3 grid_size, int num_panels=1)
+    GridSampler(int2 image_size, int2 scan_range, int3 grid_size, int num_panels = 1)
         : image_size_(image_size),
           scan_range_(scan_range),
           scan_size_(scan_range[1] - scan_range[0]),
@@ -130,12 +131,17 @@ namespace dials { namespace algorithms {
      * @returns The weight (between 1.0 and 0.0)
      */
     double weight(std::size_t index, std::size_t panel, double3 xyz) const {
-      double3 c = coord(index);
+      double3 c = coord_with_panel(index, panel);
       double dx = (c[0] - xyz[0]) / step_size_[0];
       double dy = (c[1] - xyz[1]) / step_size_[1];
       double dz = (c[2] - xyz[2]) / step_size_[2];
-      double d = std::sqrt(dx * dx + dy * dy + dz * dz);
-      return std::exp(-4.0 * d * d * std::log(2.0));
+      double d = dx * dx + dy * dy + dz * dz;
+      return std::exp(-4 * d * std::log(2.0));
+    }
+
+    double3 coord(std::size_t index) const {
+      throw DIALS_ERROR("Not implemented");
+      return double3();
     }
 
     /**
@@ -143,7 +149,8 @@ namespace dials { namespace algorithms {
      * @param index The index of the reference profile.
      * @returns The x, y, z coordinate of the profile
      */
-    double3 coord(std::size_t index) const {
+    double3 coord_with_panel(std::size_t index, std::size_t panel) const {
+      index = (std::size_t)index / (panel + 1);
       DIALS_ASSERT(index < size());
       int i = index % grid_size_[0];
       int jk = index / grid_size_[0];
@@ -188,12 +195,12 @@ namespace dials { namespace algorithms {
     /**
      * Create a profile index
      */
-    std::size_t index(
-      std::size_t ix, 
-      std::size_t iy, 
-      std::size_t iz,
-      std::size_t panel) const {
-      return (panel+1) * (ix + iy * grid_size_[0] + iz * grid_size_[0] * grid_size_[1]);
+    std::size_t index(std::size_t ix,
+                      std::size_t iy,
+                      std::size_t iz,
+                      std::size_t panel) const {
+      return (panel + 1)
+             * (ix + iy * grid_size_[0] + iz * grid_size_[0] * grid_size_[1]);
     }
 
     int2 image_size_;

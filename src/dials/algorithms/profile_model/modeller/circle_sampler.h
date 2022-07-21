@@ -176,6 +176,11 @@ namespace dials { namespace algorithms {
       return std::exp(-4.0 * d * d * std::log(2.0));
     }
 
+    double3 coord_with_panel(std::size_t index, std::size_t panel) const {
+      throw DIALS_ERROR("Not implemented");
+      return double3();
+    }
+
     /**
      * Get the x, y, z coordinate of the reference profile at the given index.
      * @param index The index of the reference profile.

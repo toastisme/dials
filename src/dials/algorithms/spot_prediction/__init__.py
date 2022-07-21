@@ -131,16 +131,20 @@ class TOFReflectionPredictorPy:
         xyz = cctbx.array_family.flex.vec3_double(len(reflection_table))
         for i in range(len(reflection_table)):
             wavelength = reflection_table["wavelength_cal"][i]
+            frame = float(interpolate.splev(wavelength, spline_coefficients))
+            """
             frame = min(
                 max(
                     frames[0], float(interpolate.splev(wavelength, spline_coefficients))
                 ),
                 frames[-1],
             )
+            """
             xyz[i] = (x[i], y[i], frame)
-
+        x, y, z = xyz.parts()
         reflection_table["xyzcal.px"] = xyz
-        return reflection_table
+        sel = z > frames[0]
+        return reflection_table.select(sel)
 
     def for_reflection_table(self, reflections, UB):
         return self.predictor.for_reflection_table(reflections, UB)
