@@ -21,6 +21,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def("model", &T::model)
       .def("fit", &T::fit)
       .def("validate", &T::validate)
+      .def("panel", &T::panel)
       .def("accumulate", &T::accumulate)
       //.def("finalize", &T::finalize)
       .def("finalized", &T::finalized)

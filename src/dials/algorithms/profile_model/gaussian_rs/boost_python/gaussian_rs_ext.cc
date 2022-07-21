@@ -144,6 +144,7 @@ namespace dials {
                   int,
                   int>())
         .def("coord", &GaussianRSProfileModeller::coord)
+        .def("coord_with_panel", &GaussianRSProfileModeller::coord_with_panel)
         .def("model", &GaussianRSProfileModeller::model, (arg("reflections")))
         .def("model_tof", &GaussianRSProfileModeller::model_tof, (arg("reflections")))
         .def("fit_reciprocal_space",
@@ -153,6 +154,10 @@ namespace dials {
              &GaussianRSProfileModeller::fit_reciprocal_space_tof,
              (arg("reflections")))
         .def("normalize_profiles", &GaussianRSProfileModeller::normalize_profiles)
+        .def("nearest_profile", &GaussianRSProfileModeller::nearest_profile)
+        .def("nearest_n_profiles", &GaussianRSProfileModeller::nearest_n_profiles)
+        .def("profile_weight", &GaussianRSProfileModeller::profile_weight)
+        .def("profile_coord", &GaussianRSProfileModeller::profile_coord)
         .def_pickle(GaussianRSProfileModellerPickleSuite());
 
       scope in_modeller = result;
@@ -228,7 +233,6 @@ namespace dials {
         .def("__call__",
              &BBoxCalculatorTOF::array,
              (arg("s0"), arg("s1"), arg("frame"), arg("panel")));
-          
 
       class_<BBoxMultiCalculator>("BBoxMultiCalculator")
         .def("append", &BBoxMultiCalculator::push_back)
@@ -253,7 +257,12 @@ namespace dials {
              (arg("shoebox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")))
         .def("__call__",
              &MaskCalculatorIface::volume_with_s0,
-             (arg("volume"), arg("bbox"), arg("s1"), arg("s0"), arg("frame"), arg("panel")));
+             (arg("volume"),
+              arg("bbox"),
+              arg("s1"),
+              arg("s0"),
+              arg("frame"),
+              arg("panel")));
 
       class_<PartialityCalculatorIface, boost::noncopyable>("PartialityCalculatorIface",
                                                             no_init)
@@ -266,8 +275,11 @@ namespace dials {
 
       class_<PartialityCalculator3D, bases<PartialityCalculatorIface> >(
         "PartialityCalculator3D", no_init)
-        .def(init<const boost::python::object&, const Goniometer&, const boost::python::object&, double>(
-          (arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))))
+        .def(
+          init<const boost::python::object&,
+               const Goniometer&,
+               const boost::python::object&,
+               double>((arg("beam"), arg("goniometer"), arg("scan"), arg("delta_m"))))
         .def(init<const boost::python::object&,
                   const Goniometer&,
                   const boost::python::object&,
@@ -318,10 +330,10 @@ namespace dials {
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
 
-      class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF", no_init)
+      class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF",
+                                                             no_init)
         .def(init<const Detector&, const boost::python::object&, double, double>(
-          (
-           arg("detector"),
+          (arg("detector"),
            arg("scan"),
            arg("delta_divergence"),
            arg("delta_mosaicity"))));
@@ -387,8 +399,7 @@ namespace dials {
 
       // Export coordinate system
       class_<CoordinateSystemTOF>("CoordinateSystemTOF", no_init)
-        .def(init<vec3<double>, vec3<double> >(
-          (arg("s0"), arg("s1"))))
+        .def(init<vec3<double>, vec3<double> >((arg("s0"), arg("s1"))))
         .def("s0", &CoordinateSystemTOF::s0)
         .def("s1", &CoordinateSystemTOF::s1)
         .def("p_star", &CoordinateSystemTOF::p_star)

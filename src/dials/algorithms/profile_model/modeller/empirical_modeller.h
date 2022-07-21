@@ -16,6 +16,7 @@
 #include <boost/pointer_cast.hpp>
 #include <dials/array_family/scitbx_shared_and_versa.h>
 #include <dials/algorithms/profile_model/modeller/modeller_interface.h>
+#include <iostream>
 
 namespace dials { namespace algorithms {
 
@@ -34,6 +35,7 @@ namespace dials { namespace algorithms {
         : data_(n),
           mask_(n),
           n_reflections_(n, 0),
+          panel_(n),
           accessor_(af::c_grid<3>(datasize[0], datasize[1], datasize[2])),
           threshold_(threshold),
           finalized_(false) {
@@ -52,7 +54,8 @@ namespace dials { namespace algorithms {
      */
     void add(const af::const_ref<std::size_t> &indices,
              const af::const_ref<double> &weights,
-             data_const_reference profile) {
+             data_const_reference profile,
+             int _panel = 0) {
       DIALS_ASSERT(finalized_ == false);
       DIALS_ASSERT(indices.size() == weights.size());
       DIALS_ASSERT(indices.size() > 0);
@@ -75,6 +78,7 @@ namespace dials { namespace algorithms {
             data[i] += weight * profile[i] / sum_data;
           }
           n_reflections_[index]++;
+          panel_[index] = _panel;
         }
       }
     }
@@ -85,7 +89,10 @@ namespace dials { namespace algorithms {
      * @param weight The weight to give the profile
      * @param profile The profile data
      */
-    void add_single(std::size_t index, double weight, data_const_reference profile) {
+    void add_single(std::size_t index,
+                    double weight,
+                    data_const_reference profile,
+                    int panel = 0) {
       DIALS_ASSERT(finalized_ == false);
       DIALS_ASSERT(profile.accessor().all_eq(accessor_));
       DIALS_ASSERT(index < data_.size());
@@ -103,6 +110,7 @@ namespace dials { namespace algorithms {
           data[i] += weight * profile[i] / sum_data;
         }
         n_reflections_[index]++;
+        panel_[index] = panel;
       }
     }
 
@@ -249,6 +257,11 @@ namespace dials { namespace algorithms {
       return mask_[index].size() != 0;
     }
 
+    int panel(std::size_t index) const {
+      DIALS_ASSERT(index < panel_.size());
+      return panel_[index];
+    }
+
     /**
      * @return The number of reflections used
      */
@@ -314,8 +327,8 @@ namespace dials { namespace algorithms {
       }
 
       // Normalize the profile such that sum of signal pixels == 1
-      //DIALS_ASSERT(signal_sum > 0);
-      if (signal_sum <= 0){
+      // DIALS_ASSERT(signal_sum > 0);
+      if (signal_sum <= 0) {
         return;
       }
       for (std::size_t i = 0; i < data.size(); ++i) {
@@ -327,6 +340,7 @@ namespace dials { namespace algorithms {
     af::shared<mask_type> mask_;
     af::shared<std::size_t> n_reflections_;
     af::c_grid<3> accessor_;
+    af::shared<int> panel_;
     double threshold_;
     bool finalized_;
   };

@@ -20,20 +20,21 @@
 #include <dials/algorithms/profile_model/modeller/circle_sampler.h>
 #include <dials/algorithms/profile_model/modeller/ewald_sphere_sampler.h>
 #include <dials/algorithms/integration/fit/fitting.h>
-#include<iostream>
+#include <iostream>
 
 namespace dials { namespace algorithms {
 
   using dials::algorithms::profile_model::gaussian_rs::CoordinateSystem;
   using dials::algorithms::profile_model::gaussian_rs::CoordinateSystemTOF;
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformForward;
-  using dials::algorithms::profile_model::gaussian_rs::transform::TransformForwardNoModel;
+  using dials::algorithms::profile_model::gaussian_rs::transform::
+    TransformForwardNoModel;
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformReverse;
   using dials::algorithms::profile_model::gaussian_rs::transform::TransformSpec;
   using dials::model::Shoebox;
-  using dxtbx::model::MonoBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
+  using dxtbx::model::MonoBeam;
   using dxtbx::model::Scan;
 
   /**
@@ -48,7 +49,7 @@ namespace dials { namespace algorithms {
       SphericalGrid = 4,
     };
 
-    enum FitMethod { ReciprocalSpace = 1, DetectorSpace = 2, TOF = 3};
+    enum FitMethod { ReciprocalSpace = 1, DetectorSpace = 2, TOF = 3 };
 
     GaussianRSProfileModellerBase(const boost::python::object &beam,
                                   const Detector &detector,
@@ -98,23 +99,27 @@ namespace dials { namespace algorithms {
         sampler = boost::make_shared<SingleSampler>(scan_range, num_scan_points);
         break;
       case RegularGrid:
-        //DIALS_ASSERT(detector.size() == 1);
-        sampler = boost::make_shared<GridSampler>(
-          detector[0].get_image_size(), scan_range, int3(3, 3, num_scan_points),
-          detector.size());
+        // DIALS_ASSERT(detector.size() == 1);
+        sampler = boost::make_shared<GridSampler>(detector[0].get_image_size(),
+                                                  scan_range,
+                                                  int3(3, 3, num_scan_points),
+                                                  detector.size());
         break;
       case CircularGrid:
         DIALS_ASSERT(detector.size() == 1);
         sampler = boost::make_shared<CircleSampler>(
           detector[0].get_image_size(), scan_range, num_scan_points);
         break;
-      case SphericalGrid:{
-        std::string sequence_type = boost::python::extract<std::string>(scan.attr("__class__").attr("__name__"));
+      case SphericalGrid: {
+        std::string sequence_type =
+          boost::python::extract<std::string>(scan.attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "Scan");
         Scan rot_scan = boost::python::extract<Scan>(scan);
-        std::string beam_type = boost::python::extract<std::string>(beam.attr("__class__").attr("__name__"));
+        std::string beam_type =
+          boost::python::extract<std::string>(beam.attr("__class__").attr("__name__"));
         DIALS_ASSERT(beam_type == "MonoBeam");
-        boost::shared_ptr<MonoBeam> mono_beam = boost::python::extract<boost::shared_ptr<MonoBeam> >(beam);      
+        boost::shared_ptr<MonoBeam> mono_beam =
+          boost::python::extract<boost::shared_ptr<MonoBeam> >(beam);
         sampler = boost::make_shared<EwaldSphereSampler>(
           mono_beam, detector, goniometer, rot_scan, num_scan_points);
         break;
@@ -181,8 +186,7 @@ namespace dials { namespace algorithms {
      * @param threshold The modelling threshold value
      * @param grid_method The gridding method
      */
-    GaussianRSProfileModeller(
-                              const boost::python::object beam,
+    GaussianRSProfileModeller(const boost::python::object beam,
                               const Detector &detector,
                               const Goniometer &goniometer,
                               const boost::python::object &scan,
@@ -272,14 +276,17 @@ namespace dials { namespace algorithms {
       return sampler_->coord(index);
     }
 
+    vec3<double> coord_with_panel(std::size_t index, std::size_t panel) const {
+      return sampler_->coord_with_panel(index, panel);
+    }
+
     /**
      * Model the profiles from the reflections
      * @param reflections The reflection list
      */
     void model(af::reflection_table reflections) {
-
       DIALS_ASSERT(reflections.contains("s0_cal"));
-      if (reflections.contains("s0_cal")){
+      if (reflections.contains("s0_cal")) {
         model_tof(reflections);
         return;
       }
@@ -309,7 +316,8 @@ namespace dials { namespace algorithms {
         if (check1(flags[i], partiality[i], sbox[i])) {
           // Create the coordinate system
           vec3<double> m2 = spec_.goniometer().get_rotation_axis();
-          vec3<double> s0 = boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
+          vec3<double> s0 =
+            boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
           CoordinateSystem cs(m2, s0, s1[i], xyzmm[i][2]);
 
           // Create the data array
@@ -365,7 +373,6 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(reflections.contains("s0_cal"));
       DIALS_ASSERT(reflections.contains("wavelength_cal"));
 
-
       // Get some data
       af::const_ref<Shoebox<> > sbox = reflections["shoebox"];
       af::const_ref<double> partiality = reflections["partiality"];
@@ -374,8 +381,6 @@ namespace dials { namespace algorithms {
       af::const_ref<vec3<double> > xyzpx = reflections["xyzcal.px"];
       af::const_ref<vec3<double> > xyzmm = reflections["xyzcal.mm"];
       af::ref<std::size_t> flags = reflections["flags"];
-
-       
 
       // Loop through all the reflections and add them to the model
       for (std::size_t i = 0; i < reflections.size(); ++i) {
@@ -410,12 +415,15 @@ namespace dials { namespace algorithms {
             sampler_->nearest_n(sbox[i].panel, xyzpx[i]);
           af::shared<double> weights(indices.size());
           for (std::size_t j = 0; j < indices.size(); ++j) {
-            weights[j] = sampler_->weight(indices[j], sbox[i].panel, xyzpx[i]);
+            double weight = sampler_->weight(indices[j], sbox[i].panel, xyzpx[i]);
+            weights[j] = weight;
           }
 
           // Add the profile
-          add(
-            indices.const_ref(), weights.const_ref(), transform.profile().const_ref());
+          add(indices.const_ref(),
+              weights.const_ref(),
+              transform.profile().const_ref(),
+              sbox[i].panel);
 
           // Set the flags
           flags[i] |= af::UsedInModelling;
@@ -423,6 +431,21 @@ namespace dials { namespace algorithms {
       }
     }
 
+    std::size_t nearest_profile(std::size_t panel, double3 xyz) const {
+      return sampler_->nearest(panel, xyz);
+    }
+
+    af::shared<std::size_t> nearest_n_profiles(std::size_t panel, double3 xyz) const {
+      return sampler_->nearest_n(panel, xyz);
+    }
+
+    double profile_weight(std::size_t index, std::size_t panel, double3 xyz) const {
+      return sampler_->weight(index, panel, xyz);
+    }
+
+    double3 profile_coord(std::size_t index, std::size_t panel) const {
+      return sampler_->coord_with_panel(index, panel);
+    }
 
     /**
      * Return a profile fitter
@@ -514,7 +537,8 @@ namespace dials { namespace algorithms {
 
             // Create the coordinate system
             vec3<double> m2 = spec_.goniometer().get_rotation_axis();
-            vec3<double> s0 = boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
+            vec3<double> s0 =
+              boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
             CoordinateSystem cs(m2, s0, s1[i], xyzmm[i][2]);
 
             // Create the data array
@@ -619,7 +643,8 @@ namespace dials { namespace algorithms {
 
             // Create the coordinate system
             vec3<double> m2 = spec_.goniometer().get_rotation_axis();
-            vec3<double> s0 = boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
+            vec3<double> s0 =
+              boost::python::extract<vec3<double> >(spec_.beam().attr("get_s0")());
             CoordinateSystem cs(m2, s0, s1[i], xyzmm[i][2]);
 
             // Compute the transform
@@ -736,12 +761,12 @@ namespace dials { namespace algorithms {
 
             // Compute the transform
             TransformForwardNoModel transform(spec_,
-                                               cs,
-                                               sbox[i].bbox,
-                                               sbox[i].panel,
-                                               data.const_ref(),
-                                               background.const_ref(),
-                                               mask.const_ref());
+                                              cs,
+                                              sbox[i].bbox,
+                                              sbox[i].panel,
+                                              data.const_ref(),
+                                              background.const_ref(),
+                                              mask.const_ref());
 
             // Get the transformed shoebox
             data_const_reference c = transform.profile().const_ref();
@@ -768,7 +793,7 @@ namespace dials { namespace algorithms {
             success[i] = true;
 
           } catch (dials::error const &e) {
-            //std::cout << e.what() << std::endl; 
+            // std::cout << e.what() << std::endl;
             continue;
           }
         }
@@ -805,7 +830,7 @@ namespace dials { namespace algorithms {
       return pointer(new GaussianRSProfileModeller(result));
     }
 
-   void normalize_profiles() {
+    void normalize_profiles() {
       finalize();
     }
 

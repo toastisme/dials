@@ -63,6 +63,7 @@ namespace dials { namespace algorithms {
      * @returns The x, y, z coordinate of the profile
      */
     virtual double3 coord(std::size_t index) const = 0;
+    virtual double3 coord_with_panel(std::size_t index, std::size_t panel) const = 0;
 
     /**
      * Return the neighbouring grid points.

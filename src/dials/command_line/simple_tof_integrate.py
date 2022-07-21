@@ -7,12 +7,10 @@ import cctbx.array_family.flex
 from dxtbx.model import Goniometer
 
 import dials.util.log
+import dials_array_family_flex_ext
 from dials.algorithms.integration.report import IntegrationReport, ProfileModelReport
 from dials.algorithms.profile_model.gaussian_rs import GaussianRSProfileModeller
 from dials.algorithms.profile_model.gaussian_rs import Model as GaussianRSProfileModel
-from dials.algorithms.profile_model.gaussian_rs.calculator import (
-    ComputeEsdBeamDivergence,
-)
 from dials.algorithms.shoebox import MaskCode
 from dials.array_family import flex
 from dials.command_line.integrate import process_reference
@@ -49,6 +47,39 @@ post-refinment, Acta Crystallographica Section D, 2010, D66, 133-144
 Usage:
 $ dev.dials.simple_integrate.py refined.expt refined.refl
 """
+
+
+def get_reference_profiles_as_reflections(model):
+    model_data = []
+    for i in range(len(model)):
+        if model.valid(i):
+            try:
+                panel = (model.panel(i)[0],)
+            except TypeError:
+                panel = model.panel(i)
+            coords = model.coord_with_panel(i, panel)
+            model_data.append([panel, coords])
+
+    xyz = cctbx.array_family.flex.vec3_double(len(model_data), (0, 0, 0))
+    panel_nums = cctbx.array_family.flex.size_t(len(model_data), 0)
+    bbox = dials_array_family_flex_ext.int6(len(model_data))
+    for i in range(len(model_data)):
+        panel_nums[i] = model_data[i][0]
+        xyz[i] = model_data[i][1]
+        bbox[i] = (
+            int(model_data[i][1][0] - 2),
+            int(model_data[i][1][0] + 2),
+            int(model_data[i][1][1] - 2),
+            int(model_data[i][1][1] + 2),
+            int(model_data[i][1][2] - 2),
+            int(model_data[i][1][2] + 2),
+        )
+    reflections = flex.reflection_table.empty_standard(len(model_data))
+    reflections["xyz.px.value"] = xyz
+    reflections["panel"] = panel_nums
+    reflections["bbox"] = bbox
+    reflections["flags"] = cctbx.array_family.flex.size_t(len(model_data), 32)
+    return reflections
 
 
 def run():
@@ -131,13 +162,13 @@ def run_simple_integrate(params, experiments, reflections):
     model_reflections = reflections.select(used_in_ref)
 
     # sigma_D in 3.1 of Kabsch 2010
-    sigma_b = ComputeEsdBeamDivergence(
-        experiment.detector, model_reflections, centroid_definition="s1"
-    ).sigma()
+    # sigma_b = ComputeEsdBeamDivergence(
+    #    experiment.detector, model_reflections, centroid_definition="s1"
+    # ).sigma()
 
     # sigma_m in 3.1 of Kabsch 2010
     sigma_m = 0.1
-
+    sigma_b = 0.01
     # The Gaussian model given in 2.3 of Kabsch 2010
     experiment.profile = GaussianRSProfileModel(
         params=params, n_sigma=3, sigma_b=sigma_b, sigma_m=sigma_m
@@ -219,6 +250,14 @@ def run_simple_integrate(params, experiments, reflections):
     do the actual profile fitting integration.
     """
 
+    sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
+    reference_reflections = predicted_reflections.select(sel)
+    reference_reflections.as_msgpack_file(
+        "/home/davidmcdonagh/work/dials/modules/dials/src/dials/command_line/predicted_reference.refl"
+    )
+    px, py, pz = reference_reflections["xyzobs.px.value"].parts()
+    experiment.sequence.set_image_range((int(min(pz) - 10), int(max(pz) + 10)))
+
     # Default params when running dials.integrate with C2sum_1_*.cbf.gz
     fit_method = 1  # reciprocal space fitter (called explicitly below)
     grid_method = 2  # regular grid
@@ -248,11 +287,15 @@ def run_simple_integrate(params, experiments, reflections):
     ("Learning phase" of 3.3 in Kabsch 2010)
     """
 
-    sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
-    reference_reflections = predicted_reflections.select(sel)
     sel = reference_reflections.get_flags(reference_reflections.flags.dont_integrate)
     sel = ~sel
     reference_reflections = reference_reflections.select(sel)
+    num_reflections = {}
+    for i in range(11):
+        num_reflections[i] = (reference_reflections["panel"] == i).count(True)
+    # sel = reference_reflections["panel"]==8
+    # reference_reflections = reference_reflections.select(sel)
+    # logger.info(f"Using {len(reference_reflections)} from panel 8")
     reference_profile_modeller.model(reference_reflections)
     reference_profile_modeller.normalize_profiles()
 
@@ -261,6 +304,15 @@ def run_simple_integrate(params, experiments, reflections):
     )
     logger.info("")
     logger.info(profile_model_report.as_str(prefix=" "))
+    logger.info(str(profile_model_report.num_profiles))
+    logger.info(str(num_reflections))
+    reference_profiles = get_reference_profiles_as_reflections(
+        reference_profile_modeller
+    )
+
+    reference_profiles.as_msgpack_file(
+        "/home/davidmcdonagh/work/dials/modules/dials/src/dials/command_line/reference_profiles.refl"
+    )
 
     """
     Carry out the integration by fitting to reference profiles in 1D.
@@ -270,8 +322,12 @@ def run_simple_integrate(params, experiments, reflections):
     sel = predicted_reflections.get_flags(predicted_reflections.flags.dont_integrate)
     sel = ~sel
     predicted_reflections = predicted_reflections.select(sel)
-    reference_profile_modeller.fit_reciprocal_space(predicted_reflections)
-    predicted_reflections.compute_corrections(experiments)
+
+    pred_px, pred_py, pred_pz = predicted_reflections["xyzcal.px"].parts()
+    sel = pred_pz > min(pz) and pred_pz < max(pz)
+    predicted_reflections = predicted_reflections.select(sel)
+    reference_profile_modeller.fit_reciprocal_space_tof(predicted_reflections)
+    # predicted_reflections.compute_corrections(experiments)
 
     integration_report = IntegrationReport(experiments, predicted_reflections)
     logger.info("")
@@ -281,7 +337,7 @@ def run_simple_integrate(params, experiments, reflections):
     Filter for integrated reflections and remove shoeboxes
     """
 
-    del predicted_reflections["shoebox"]
+    # del predicted_reflections["shoebox"]
     sel = predicted_reflections.get_flags(
         predicted_reflections.flags.integrated, all=False
     )

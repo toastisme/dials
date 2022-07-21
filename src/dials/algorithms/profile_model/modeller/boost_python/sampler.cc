@@ -68,6 +68,10 @@ namespace dials { namespace algorithms { namespace boost_python {
       return this->get_override("coord")(index);
     }
 
+    double3 coord_with_panel(std::size_t index, std::size_t panel) const {
+      return this->get_override("coord")(index, panel);
+    }
+
     af::shared<std::size_t> neighbours(std::size_t index) const {
       return this->get_override("neighbours")(index);
     }
@@ -80,6 +84,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def("nearest_n", pure_virtual(&SamplerIface::nearest_n))
       .def("weight", pure_virtual(&SamplerIface::weight))
       .def("coord", pure_virtual(&SamplerIface::coord))
+      .def("coord_with_panel", pure_virtual(&SamplerIface::coord_with_panel))
       .def("neighbours", pure_virtual(&SamplerIface::neighbours))
       .def("__len__", &SamplerIface::size);
 
