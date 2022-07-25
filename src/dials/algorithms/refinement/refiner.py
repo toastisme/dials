@@ -372,6 +372,7 @@ class RefinerFactory:
 
         if experiments.is_single_tof_experiment():
             obs["wavelength_resid"] = obs["wavelength_cal"] - obs["wavelength"]
+            obs["wavelength_resid2"] = (obs["wavelength_cal"] - obs["wavelength"]) ** 2
             sequence = experiments[0].sequence
             frame_resid = flex.double(len(obs))
             for i in range(len(obs)):
@@ -380,6 +381,7 @@ class RefinerFactory:
                 frame_resid[i] = frame_cal - frame
 
             obs["wavelength_resid_frame"] = frame_resid
+            obs["wavelength_resid_frame2"] = frame_resid**2
 
         else:
             obs["phi_resid"] = phi_calc - phi_obs
@@ -913,7 +915,7 @@ class Refiner:
                 # RMSD_DeltaPsi and RMSD_2theta)
                 header.append(name + "\n(deg)")
             elif name == "RMSD_wavelength" and units == "A":
-                header.append(name + f"\n({units})")
+                header.append(name + "\n(frame)")
             else:  # skip other/unknown RMSDs
                 pass
 
@@ -954,7 +956,7 @@ class Refiner:
                     rmsds.append(rmsd * images_per_rad)
                 elif units == "rad":
                     rmsds.append(rmsd * RAD2DEG)
-                elif name == "RMSD_wavelength" and units == "A":
+                elif name == "RMSD_wavelength_frame" and units == "frame":
                     rmsds.append(rmsd)
             rows.append([str(iexp), str(num)] + [f"{r:.5g}" for r in rmsds])
 

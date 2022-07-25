@@ -107,7 +107,12 @@ class ExperimentsPredictor:
 class TOFExperimentsPredictor(ExperimentsPredictor):
     def _predict_one_experiment(self, experiment, reflections):
 
-        dmin = experiment.detector.get_max_resolution(min(reflections["s0"]))
+        min_s0_idx = min(
+            range(len(reflections["wavelength"])),
+            key=reflections["wavelength"].__getitem__,
+        )
+        min_s0 = reflections["s0"][min_s0_idx]
+        dmin = experiment.detector.get_max_resolution(min_s0)
         predictor = TOFReflectionPredictorPy(experiment, dmin)
         UB = experiment.crystal.get_A()
         predictor.for_reflection_table(reflections, UB)

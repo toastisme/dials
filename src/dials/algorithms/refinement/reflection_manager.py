@@ -269,7 +269,9 @@ class ReflectionManagerFactory:
         if params.outlier.algorithm in ("null", None):
             outlier_detector = None
         else:
-            if do_stills:
+            if experiments.is_single_tof_experiment():
+                colnames = ["x_resid", "y_resid", "wavelength_resid"]
+            elif do_stills:
                 colnames = ["x_resid", "y_resid"]
                 params.outlier.block_width = None
             else:
@@ -687,7 +689,13 @@ class ReflectionManager:
             phi_resid = l["phi_resid"]
             w_x, w_y, w_phi = l["xyzobs.mm.weights"].parts()
         except KeyError:
-            return
+            try:
+                x_resid = l["x_resid"]
+                y_resid = l["y_resid"]
+                phi_resid = l["wavelength_resid"]
+                w_x, w_y, w_phi = l["xyzobs.mm.weights"].parts()
+            except KeyError:
+                return
 
         msg = (
             f"\nSummary statistics for {nref} observations" + " matched to predictions:"
@@ -811,7 +819,7 @@ class TOFReflectionManager(ReflectionManager):
     reflections too close to the spindle, and reports only information
     about X, and Y residuals"""
 
-    _weighting_strategy = weighting_strategies.StillsWeightingStrategy()
+    _weighting_strategy = weighting_strategies.TOFWeightingStrategy()
     experiment_type = "ToF"
 
     def _id_refs_to_keep(self, obs_data):
@@ -848,9 +856,10 @@ class TOFReflectionManager(ReflectionManager):
         try:
             x_resid = l["x_resid"]
             y_resid = l["y_resid"]
-            w_x, w_y, _ = l["xyzobs.mm.weights"].parts()
+            wavelength_resid = l["wavelength_resid"]
+            w_x, w_y, w_z = l["xyzobs.mm.weights"].parts()
         except KeyError:
-            return
+            raise
 
         header = ["", "Min", "Q1", "Med", "Q3", "Max"]
         rows = []
@@ -858,10 +867,14 @@ class TOFReflectionManager(ReflectionManager):
         rows.append(["Xc - Xo (mm)"] + [f"{e:.4g}" for e in row_data])
         row_data = five_number_summary(y_resid)
         rows.append(["Yc - Yo (mm)"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(wavelength_resid)
+        rows.append(["Wavelengthc - Wavelengtho (A)"] + [f"{e:.4g}" for e in row_data])
         row_data = five_number_summary(w_x)
         rows.append(["X weights"] + [f"{e:.4g}" for e in row_data])
         row_data = five_number_summary(w_y)
         rows.append(["Y weights"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(w_z)
+        rows.append(["Wavelength weights"] + [f"{e:.4g}" for e in row_data])
 
         msg = (
             f"\nSummary statistics for {nref} observations" + " matched to predictions:"

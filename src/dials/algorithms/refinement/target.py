@@ -658,7 +658,7 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
     in terms of detector impact position X, Y, terminating on achieved
     rmsd (or on intrisic convergence of the chosen minimiser)"""
 
-    _grad_names = ["dX_dp", "dY_dp"]
+    _grad_names = ["dX_dp", "dY_dp", "dwavelength_dp"]
     rmsd_names = ["RMSD_X", "RMSD_Y", "RMSD_wavelength", "RMSD_wavelength_frame"]
     rmsd_units = ["mm", "mm", "A", "frame"]
 
@@ -706,9 +706,11 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
 
         # return residuals and weights as 1d flex.double vectors
         residuals = flex.double.concatenate(matches["x_resid"], matches["y_resid"])
+        residuals.extend(matches["wavelength_resid"])
 
         weights, w_y, w_z = matches["xyzobs.mm.weights"].parts()
         weights.extend(w_y)
+        weights.extend(w_z)
 
         return residuals, weights
 
@@ -716,6 +718,7 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
     def _extract_squared_residuals(matches):
 
         residuals2 = flex.double.concatenate(matches["x_resid2"], matches["y_resid2"])
+        residuals2.extend(matches["wavelength_resid2"])
 
         return residuals2
 
@@ -724,8 +727,8 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
 
         resid_x = flex.sum(reflections["x_resid2"])
         resid_y = flex.sum(reflections["y_resid2"])
-        resid_wavelength = flex.sum(reflections["wavelength_resid"])
-        resid_frame = flex.sum(reflections["wavelength_resid_frame"])
+        resid_wavelength = flex.sum(reflections["wavelength_resid2"])
+        resid_frame = flex.sum(reflections["wavelength_resid_frame2"])
         n = len(reflections)
 
         rmsds = (
@@ -743,7 +746,11 @@ class TOFLeastSquaresPositionalResidualWithRmsdCutoff(Target):
         # reset cached rmsds to avoid getting out of step
         self._rmsds = None
 
-        if r[0] < self._binsize_cutoffs[0] and r[1] < self._binsize_cutoffs[1]:
+        if (
+            r[0] < self._binsize_cutoffs[0]
+            and r[1] < self._binsize_cutoffs[1]
+            and r[2] < self._binsize_cutoffs[2]
+        ):
             return True
         return False
 
