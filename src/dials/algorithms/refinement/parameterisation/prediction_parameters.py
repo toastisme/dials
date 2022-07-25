@@ -651,7 +651,6 @@ class PredictionParameterisation:
     def _grads_beam_loop(self, reflections, results, callback=None):
         """Loop over all beam parameterisations, calculate gradients and extend
         the results"""
-
         return self._grads_model_loop(
             self._beam_parameterisations,
             reflections,
@@ -979,13 +978,16 @@ class TOFPredictionParameterisation(PredictionParameterisation):
     """A basic extension to PredictionParameterisation for ToF data,
     where only panel positions are considered."""
 
-    _grad_names = ("dX_dp", "dY_dp")
+    _grad_names = ("dX_dp", "dY_dp", "dwavelength_dp")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         return
 
     def _local_setup(self, reflections):
+        self._wavelength = reflections["wavelength_cal"]
+        self._r = self._UB * self._h
+        self._s0 = reflections["s0_cal"]
         return
 
     def _xl_derivatives(self, isel, derivatives, b_matrix, parameterisation=None):
@@ -999,6 +1001,9 @@ class TOFPredictionParameterisation(PredictionParameterisation):
         else:
             U = self._U.select(isel)
         D = self._D.select(isel)
+        s1 = self._s1.select(isel)
+        s0 = self._s0.select(isel)
+        wavelength = self._wavelength.select(isel)
 
         if derivatives is None:
             # get derivatives of the B/U matrix wrt the parameters
@@ -1008,11 +1013,13 @@ class TOFPredictionParameterisation(PredictionParameterisation):
             ]
 
         dpv_dp = []
+        dwavelength_dp = []
 
         # loop through the parameters
         for der in derivatives:
             if der is None:
                 dpv_dp.append(None)
+                dwavelength_dp.append(None)
                 continue
 
             # calculate the derivative of r for this parameter
@@ -1021,10 +1028,12 @@ class TOFPredictionParameterisation(PredictionParameterisation):
             else:
                 dr = U * der * h
 
+            dwavelength = (-wavelength) * (dr.dot(s1)) / (s0.dot(s0))
+            dwavelength_dp.append(dwavelength)
             # calculate the derivative of pv for this parameter
-            dpv_dp.append(D * dr)
+            dpv_dp.append(D * (dr + (s0 / wavelength) * dwavelength))
 
-        return dpv_dp, [None for i in dpv_dp]
+        return dpv_dp, dwavelength_dp
 
     def _xl_orientation_derivatives(
         self, isel, parameterisation=None, dU_dxlo_p=None, reflections=None
