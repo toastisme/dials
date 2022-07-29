@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
 
 import cctbx.array_family.flex
 from dxtbx.model import Goniometer
@@ -82,6 +83,25 @@ def get_reference_profiles_as_reflections(model):
     return reflections
 
 
+def split_reflections(reflections, n, by_panel=False):
+    if by_panel:
+        for i in range(max(reflections["panel"]) + 1):
+            sel = reflections["panel"] == i
+            yield reflections.select(sel)
+    else:
+        d, r = divmod(len(reflections), n)
+        for i in range(n):
+            si = (d + 1) * (i if i < r else r) + d * (0 if i < r else i - r)
+            yield reflections[si : si + (d + 1 if i < r else d)]
+
+
+def join_reflections(list_of_reflections):
+    reflections = list_of_reflections[0]
+    for i in range(1, len(list_of_reflections)):
+        reflections.extend(list_of_reflections[i])
+    return reflections
+
+
 def run():
 
     """
@@ -121,6 +141,8 @@ def run():
 
 
 def run_simple_integrate(params, experiments, reflections):
+    nproc = 11
+    pool = multiprocessing.Pool(nproc)
 
     experiment = experiments[0]
 
@@ -160,11 +182,6 @@ def run_simple_integrate(params, experiments, reflections):
     # Filter reflections to use to create the model
     used_in_ref = reflections.get_flags(reflections.flags.used_in_refinement)
     model_reflections = reflections.select(used_in_ref)
-
-    # sigma_D in 3.1 of Kabsch 2010
-    # sigma_b = ComputeEsdBeamDivergence(
-    #    experiment.detector, model_reflections, centroid_definition="s1"
-    # ).sigma()
 
     # sigma_m in 3.1 of Kabsch 2010
     sigma_m = 0.1
@@ -266,10 +283,11 @@ def run_simple_integrate(params, experiments, reflections):
     num_scan_points = 72
     n_sigma = 4.5  # multiplier to expand bounding boxes
     fitting_threshold = 0.02
+    goniometer = Goniometer()
     reference_profile_modeller = GaussianRSProfileModeller(
         experiment.beam,
         experiment.detector,
-        Goniometer(),
+        goniometer,
         experiment.sequence,
         sigma_b,
         sigma_m,
@@ -290,13 +308,13 @@ def run_simple_integrate(params, experiments, reflections):
     sel = reference_reflections.get_flags(reference_reflections.flags.dont_integrate)
     sel = ~sel
     reference_reflections = reference_reflections.select(sel)
-    num_reflections = {}
-    for i in range(11):
-        num_reflections[i] = (reference_reflections["panel"] == i).count(True)
-    # sel = reference_reflections["panel"]==8
-    # reference_reflections = reference_reflections.select(sel)
-    # logger.info(f"Using {len(reference_reflections)} from panel 8")
-    reference_profile_modeller.model(reference_reflections)
+    processes = [
+        pool.apply_async(reference_profile_modeller.model_tof_return, args=(r,))
+        for r in split_reflections(reference_reflections, nproc, by_panel=True)
+    ]
+    result = [p.get() for p in processes]
+    for i in result:
+        reference_profile_modeller.accumulate(i)
     reference_profile_modeller.normalize_profiles()
 
     profile_model_report = ProfileModelReport(
@@ -304,8 +322,6 @@ def run_simple_integrate(params, experiments, reflections):
     )
     logger.info("")
     logger.info(profile_model_report.as_str(prefix=" "))
-    logger.info(str(profile_model_report.num_profiles))
-    logger.info(str(num_reflections))
     reference_profiles = get_reference_profiles_as_reflections(
         reference_profile_modeller
     )
@@ -326,9 +342,17 @@ def run_simple_integrate(params, experiments, reflections):
     pred_px, pred_py, pred_pz = predicted_reflections["xyzcal.px"].parts()
     sel = pred_pz > min(pz) and pred_pz < max(pz)
     predicted_reflections = predicted_reflections.select(sel)
-    reference_profile_modeller.fit_reciprocal_space_tof(predicted_reflections)
-    # predicted_reflections.compute_corrections(experiments)
 
+    processes = [
+        pool.apply_async(
+            reference_profile_modeller.fit_reciprocal_space_tof_return, args=(r,)
+        )
+        for r in split_reflections(predicted_reflections, nproc, by_panel=True)
+    ]
+    result = [p.get() for p in processes]
+    predicted_reflections = result[0]
+    for i in range(1, len(result)):
+        predicted_reflections.extend(result[i])
     integration_report = IntegrationReport(experiments, predicted_reflections)
     logger.info("")
     logger.info(integration_report.as_str(prefix=" "))
@@ -337,7 +361,7 @@ def run_simple_integrate(params, experiments, reflections):
     Filter for integrated reflections and remove shoeboxes
     """
 
-    # del predicted_reflections["shoebox"]
+    del predicted_reflections["shoebox"]
     sel = predicted_reflections.get_flags(
         predicted_reflections.flags.integrated, all=False
     )

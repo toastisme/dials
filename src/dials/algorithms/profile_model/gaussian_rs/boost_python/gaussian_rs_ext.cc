@@ -82,8 +82,10 @@ namespace dials {
         boost::python::list data_list;
         boost::python::list mask_list;
         boost::python::list nref_list;
+        boost::python::list panel_list;
         for (std::size_t i = 0; i < obj.size(); ++i) {
           nref_list.append(obj.n_reflections(i));
+          panel_list.append(obj.panel(i));
           try {
             data_list.append(obj.data(i));
             mask_list.append(obj.mask(i));
@@ -93,20 +95,22 @@ namespace dials {
           }
         }
         return boost::python::make_tuple(
-          data_list, mask_list, nref_list, obj.finalized());
+          data_list, mask_list, nref_list, obj.finalized(), panel_list);
       }
 
       static void setstate(GaussianRSProfileModeller& obj, boost::python::tuple state) {
         typedef GaussianRSProfileModeller::data_type data_type;
         typedef GaussianRSProfileModeller::mask_type mask_type;
-        DIALS_ASSERT(boost::python::len(state) == 4);
+        DIALS_ASSERT(boost::python::len(state) == 5);
         boost::python::list data_list = extract<boost::python::list>(state[0]);
         boost::python::list mask_list = extract<boost::python::list>(state[1]);
         boost::python::list nref_list = extract<boost::python::list>(state[2]);
         bool finalized = extract<bool>(state[3]);
+        boost::python::list panel_list = extract<boost::python::list>(state[4]);
         DIALS_ASSERT(boost::python::len(data_list) == boost::python::len(mask_list));
         DIALS_ASSERT(boost::python::len(data_list) == obj.size());
         DIALS_ASSERT(boost::python::len(nref_list) == obj.size());
+        DIALS_ASSERT(boost::python::len(panel_list) == obj.size());
         for (std::size_t i = 0; i < obj.size(); ++i) {
           af::flex_double d = boost::python::extract<af::flex_double>(data_list[i]);
           af::flex_bool m = boost::python::extract<af::flex_bool>(mask_list[i]);
@@ -115,6 +119,7 @@ namespace dials {
           obj.set_data(i, data_type(d.handle(), af::c_grid<3>(d.accessor())));
           obj.set_mask(i, mask_type(m.handle(), af::c_grid<3>(m.accessor())));
           obj.set_n_reflections(i, boost::python::extract<std::size_t>(nref_list[i]));
+          obj.set_panel(i, boost::python::extract<int>(panel_list[i]));
         }
         obj.set_finalized(finalized);
       }
@@ -147,11 +152,18 @@ namespace dials {
         .def("coord_with_panel", &GaussianRSProfileModeller::coord_with_panel)
         .def("model", &GaussianRSProfileModeller::model, (arg("reflections")))
         .def("model_tof", &GaussianRSProfileModeller::model_tof, (arg("reflections")))
+        .def("model_tof_return",
+             &GaussianRSProfileModeller::model_tof_return,
+             (arg("reflections")))
+        .def("accumulate", &GaussianRSProfileModeller::accumulate, (arg("other")))
         .def("fit_reciprocal_space",
              &GaussianRSProfileModeller::fit_reciprocal_space,
              (arg("reflections")))
         .def("fit_reciprocal_space_tof",
              &GaussianRSProfileModeller::fit_reciprocal_space_tof,
+             (arg("reflections")))
+        .def("fit_reciprocal_space_tof_return",
+             &GaussianRSProfileModeller::fit_reciprocal_space_tof_return,
              (arg("reflections")))
         .def("normalize_profiles", &GaussianRSProfileModeller::normalize_profiles)
         .def("nearest_profile", &GaussianRSProfileModeller::nearest_profile)

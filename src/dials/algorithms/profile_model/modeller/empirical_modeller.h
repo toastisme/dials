@@ -140,12 +140,13 @@ namespace dials { namespace algorithms {
       // Loop through all the profiles. If needed, allocate them, then
       // add the pixel values from the other modeller to this
       for (std::size_t i = 0; i < data_.size(); ++i) {
-        n_reflections_[i] += other->n_reflections_[i];
         if (other->data_[i].size() != 0) {
           if (data_[i].size() == 0) {
             data_[i] = data_type(accessor_, 0);
             mask_[i] = mask_type(accessor_, true);
           }
+          n_reflections_[i] += other->n_reflections_[i];
+          panel_[i] = other->panel_[i];
           data_reference d1 = data_[i].ref();
           mask_reference m1 = mask_[i].ref();
           data_const_reference d2 = other->data_[i].const_ref();
@@ -208,6 +209,11 @@ namespace dials { namespace algorithms {
     void set_n_reflections(std::size_t index, std::size_t value) {
       DIALS_ASSERT(index < n_reflections_.size());
       n_reflections_[index] = value;
+    }
+
+    void set_panel(std::size_t index, int value) {
+      DIALS_ASSERT(index < panel_.size());
+      panel_[index] = value;
     }
 
     /**

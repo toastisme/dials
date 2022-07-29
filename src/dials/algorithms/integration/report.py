@@ -479,9 +479,9 @@ class ProfileModelReport(Report):
                         "%d" % i,
                         "%d" % j,
                         f"{model.valid(j)}",
-                        f"{model.coord(j)[0]:.2f}",
-                        f"{model.coord(j)[1]:.2f}",
-                        f"{model.coord(j)[2]:.2f}",
+                        f"{model.coord_with_panel(j, model.panel(j))[0]:.2f}",
+                        f"{model.coord_with_panel(j, model.panel(j))[1]:.2f}",
+                        f"{model.coord_with_panel(j, model.panel(j))[2]:.2f}",
                         "%d" % model.n_reflections(j),
                     ]
                 )
