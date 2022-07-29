@@ -357,6 +357,11 @@ namespace dials { namespace algorithms {
       }
     }
 
+    GaussianRSProfileModeller model_tof_return(af::reflection_table reflections) {
+      model_tof(reflections);
+      return *this;
+    }
+
     /**
      * Model the profiles from the reflections
      * @param reflections The reflection list
@@ -418,7 +423,6 @@ namespace dials { namespace algorithms {
             double weight = sampler_->weight(indices[j], sbox[i].panel, xyzpx[i]);
             weights[j] = weight;
           }
-
           // Add the profile
           add(indices.const_ref(),
               weights.const_ref(),
@@ -689,6 +693,12 @@ namespace dials { namespace algorithms {
         }
       }
       return success;
+    }
+
+    af::reflection_table fit_reciprocal_space_tof_return(
+      af::reflection_table reflections) const {
+      af::shared<bool> success = fit_reciprocal_space_tof(reflections);
+      return reflections;
     }
 
     /**

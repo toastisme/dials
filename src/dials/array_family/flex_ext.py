@@ -1068,7 +1068,8 @@ class _:
     ) -> Tuple[list, list]:
 
         """
-        Finds any bounding boxes within px and py on panel and returns their pz positions along with
+        Finds any bounding boxes within px and py on panel
+        and returns their pz positions along with
         the centroid pz position.
         """
 
@@ -1365,11 +1366,11 @@ Found %s"""
             return frame_tof_vals
 
         def get_tof_wavelength_in_ang(L, tof):
-            return ((Planck * tof) / (m_n * L)) * 10 ** 10
+            return ((Planck * tof) / (m_n * L)) * 10**10
 
         def add_tof_data(sel_expt):
 
-            L0_in_m = expt.beam.get_sample_to_moderator_distance() * 10 ** -3
+            L0_in_m = expt.beam.get_sample_to_moderator_distance() * 10**-3
             unit_s0 = np.asarray(expt.beam.get_unit_s0())
             tof_in_s = expt.sequence.get_tof_in_seconds()
             # Cubic spline for estimating ToF between frames
@@ -1399,7 +1400,7 @@ Found %s"""
                 tofs = cctbx.array_family.flex.double(len(s1))
 
                 for j in range(len(s1)):
-                    s1_length = np.linalg.norm(s1[j]) * 10 ** -3
+                    s1_length = np.linalg.norm(s1[j]) * 10**-3
                     wavelengths[j] = get_tof_wavelength_in_ang(
                         L0_in_m + s1_length, frame_tof_vals[j]
                     )
@@ -1427,7 +1428,7 @@ Found %s"""
 
             unit_s0 = expt.beam.get_unit_s0()
             wavelength = expt.beam.get_wavelength()
-            energy = Planck * c / (wavelength * 10 ** -10)
+            energy = Planck * c / (wavelength * 10**-10)
             s0 = expt.beam.get_s0()
             num_reflections = len(self.select(sel_expt))
 
