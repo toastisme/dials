@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import multiprocessing
+
 import numpy as np
 
 
@@ -190,43 +192,117 @@ class SphericalAbsorption:
         self.linear_absorption_c = absorption_x_section * sample_number_density
         self.linear_scattering_c = scattering_x_section * sample_number_density
 
+    def get_absorption_correction_for_spectra(self, spectra, muR_arr, two_theta, idx):
+        corrections = np.zeros(spectra.shape)
+        for j, bin in enumerate(spectra):
+            muR = muR_arr[j]
+            # assert muR <= 8.0
+            if muR > 8.0:
+                print(f"mur {muR} at idx {idx}")
+            two_theta_deg = two_theta * (180 / np.pi)
+            # assert two_theta_deg > 0 and two_theta_deg < 180
+            if two_theta_deg < 0 or two_theta_deg > 180:
+                print(f"two_theta {two_theta_deg} at idx {idx}")
+
+            theta_idx = int(two_theta_deg)
+
+            ln_transmission_1 = 0
+            ln_transmission_2 = 0
+
+            for n in range(self.pc.shape[0]):
+                ln_transmission_1 = ln_transmission_1 * muR + self.pc[n][theta_idx]
+                ln_transmission_2 = ln_transmission_2 * muR + self.pc[n][theta_idx + 1]
+
+            transmission_1 = np.exp(ln_transmission_1)
+            transmission_2 = np.exp(ln_transmission_2)
+
+            sin_theta_1 = np.square(np.sin(theta_idx * 5.0 * (np.pi / 180)))
+            sin_theta_2 = np.square(np.sin((theta_idx + 1) * 5.0 * (np.pi / 180)))
+
+            l1 = (transmission_1 - transmission_2) / (sin_theta_1 - sin_theta_2)
+            l0 = transmission_1 - l1 * sin_theta_1
+
+            absorption_correction = 1 / (l0 + l1 * np.square(np.sin(two_theta)))
+            corrections[j] = absorption_correction
+        return corrections
+
+    def absorption_correction_single(
+        self,
+        muR,
+        two_theta,
+        theta_idx,
+    ):
+        ln_transmission_1 = 0
+        ln_transmission_2 = 0
+
+        for n in range(self.pc.shape[0]):
+            ln_transmission_1 = ln_transmission_1 * muR + self.pc[n][theta_idx]
+            ln_transmission_2 = ln_transmission_2 * muR + self.pc[n][theta_idx + 1]
+
+        transmission_1 = np.exp(ln_transmission_1)
+        transmission_2 = np.exp(ln_transmission_2)
+
+        sin_theta_1 = np.square(np.sin(theta_idx * 5.0 * (np.pi / 180.0)))
+        sin_theta_2 = np.square(np.sin((theta_idx + 1) * 5.0 * (np.pi / 180.0)))
+
+        l1 = (transmission_1 - transmission_2) / (sin_theta_1 - sin_theta_2)
+        l0 = transmission_1 - l1 * sin_theta_1
+
+        return 1 / (l0 + l1 * np.square(np.sin(two_theta / 2.0)))
+
+    def get_absorption_correction_vec(self, spectra_arr, wavelength_arr, two_theta_arr):
+
+        corrections = np.zeros(spectra_arr.shape)
+        muR_arr = (
+            self.linear_scattering_c + (self.linear_absorption_c / 1.8) * wavelength_arr
+        ) * self.radius
+        two_theta_deg_arr = two_theta_arr * 180 / np.pi
+        two_theta_idx_arr = (two_theta_deg_arr / 10.0).astype(int)
+
+        vfunc = np.vectorize(self.absorption_correction_single)
+
+        nproc = 14
+        pool = multiprocessing.Pool(nproc)
+
+        processes = [
+            pool.apply_async(
+                vfunc,
+                args=(
+                    muR_arr,
+                    two_theta_arr[i],
+                    two_theta_idx_arr[i],
+                ),
+            )
+            for i in range(len(spectra_arr[0]))
+        ]
+        result = [p.get() for p in processes]
+        for i in range(corrections.shape[1]):
+            corrections[0, i, :] = result[i]
+        return 1 / corrections
+
     def get_absorption_correction(self, spectra_arr, wavelength_arr, two_theta_arr):
 
         corrections = np.zeros(spectra_arr.shape)
+        muR_arr = (
+            self.linear_scattering_c + (self.linear_absorption_c / 1.8) * wavelength_arr
+        ) * self.radius
+        nproc = 14
+        pool = multiprocessing.Pool(nproc)
 
-        for i, spectra in enumerate(spectra_arr):
-            for j, bin in enumerate(spectra):
-                wavelength = wavelength_arr[j]
-                two_theta = two_theta_arr[i]
-                muR = (
-                    self.linear_scattering_c
-                    + (self.linear_absorption_c / 1.8) * wavelength
-                ) * self.radius
-
-                assert muR <= 8.0
-                two_theta_deg = two_theta * (180 / np.pi)
-                assert two_theta_deg > 0 and two_theta_deg < 180
-
-                theta_idx = int(two_theta_deg)
-
-                ln_transmission_1 = 0
-                ln_transmission_2 = 0
-
-                ncoef = self.pc.shape[0] / self.pc.shape[1]
-                for n in range(ncoef):
-                    ln_transmission_1 *= muR + self.pc[n][theta_idx]
-                    ln_transmission_2 *= muR + self.pc[n][theta_idx + 1]
-
-                transmission_1 = np.exp(ln_transmission_1)
-                transmission_2 = np.exp(ln_transmission_2)
-
-                sin_theta_1 = np.square(np.sin(theta_idx * 5.0 * (np.pi / 180)))
-                sin_theta_2 = np.square(np.sin((theta_idx + 1) * 5.0 * (np.pi / 180)))
-
-                L1 = (transmission_1 - transmission_2) / (sin_theta_1 - sin_theta_2)
-                L0 = transmission_1 - L1 * sin_theta_1
-
-                absorption_correction = 1 / (L0 + L1 * np.square(np.sin(two_theta)))
-                corrections[i, j] = absorption_correction
+        processes = [
+            pool.apply_async(
+                self.get_absorption_correction_for_spectra,
+                args=(
+                    spectra_arr[0][i],
+                    muR_arr,
+                    two_theta_arr[i],
+                    i,
+                ),
+            )
+            for i in range(len(spectra_arr[0]))
+        ]
+        result = [p.get() for p in processes]
+        for i in range(corrections.shape[1]):
+            corrections[0, i, :] = result[i]
 
         return corrections
