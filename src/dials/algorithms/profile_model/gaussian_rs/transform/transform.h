@@ -14,6 +14,7 @@
 #include <scitbx/vec2.h>
 #include <scitbx/vec3.h>
 #include <scitbx/array_family/tiny_types.h>
+#include <scitbx/constants.h>
 #include <dxtbx/model/beam.h>
 #include <dxtbx/model/detector.h>
 #include <dxtbx/model/goniometer.h>
@@ -45,6 +46,7 @@ namespace dials {
     using dxtbx::model::Detector;
     using dxtbx::model::Goniometer;
     using dxtbx::model::MonoBeam;
+    using dxtbx::model::PolyBeam;
     using dxtbx::model::Scan;
     using dxtbx::model::TOFSequence;
     using scitbx::vec2;
@@ -53,6 +55,8 @@ namespace dials {
     using scitbx::af::int2;
     using scitbx::af::int3;
     using scitbx::af::int6;
+    using scitbx::constants::m_n;
+    using scitbx::constants::Planck;
 
     template <typename T>
     T min4(T a, T b, T c, T d) {
@@ -529,9 +533,11 @@ namespace dials {
                               int6 bbox,
                               std::size_t panel,
                               const af::const_ref<double, af::c_grid<3> > &image,
-                              const af::const_ref<bool, af::c_grid<3> > &mask) {
+                              const af::const_ref<bool, af::c_grid<3> > &mask,
+                              bool &transform_successful) {
         af::versa<double, af::c_grid<3> > bkgrd;
-        init(spec, cs, bbox, panel, image, bkgrd.const_ref(), mask);
+        init(
+          spec, cs, bbox, panel, image, bkgrd.const_ref(), mask, transform_successful);
       }
 
       TransformForwardNoModel(const TransformSpec &spec,
@@ -540,8 +546,9 @@ namespace dials {
                               std::size_t panel,
                               const af::const_ref<double, af::c_grid<3> > &image,
                               const af::const_ref<double, af::c_grid<3> > &bkgrd,
-                              const af::const_ref<bool, af::c_grid<3> > &mask) {
-        init(spec, cs, bbox, panel, image, bkgrd, mask);
+                              const af::const_ref<bool, af::c_grid<3> > &mask,
+                              bool &transform_successful) {
+        init(spec, cs, bbox, panel, image, bkgrd, mask, transform_successful);
       }
 
       /** @returns The transformed profile */
@@ -708,7 +715,8 @@ namespace dials {
                 std::size_t panel,
                 const af::const_ref<double, af::c_grid<3> > &image,
                 const af::const_ref<double, af::c_grid<3> > &bkgrd,
-                const af::const_ref<bool, af::c_grid<3> > &mask) {
+                const af::const_ref<bool, af::c_grid<3> > &mask,
+                bool &success) {
         // Check if we're using background
         bool use_background = bkgrd.size() > 0;
 
@@ -766,6 +774,7 @@ namespace dials {
           spec.scan().attr("__class__").attr("__name__"));
         DIALS_ASSERT(sequence_type == "TOFSequence");
         TOFSequence scan = boost::python::extract<TOFSequence>(spec.scan());
+        PolyBeam beam = boost::python::extract<PolyBeam>(spec.beam());
         // Compute the frame numbers of each slice on the grid
         af::shared<double> z(data_.accessor()[0] + 1);
 
@@ -778,11 +787,12 @@ namespace dials {
             xyp[0] -= bbox[0];
             xyp[1] -= bbox[2];
             xy(j, i) = xyp;
+
             for (std::size_t k = 0; k <= data_.accessor()[0]; ++k) {
               double c3 = zoff + k * zstep;
               double wavelength = cs.to_wavelength(c3, s1p);
-              double frame = boost::python::extract<double>(
-                spec.scan().attr("get_frame_from_wavelength")(wavelength));
+              double tof = beam.get_tof_from_wavelength(wavelength, cs.L1());
+              double frame = scan.get_frame_from_tof(tof);
               z[k] = frame - bbox[4];
             }
           }
@@ -856,6 +866,7 @@ namespace dials {
             }
           }
         }
+        success = true;
       }
 
       af::versa<double, af::c_grid<3> > data_;

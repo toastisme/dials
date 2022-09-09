@@ -1076,7 +1076,7 @@ class _:
         sel = self["panel"] == panel
         x0, x1, y0, y1, z0, z1 = self["bbox"].select(sel).parts()
         if "xyzobs.px.value" in self:
-            centroids = self["xyzobs.px.value"].select(sel)
+            centroids = self["xyzcal.px"].select(sel)
         else:
             centroids = None
         py = int(pixel_pos[0])
@@ -1370,11 +1370,9 @@ Found %s"""
 
         def add_tof_data(sel_expt):
 
+            self["L1"] = cctbx.array_family.flex.double(self.nrows())
             L0_in_m = expt.beam.get_sample_to_moderator_distance() * 10**-3
             unit_s0 = np.asarray(expt.beam.get_unit_s0())
-            tof_in_s = expt.sequence.get_tof_in_seconds()
-            # Cubic spline for estimating ToF between frames
-            tof_curve_coeffs = get_tof_curve_coefficients(tof_in_s)
             fmt_instance = expt.imageset.get_format_class().get_instance(
                 expt.imageset.paths()[0], **expt.imageset.data().get_params()
             )
@@ -1384,13 +1382,12 @@ Found %s"""
                 sel = sel_expt & (panel_numbers == i_panel)
                 # rot_angle is a zero vector here, set from centroid_px_to_mm
                 # This component is used to store the ToF
-                x, y, rot_angle = self["xyzobs.mm.value"].select(sel).parts()
+                x, y, _ = self["xyzobs.mm.value"].select(sel).parts()
                 px, py, frame = self["xyzobs.px.value"].select(sel).parts()
                 s1 = expt.detector[i_panel].get_lab_coord(
                     cctbx.array_family.flex.vec2_double(x, y)
                 )
                 s1_norm = s1 / s1.norms()
-                frame_tof_vals = get_frame_tof_vals(frame, tof_curve_coeffs)
 
                 wavelengths = cctbx.array_family.flex.double(len(s1))
                 energies = cctbx.array_family.flex.double(len(s1))
@@ -1398,18 +1395,19 @@ Found %s"""
                 spectra_idx_1D = cctbx.array_family.flex.int(len(s1))
                 s0s = cctbx.array_family.flex.vec3_double(len(s1))
                 tofs = cctbx.array_family.flex.double(len(s1))
+                L1 = cctbx.array_family.flex.double(len(s1))
 
                 for j in range(len(s1)):
+                    tof = float(expt.sequence.get_tof_from_frame(frame[j]))
                     s1_length = np.linalg.norm(s1[j]) * 10**-3
-                    wavelengths[j] = get_tof_wavelength_in_ang(
-                        L0_in_m + s1_length, frame_tof_vals[j]
-                    )
+                    L1[j] = s1_length
+                    wavelengths[j] = get_tof_wavelength_in_ang(L0_in_m + s1_length, tof)
+                    tofs[j] = tof
                     s0s[j] = get_tof_s0(unit_s0, wavelengths[j])
                     d_spacing[j] = 1 / np.linalg.norm(
                         np.array(s1_norm[j]) - np.array(s0s[j]) / wavelengths[j]
                     )
-                    tofs[j] = float(frame_tof_vals[j])
-                    energies[j] = get_energy(L0_in_m + s1_length, frame_tof_vals[j])
+                    energies[j] = get_energy(L0_in_m + s1_length, tof)
                     spectra_idx_1D[j] = get_spectra_idx_1D(
                         fmt_instance=fmt_instance,
                         panel=i_panel,
@@ -1423,6 +1421,7 @@ Found %s"""
                 self["spectra_idx_1D"].set_selected(sel, spectra_idx_1D)
                 self["s0"].set_selected(sel, s0s)
                 self["tof"].set_selected(sel, tofs)
+                self["L1"].set_selected(sel, L1)
 
         def add_monochromatic_data(sel_expt):
 

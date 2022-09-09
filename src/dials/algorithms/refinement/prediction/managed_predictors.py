@@ -13,6 +13,7 @@ from math import pi
 
 from scipy.constants import Planck, m_n
 
+import cctbx.array_family.flex
 from scitbx.array_family import flex
 
 from dials.algorithms.spot_prediction import ScanStaticRayPredictor
@@ -121,20 +122,42 @@ class TOFExperimentsPredictor(ExperimentsPredictor):
 
         if "tof_cal" not in reflections:
             reflections["tof_cal"] = flex.double(reflections.nrows())
+        if "L1" not in reflections:
+            reflections["L1"] = flex.double(reflections.nrows())
+
+        tof_cal = flex.double(reflections.nrows())
+        L1 = flex.double(reflections.nrows())
+
+        panel_numbers = cctbx.array_family.flex.size_t(reflections["panel"])
         for i, expt in enumerate(self._experiments):
+
+            L = expt.beam.get_sample_to_moderator_distance() * 10**-3
+
             if "imageset_id" in reflections:
                 sel_expt = reflections["imageset_id"] == i
             else:
                 sel_expt = reflections["id"] == i
-            expt_reflections = reflections.select(sel_expt)
-            L = expt.beam.get_sample_to_moderator_distance()
-            expt_reflections = reflections.select(sel_expt)
-            for idx, reflection in enumerate(expt_reflections):
-                wavelength = expt_reflections[idx]["wavelength_cal"]
-                expt_reflections[idx]["tof_cal"] = self._calc_tof_from_wavelength(
-                    wavelength, L
-                )
 
+            for i_panel in range(len(expt.detector)):
+                sel = sel_expt & (panel_numbers == i_panel)
+                expt_reflections = reflections.select(sel)
+                x, y, _ = expt_reflections["xyzcal.mm"].parts()
+                s1 = expt.detector[i_panel].get_lab_coord(
+                    cctbx.array_family.flex.vec2_double(x, y)
+                )
+                expt_L1 = s1.norms() * 10**-3
+                expt_tof_cal = flex.double(expt_reflections.nrows())
+
+                for idx in range(len(expt_reflections)):
+                    wavelength = expt_reflections[idx]["wavelength_cal"]
+                    expt_tof_cal[idx] = self._calc_tof_from_wavelength(
+                        wavelength * 10**-10, L + expt_L1[idx]
+                    )
+                tof_cal.set_selected(sel, expt_tof_cal)
+                L1.set_selected(sel, expt_L1)
+
+        reflections["tof_cal"] = tof_cal
+        reflections["L1"] = L1
         return reflections
 
     def _calc_tof_from_wavelength(self, wavelength, L):

@@ -38,9 +38,9 @@ __all__ = [
     "TOFReflectionPredictor",
 ]
 
-from scipy import interpolate
 
 import cctbx.array_family.flex
+from scitbx.array_family import flex
 
 
 def ScanStaticReflectionPredictor(experiment, dmin=None, margin=1, padding=0, **kwargs):
@@ -121,25 +121,64 @@ class TOFReflectionPredictorPy:
             dmin,
         )
 
+    def post_prediction(self, reflections):
+
+        if "tof_cal" not in reflections:
+            reflections["tof_cal"] = flex.double(reflections.nrows())
+        if "L1" not in reflections:
+            reflections["L1"] = flex.double(reflections.nrows())
+
+        tof_cal = flex.double(reflections.nrows())
+        L1 = flex.double(reflections.nrows())
+
+        panel_numbers = cctbx.array_family.flex.size_t(reflections["panel"])
+        expt = self.experiment
+
+        for i_panel in range(len(expt.detector)):
+            sel = panel_numbers == i_panel
+            expt_reflections = reflections.select(sel)
+            x, y, _ = expt_reflections["xyzcal.mm"].parts()
+            s1 = expt.detector[i_panel].get_lab_coord(
+                cctbx.array_family.flex.vec2_double(x, y)
+            )
+            expt_L1 = s1.norms() * 10**-3
+            expt_tof_cal = flex.double(expt_reflections.nrows())
+
+            for idx in range(len(expt_reflections)):
+                wavelength = expt_reflections[idx]["wavelength_cal"]
+                expt_tof_cal[idx] = expt.beam.get_tof_from_wavelength(
+                    wavelength, expt_L1[idx]
+                )
+            tof_cal.set_selected(sel, expt_tof_cal)
+            L1.set_selected(sel, expt_L1)
+
+        reflections["tof_cal"] = tof_cal
+        reflections["L1"] = L1
+
+        # Filter out predicted reflections outside of experiment range
+        wavelength_range = expt.beam.get_wavelength_range()
+        sel = reflections["wavelength_cal"] >= wavelength_range[0]
+        reflections = reflections.select(sel)
+        sel = reflections["wavelength_cal"] <= wavelength_range[1]
+        reflections = reflections.select(sel)
+
+        return reflections
+
     def for_ub(self, ub):
+
         reflection_table = self.predictor.for_ub(ub)
-        wavelengths = list(self.experiment.sequence.get_wavelengths())
+        reflection_table = self.post_prediction(reflection_table)
+
         image_range = self.experiment.sequence.get_image_range()
         frames = list(range(image_range[0], image_range[1]))
-        spline_coefficients = interpolate.splrep(wavelengths, frames)
         x, y, z = reflection_table["xyzcal.px"].parts()
         xyz = cctbx.array_family.flex.vec3_double(len(reflection_table))
+
         for i in range(len(reflection_table)):
             wavelength = reflection_table["wavelength_cal"][i]
-            frame = float(interpolate.splev(wavelength, spline_coefficients))
-            """
-            frame = min(
-                max(
-                    frames[0], float(interpolate.splev(wavelength, spline_coefficients))
-                ),
-                frames[-1],
-            )
-            """
+            L1 = reflection_table["L1"][i]
+            tof = self.experiment.beam.get_tof_from_wavelength(wavelength, L1)
+            frame = self.experiment.sequence.get_frame_from_tof(tof)
             xyz[i] = (x[i], y[i], frame)
         x, y, z = xyz.parts()
         reflection_table["xyzcal.px"] = xyz

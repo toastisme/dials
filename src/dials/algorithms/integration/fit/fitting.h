@@ -207,7 +207,7 @@ namespace dials { namespace algorithms {
       double sump = 0;
       for (std::size_t i = 0; i < m.size(); ++i) {
         if (m[i]) {
-          DIALS_ASSERT(p[i] >= 0);
+          // DIALS_ASSERT(p[i] >= 0);
           sumd += d[i];
           sumb += b[i];
           sump += p[i];

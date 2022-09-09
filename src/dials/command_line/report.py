@@ -8,6 +8,7 @@ import math
 import numpy as np
 
 from cctbx import uctbx
+from dxtbx.model import Scan
 
 import dials.util.log
 from dials.algorithms.scaling.model.model import plot_scaling_models
@@ -2372,7 +2373,7 @@ class Analyser:
                             )
                         )
 
-            if expt.sequence is not None:
+            if expt.sequence is not None and isinstance(expt.sequence, Scan):
                 expt_geom_table.append(
                     (
                         "<strong>Scan:</strong>",
