@@ -30,11 +30,12 @@ namespace dials {
       namespace gaussian_rs {
 
   // Use a load of stuff from other namespaces
-  using dxtbx::model::MonoBeam;
-  using dxtbx::model::PolyBeam;
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
+  using dxtbx::model::MonoBeam;
+  using dxtbx::model::PolyBeam;
   using dxtbx::model::Scan;
+  using dxtbx::model::TOFSequence;
   using scitbx::vec2;
   using scitbx::vec3;
   using scitbx::af::double2;
@@ -110,7 +111,8 @@ namespace dials {
       DIALS_ASSERT(delta_divergence.all_gt(0.0));
       DIALS_ASSERT(delta_mosaicity.all_gt(0.0));
       DIALS_ASSERT(delta_divergence_.size() == delta_mosaicity_.size());
-      DIALS_ASSERT(delta_divergence_.size() == boost::python::extract<int>(scan.attr("get_num_images")));
+      DIALS_ASSERT(delta_divergence_.size()
+                   == boost::python::extract<int>(scan.attr("get_num_images")));
       DIALS_ASSERT(delta_divergence_.size() > 0);
     }
 
@@ -258,7 +260,8 @@ namespace dials {
                      double delta_divergence,
                      double delta_mosaicity)
         : s0_(boost::python::extract<vec3<double> >(beam.attr("get_s0"))),
-        detector_(detector), delta_divergence_(delta_divergence) {
+          detector_(detector),
+          delta_divergence_(delta_divergence) {
       DIALS_ASSERT(delta_divergence > 0.0);
       DIALS_ASSERT(delta_mosaicity >= 0.0);
     }
@@ -360,11 +363,16 @@ namespace dials {
      * @param delta_divergence The xds delta_divergence parameter
      * @param delta_mosaicity The xds delta_mosaicity parameter
      */
-    BBoxCalculatorTOF(const boost::python::object &beam,
-                     const Detector &detector,
-                     double delta_divergence,
-                     double delta_mosaicity)
-        : detector_(detector), delta_divergence_(delta_divergence) {
+    BBoxCalculatorTOF(const PolyBeam &beam,
+                      const Detector &detector,
+                      const TOFSequence &sequence,
+                      double delta_divergence,
+                      double delta_mosaicity)
+        : detector_(detector),
+          sequence_(sequence),
+          beam_(beam),
+          delta_divergence_(delta_divergence),
+          delta_mosaicity_(delta_mosaicity) {
       DIALS_ASSERT(delta_divergence > 0.0);
       DIALS_ASSERT(delta_mosaicity >= 0.0);
     }
@@ -389,15 +397,20 @@ namespace dials {
      * @param frame The predicted frame number
      * @returns A 6 element array: (minx, maxx, miny, maxy, minz, maxz)
      */
-    virtual int6 single(vec3<double> s0, vec3<double> s1, double frame, std::size_t panel) const {
+    virtual int6 single(vec3<double> s0,
+                        vec3<double> s1,
+                        double frame,
+                        double L1,
+                        std::size_t panel) const {
       // Ensure our values are ok
       DIALS_ASSERT(s1.length_sq() > 0);
 
       // Create the coordinate system for the reflection
-      CoordinateSystem2d xcs(s0, s1);
+      CoordinateSystemTOF xcs(s0, s1, L1);
 
       // Get the divergence and mosaicity for this point
       double delta_d = delta_divergence_;
+      double delta_m = delta_mosaicity_;
 
       // Calculate the beam vectors at the following xds coordinates:
       //   (-delta_d, -delta_d, 0)
@@ -421,12 +434,25 @@ namespace dials {
       // Min's are rounded down to the nearest integer, Max's are rounded up
       double4 x(xy1[0], xy2[0], xy3[0], xy4[0]);
       double4 y(xy1[1], xy2[1], xy3[1], xy4[1]);
-      int6 bbox((int)floor(min(x)),
-                (int)ceil(max(x)),
-                (int)floor(min(y)),
-                (int)ceil(max(y)),
-                (int)floor(frame),
-                (int)floor(frame) + 7);
+
+      int x0 = (int)floor(min(x));
+      int x1 = (int)ceil(max(x));
+      int y0 = (int)floor(min(y));
+      int y1 = (int)ceil(max(y));
+
+      /// Calculate the rotation angles at the following XDS
+      // e3 coordinates: -delta_m, +delta_m
+      double wavelength1 = xcs.to_wavelength(-delta_m, s1);
+      double wavelength2 = xcs.to_wavelength(+delta_m, s1);
+      double tof1 = beam_.get_tof_from_wavelength(wavelength1, L1);
+      double tof2 = beam_.get_tof_from_wavelength(wavelength2, L1);
+
+      // Get the array indices at the rotation angles
+      double z1 = sequence_.get_frame_from_tof(tof1);
+      double z2 = sequence_.get_frame_from_tof(tof2);
+      double2 z(z1, z2);
+
+      int6 bbox(x0, x1, y0, y1, frame - 5, frame + 65);
       DIALS_ASSERT(bbox[1] > bbox[0]);
       DIALS_ASSERT(bbox[3] > bbox[2]);
       DIALS_ASSERT(bbox[5] > bbox[4]);
@@ -442,6 +468,7 @@ namespace dials {
     virtual af::shared<int6> array(const af::const_ref<vec3<double> > &s0,
                                    const af::const_ref<vec3<double> > &s1,
                                    const af::const_ref<double> &frame,
+                                   const af::const_ref<double> &L1,
                                    const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(s1.size() == frame.size());
       DIALS_ASSERT(s1.size() == panel.size());
@@ -449,14 +476,17 @@ namespace dials {
       DIALS_ASSERT(s0.size() == panel.size());
       af::shared<int6> result(s1.size(), af::init_functor_null<int6>());
       for (std::size_t i = 0; i < s1.size(); ++i) {
-        result[i] = single(s0[i], s1[i], frame[i], panel[i]);
+        result[i] = single(s0[i], s1[i], frame[i], L1[i], panel[i]);
       }
       return result;
     }
 
   private:
     Detector detector_;
+    TOFSequence sequence_;
+    PolyBeam beam_;
     double delta_divergence_;
+    double delta_mosaicity_;
   };
   /**
    * Class to help compute bbox for multiple experiments.

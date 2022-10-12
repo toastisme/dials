@@ -1,10 +1,18 @@
-# LIBTBX_SET_DISPATCHER_NAME dev.dials.simple_integrate
+# LIBTBX_SET_DISPATCHER_NAME dev.dials.simple_tof_integrate
 from __future__ import annotations
 
 import logging
 import multiprocessing
+from math import ceil, floor
+from typing import Tuple
+
+import numpy as np
+from numpy.linalg import det
+from scipy.optimize import curve_fit
+from scipy.special import erfc
 
 import cctbx.array_family.flex
+from dxtbx import flumpy
 from dxtbx.model import Goniometer
 
 import dials.util.log
@@ -28,15 +36,34 @@ logger = logging.getLogger("dials.command_line.simple_integrate")
 phil_scope = parse(
     """
 output {
-reflections = 'simple_integrated.refl'
+experiments = 'integrated.expt'
+    .type = str
+    .help = "The experiments output filename"
+reflections = 'integrated.refl'
     .type = str
     .help = "The integrated output filename"
+output_hkl = True
+    .type = bool
+    .help = "Output the integrated intensities as a SHELX hkl file"
+hkl =  'integrated.hkl'
+    .type = str
+    .help = "The hkl output filename"
 phil = 'dials.simple_integrate.phil'
     .type = str
     .help = "The output phil file"
-log = 'dials.simple_integrate.log'
+log = 'simple_tof_integrate.log'
     .type = str
     .help = "The log filename"
+}
+corrections {
+lorentz = True
+    .type = bool
+    .help = "Apply the Lorentz Correction"
+}
+method{
+profile_fitting = False
+    .type = bool
+    .help = "Use integration by profile fitting"
 }
 """
 )
@@ -46,8 +73,379 @@ Kabsch 2010 refers to
 Kabsch W., Integration, scaling, space-group assignment and
 post-refinment, Acta Crystallographica Section D, 2010, D66, 133-144
 Usage:
-$ dev.dials.simple_integrate.py refined.expt refined.refl
+$ dev.dials.simple_tof_integrate.py refined.expt refined.refl
 """
+
+
+class GutmannProfile:
+    def __init__(self, reflection, alpha, beta):
+        self.centroid = reflection["xyzcal.px"]
+        s = reflection["shoebox"]
+        s.flatten()
+        self.intensities = flumpy.to_numpy(s.values())
+        self.coords = list(s.coords())
+        self.dx = self.get_dx(self.centroid, self.coords)
+        self.dy = self.get_dy(self.centroid, self.coords)
+        self.dt = self.get_dt(self.centroid, self.coords)
+        self.alpha = alpha
+        self.beta = beta
+        self.H = self.init_H(self.coords)
+        self.cov = None
+        self.params = None
+
+    def init_H(self, coords):
+        x = [i[0] for i in coords]
+        y = [i[1] for i in coords]
+        t = [i[2] for i in coords]
+        H1 = 1 / (max(x) - min(x))
+        H4 = 1 / (max(y) - min(y))
+        H6 = 1 / (max(t) - min(t))
+        H3 = 0.01
+        H5 = 0.01
+        H2 = 0.01
+        return np.array((H1, H2, H3, H4, H5, H6))
+
+    def get_dx(self, centroid, coords):
+        x = [i[0] for i in coords]
+        return np.array([i - centroid[0] for i in x])
+
+    def get_dy(self, centroid, coords):
+        y = [i[1] for i in coords]
+        return np.array([i - centroid[1] for i in y])
+
+    def get_dt(self, centroid, coords):
+        t = [i[2] for i in coords]
+        return np.array([i - centroid[2] for i in t])
+
+    def plot_sum(self):
+        import matplotlib.pyplot as plt
+
+        predicted = self.func((self.dx, self.dy, self.dt), *(self.params))
+        sum_predicted = []
+        sum_intensities = []
+
+        tof = []
+        for idx, i in enumerate(self.coords):
+            new_tof = i[2]
+            if len(tof) == 0 or abs(new_tof - tof[-1]) > 1e-7:
+                sum_predicted.append(predicted[idx])
+                sum_intensities.append(self.intensities[idx])
+                tof.append(new_tof)
+            else:
+                sum_predicted[-1] += predicted[idx]
+                sum_intensities[-1] += self.intensities[idx]
+
+        plt.figure(figsize=(12, 10))
+        plt.plot(tof, sum_intensities, label="Observed")
+        plt.plot(tof, sum_predicted, label="Fit")
+        plt.legend(fontsize=15)
+        plt.xticks(fontsize=15)
+        plt.yticks(fontsize=15)
+        plt.xlabel("ToF", fontsize=20)
+        plt.ylabel("Intensity", fontsize=20)
+        plt.show()
+
+    def func(self, coords, H1, H2, H3, H4, H5, H6, alpha, beta):
+        H_mat = np.array(((H1, H2, H3), (H2, H4, H5), (H3, H5, H6)))
+        dx, dy, dt = coords
+        a = alpha
+        b = beta
+        N = (a * b) / (2 * (a + b))
+        N_g = np.sqrt(det(H_mat)) / (2 * np.pi) ** (3 / 2.0)
+        N_g = 1
+        u = 0.5 * a * (a + 2 * H6 * dt + 2 * H3 * dx + 2 * H5 * dy)
+        v = 0.5 * b * (b - 2 * H6 * dt - 2 * H3 * dx - 2 * H5 * dy)
+        y = (a + H6 * dt + H3 * dx + H5 * dy) / (np.sqrt(2 * H6))
+        w = (b - H6 * dt - H3 * dx - H5 * dy) / (np.sqrt(2 * H6))
+        f1 = N * N_g * np.sqrt(np.pi / (2 * H6))
+        f2 = np.exp(
+            -0.5 * H1 * np.square(dx)
+            - H2 * dx * dy
+            - 0.5 * H4 * np.square(dy)
+            + (
+                (
+                    np.square(H3) * np.square(dx)
+                    + 2 * H3 * H5 * dx * dy
+                    + np.square(H5) * np.square(dy)
+                )
+                / (2 * H6)
+            )
+        )
+        f3 = np.exp(u) * erfc(y) + np.exp(v) * erfc(w)
+        return f1 * f2 * f3
+
+    def fit(self, H):
+        intensities = self.intensities
+        params, cov = curve_fit(
+            f=self.func,
+            xdata=(self.dx, self.dy, self.dt),
+            ydata=intensities,
+            p0=(*H, self.alpha, self.beta),
+            maxfev=10000000,
+        )
+        self.params = params
+        self.cov = cov
+
+
+class ReferenceProfileGrid:
+    def __init__(
+        self,
+        image_range: Tuple[3],
+        grid_size: Tuple[3],
+        subdivision: Tuple[3],
+        num_panels: int,
+    ):
+
+        self.grid_size = grid_size
+        self.profiles = {i: {} for i in range(num_panels)}
+        self.subdivision = subdivision
+        self.step_size = tuple([image_range[i] / grid_size[i] for i in range(3)])
+
+    def get_subdivided_data(self, reflection, subdivision):
+        sbox = reflection["shoebox"]
+
+        data = flumpy.to_numpy(sbox.data)
+        mask = flumpy.to_numpy(sbox.mask)
+
+        data = self.subdivide_array(data, subdivision)
+        mask = self.subdivide_array(mask, subdivision)
+        return data, mask
+
+    def add_reflection_data(self, reflections, weight_func):
+
+        for r in range(len(reflections)):
+            reflection = reflections[r]
+
+            data, mask = self.get_subdivided_data(reflection, self.subdivision)
+            if not np.sum(data) > 0:
+                continue
+
+            pxyz = reflection["xyzcal.px"]
+
+            nearest_grid_idxs = self.get_nearest_grid_idxs(pxyz)
+            weights = self.get_weights_for_idxs(nearest_grid_idxs, pxyz, weight_func)
+
+            panel = reflection["panel"]
+            for i, idx in enumerate(nearest_grid_idxs):
+                if idx in self.profiles[panel]:
+                    self.profiles[panel][idx] += data * weights[i] / np.sum(data)
+                else:
+                    self.profiles[panel][idx] = data * weights[i] / np.sum(data)
+
+    def profile_fit(self, reflections):
+        for r in range(len(reflections)):
+            reflection = reflections[r]
+            data, mask = self.get_subdivided_data(reflection, self.subdivision)
+
+    def get_weights_for_idxs(self, idxs, pxyz, weight_func):
+        weights = []
+        for idx in idxs:
+            weights.append(self.get_weight_for_idx(idx, pxyz, weight_func))
+        return weights
+
+    def get_weight_for_idx(self, idx, pxyz, weight_func):
+        idx_coords = self.get_idx_panel_coords(idx)
+        x = (idx_coords[0] - pxyz[0]) / self.step_size[0]
+        y = (idx_coords[1] - pxyz[1]) / self.step_size[1]
+        z = (idx_coords[2] - pxyz[2]) / self.step_size[2]
+        distance = x * x + y * y + z * z
+        return weight_func(distance)
+
+    def get_idx_panel_coords(self, idx: Tuple[3]) -> Tuple[3]:
+        return (
+            idx[0] * self.step_size[0],
+            idx[1] * self.step_size[1],
+            idx[2] * self.step_size[2],
+        )
+
+    def get_nearest_grid_idxs(self, pxyz: Tuple[3]):
+        x, y, z = pxyz
+        idxs = []
+        for i in (floor, ceil):
+            for j in (floor, ceil):
+                for k in (floor, ceil):
+                    idxs.append(
+                        (
+                            int(i(x) / self.step_size[0]),
+                            int(j(y) / self.step_size[1]),
+                            int(k(z) / self.step_size[2]),
+                        )
+                    )
+        return idxs
+
+    def subdivide_array(self, arr, subdivision: Tuple):
+        assert len(arr.shape) == len(subdivision)
+        for i in range(len(subdivision)):
+            arr = np.repeat(arr, [subdivision[i]], axis=i)
+        arr = arr / np.product(subdivision)
+        return arr
+
+
+class ReferenceProfile:
+    def init(self, idx: int, size: Tuple[3]):
+        self.idx = idx
+
+
+def print_data(reflections, panel):
+    r = reflections.select(reflections["panel"] == panel)
+    s = ""
+    for i in range(len(r)):
+        s += (
+            f'{r[i]["tof"]*10**6} {r[i]["wavelength"]} {r[i]["xyzobs.px.value"]} {r[i]["intensity.sum.value"]} {np.sqrt(r[i]["intensity.sum.variance"])} {r[i]["miller_index"]}'
+            + "\n"
+        )
+    print(s)
+
+
+def add_lorentz_correction(experiment, reflections):
+    def get_lorentz_correction(detector, sequence, unit_s0, L0, coords, panel):
+        px, py, frame = coords.parts()
+        tof = sequence.get_tof_from_frames(frame)
+        x, y = (
+            detector[panel]
+            .pixel_to_millimeter(cctbx.array_family.flex.vec2_double(px, py))
+            .parts()
+        )
+
+        s1 = detector[panel].get_lab_coord(cctbx.array_family.flex.vec2_double(x, y))
+        L1 = s1.norms() * 10**-3
+        wl4 = sequence.get_tof_wavelengths_in_ang(L0 + L1, tof) ** 4
+        s1 = s1 / s1.norms()
+        sinsqt = np.square(np.sin(np.arccos(s1.dot(unit_s0))))
+        return sinsqt / wl4
+
+    beam = experiment.beam
+    sequence = experiment.sequence
+    detector = experiment.detector
+    L0 = beam.get_sample_to_moderator_distance() * 10**-3
+    unit_s0 = beam.get_unit_s0()
+
+    for i in range(len(reflections)):
+        correction = get_lorentz_correction(
+            detector,
+            sequence,
+            unit_s0,
+            L0,
+            reflections[i]["shoebox"].coords(),
+            reflections[i]["panel"],
+        )
+        reflections[i]["shoebox"].add_correction(correction)
+
+    return reflections
+
+
+def output_reflections_as_hkl(reflections, filename):
+    def get_corrected_intensity_and_sigma(reflections, idx):
+        intensity = reflections["intensity.sum.value"][idx]
+        variance = reflections["intensity.sum.variance"][idx]
+        return intensity, np.sqrt(variance)
+
+    def valid_intensity(intensity):
+        from math import isinf, isnan
+
+        if isnan(intensity) or isinf(intensity):
+            return False
+        return intensity > 0 and intensity < 100000
+
+    with open(filename, "w") as g:
+        for i in range(len(reflections)):
+            h, k, l = reflections["miller_index"][i]
+            batch_number = 1
+            intensity, sigma = get_corrected_intensity_and_sigma(reflections, i)
+            if not valid_intensity(intensity):
+                continue
+            intensity = round(intensity, 2)
+            sigma = round(sigma, 2)
+            wavelength = round(reflections["wavelength_cal"][i], 4)
+            g.write(
+                ""
+                + "{:4d}{:4d}{:4d}{:8.1f}{:8.2f}{:4d}{:8.4f}\n".format(
+                    int(h),
+                    int(k),
+                    int(l),
+                    float(intensity),
+                    float(sigma),
+                    int(batch_number),
+                    float(wavelength),
+                )
+            )
+        g.write(
+            ""
+            + "{:4d}{:4d}{:4d}{:8.1f}{:9.2f}{:4d}{:8.4f}\n".format(
+                int(0), int(0), int(0), float(0.00), float(0.00), int(0), float(0.0000)
+            )
+        )
+
+
+def output_expt_as_ins(expt, filename):
+    def LATT_SYMM(s, space_group, decimal=False):
+        Z = space_group.conventional_centring_type_symbol()
+        Z_dict = {
+            "P": 1,
+            "I": 2,
+            "R": 3,
+            "F": 4,
+            "A": 5,
+            "B": 6,
+            "C": 7,
+        }
+        try:
+            LATT_N = Z_dict[Z]
+        except Exception:
+            raise RuntimeError("Error: Lattice type not supported by SHELX.")
+        # N must be made negative if the structure is non-centrosymmetric.
+        if space_group.is_centric():
+            if not space_group.is_origin_centric():
+                raise RuntimeError(
+                    "Error: "
+                    + " SHELX manual: If the structure is centrosymmetric, the"
+                    + " origin MUST lie on a center of symmetry."
+                )
+        else:
+            LATT_N = -LATT_N
+        print("LATT", LATT_N, file=s)
+        # The operator x,y,z is always assumed, so MUST NOT be input.
+        for i in range(1, space_group.n_smx()):
+            print(
+                "SYMM",
+                space_group(i).as_xyz(
+                    decimal=decimal, t_first=False, symbol_letters="XYZ", separator=","
+                ),
+                file=s,
+            )
+
+    uc = expt.crystal.get_recalculated_unit_cell() or expt.crystal.get_unit_cell()
+    uc_sd = (
+        expt.crystal.get_recalculated_cell_parameter_sd()
+        or expt.crystal.get_cell_parameter_sd()
+    )
+    sg = expt.crystal.get_space_group()
+    wl = 0.7
+
+    with open(filename, "w") as f:
+        f.write(
+            f"TITL {sg.type().number()} in {sg.type().lookup_symbol().replace(' ','')}\n"
+        )
+        f.write(
+            "CELL {:8.5f} {:8.4f} {:8.4f} {:8.4f} {:8.3f} {:8.3f} {:8.3f}\n".format(
+                wl, *uc.parameters()
+            )
+        )
+        if uc_sd:
+            f.write(
+                "ZERR {:8.3f} {:8.4f} {:8.4f} {:8.4f} {:8.3f} {:8.3f} {:8.3f}\n".format(
+                    sg.order_z(), *uc_sd
+                )
+            )
+        f.write("ZERR 4.0\n")
+        LATT_SYMM(f, sg)
+        f.write("SFAC Na Cl\n")
+        f.write("UNIT 2 2\n")
+
+        f.write(
+            "MERG 0\nL.S. 10\nFMAP -2\nPLAN 10\nREM BASF 1 1 1 1 1 1 1 1 1 1\nREM BASF 1 1 1 1 1 1 1 1 1 1 1\nREM BASF 1 1 1 1 1 1 1 1 1 1 1\nREM BASF 1 1 1 1 1 1 1 1 1 1 1\nREM BASF 1 1 1 1 1 1 1 1 1 1 1\nREM BASF 1 1 1 1 1 1 1 1 1 1 1\nWGHT 0.1\nFVAR 1.0\n"
+        )
+        f.write("HKLF 2\nEND")
 
 
 def get_reference_profiles_as_reflections(model):
@@ -110,7 +508,7 @@ def run():
 
     phil = phil_scope.fetch()
 
-    usage = "usage: dev.dials.simple_integrate.py models.expt reflections.expt"
+    usage = "usage: dev.dials.simple_tof_integrate.py refined.expt refined.refl"
     parser = ArgumentParser(
         usage=usage,
         phil=phil,
@@ -138,6 +536,9 @@ def run():
 
     integrated_reflections = run_simple_integrate(params, experiments, reflections)
     integrated_reflections.as_msgpack_file(params.output.reflections)
+    experiments.as_file(params.output.experiments)
+    if params.output.output_hkl:
+        output_reflections_as_hkl(integrated_reflections, params.output.hkl)
 
 
 def run_simple_integrate(params, experiments, reflections):
@@ -146,10 +547,7 @@ def run_simple_integrate(params, experiments, reflections):
 
     experiment = experiments[0]
 
-    # Remove bad reflections (e.g. those not indexed)
     reflections, _ = process_reference(reflections)
-    # Mask neighbouring pixels to shoeboxes
-    # reflections = filter_reference_pixels(reflections, experiments)
 
     """
     Predict reflections using experiment crystal
@@ -173,9 +571,11 @@ def run_simple_integrate(params, experiments, reflections):
     matched, reflections, unmatched = predicted_reflections.match_with_reference(
         reflections
     )
+    sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
+    predicted_reflections = predicted_reflections.select(sel)
 
     """
-    Create profile model and add it to experiment.
+    Create profile model and add it to erperiment.
     This is used to predict reflection properties.
     """
 
@@ -184,7 +584,7 @@ def run_simple_integrate(params, experiments, reflections):
     model_reflections = reflections.select(used_in_ref)
 
     # sigma_m in 3.1 of Kabsch 2010
-    sigma_m = 0.1
+    sigma_m = 0.01
     sigma_b = 0.01
     # The Gaussian model given in 2.3 of Kabsch 2010
     experiment.profile = GaussianRSProfileModel(
@@ -200,6 +600,10 @@ def run_simple_integrate(params, experiments, reflections):
     """
 
     predicted_reflections.compute_bbox(experiments)
+    x1, x2, y1, y2, t1, t2 = predicted_reflections["bbox"].parts()
+    predicted_reflections = predicted_reflections.select(
+        t2 < experiment.sequence.get_image_range()[1]
+    )
     predicted_reflections.compute_d(experiments)
     predicted_reflections.compute_partiality(experiments)
 
@@ -224,6 +628,11 @@ def run_simple_integrate(params, experiments, reflections):
         image = experiment.imageset.get_corrected_data(i)
         mask = experiment.imageset.get_mask(i)
         shoebox_processor.next_data_only(make_image(image, mask))
+
+    if params.corrections.lorentz:
+        predicted_reflections = add_lorentz_correction(
+            experiment, predicted_reflections
+        )
 
     predicted_reflections.is_overloaded(experiments)
     predicted_reflections.compute_mask(experiments)
@@ -262,6 +671,8 @@ def run_simple_integrate(params, experiments, reflections):
     )
     predicted_reflections["num_pixels.foreground"] = nvalfg
 
+    predicted_reflections.experiment_identifiers()[0] = experiment.identifier
+
     """
     Load modeller that will calculate reference profiles and
     do the actual profile fitting integration.
@@ -269,13 +680,13 @@ def run_simple_integrate(params, experiments, reflections):
 
     sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
     reference_reflections = predicted_reflections.select(sel)
-    reference_reflections.as_msgpack_file(
-        "/home/davidmcdonagh/work/dials/modules/dials/src/dials/command_line/predicted_reference.refl"
-    )
-    px, py, pz = reference_reflections["xyzobs.px.value"].parts()
-    experiment.sequence.set_image_range((int(min(pz) - 10), int(max(pz) + 10)))
 
-    # Default params when running dials.integrate with C2sum_1_*.cbf.gz
+    if params.method.profile_fitting is False:
+        integration_report = IntegrationReport(experiments, predicted_reflections)
+        logger.info("")
+        logger.info(integration_report.as_str(prefix=" "))
+        return predicted_reflections
+
     fit_method = 1  # reciprocal space fitter (called explicitly below)
     grid_method = 2  # regular grid
     grid_size = 5  # Downsampling grid size described in 3.3 of Kabsch 2010
@@ -308,6 +719,7 @@ def run_simple_integrate(params, experiments, reflections):
     sel = reference_reflections.get_flags(reference_reflections.flags.dont_integrate)
     sel = ~sel
     reference_reflections = reference_reflections.select(sel)
+
     processes = [
         pool.apply_async(reference_profile_modeller.model_tof_return, args=(r,))
         for r in split_reflections(reference_reflections, nproc, by_panel=True)
@@ -315,6 +727,7 @@ def run_simple_integrate(params, experiments, reflections):
     result = [p.get() for p in processes]
     for i in result:
         reference_profile_modeller.accumulate(i)
+
     reference_profile_modeller.normalize_profiles()
 
     profile_model_report = ProfileModelReport(
@@ -322,13 +735,6 @@ def run_simple_integrate(params, experiments, reflections):
     )
     logger.info("")
     logger.info(profile_model_report.as_str(prefix=" "))
-    reference_profiles = get_reference_profiles_as_reflections(
-        reference_profile_modeller
-    )
-
-    reference_profiles.as_msgpack_file(
-        "/home/davidmcdonagh/work/dials/modules/dials/src/dials/command_line/reference_profiles.refl"
-    )
 
     """
     Carry out the integration by fitting to reference profiles in 1D.
@@ -339,8 +745,10 @@ def run_simple_integrate(params, experiments, reflections):
     sel = ~sel
     predicted_reflections = predicted_reflections.select(sel)
 
-    pred_px, pred_py, pred_pz = predicted_reflections["xyzcal.px"].parts()
-    sel = pred_pz > min(pz) and pred_pz < max(pz)
+    # Avoid trying to model predicted reflections far from observed
+    pz = reflections["xyzobs.px.value"].parts()[2]
+    pred_pz = predicted_reflections["xyzcal.px"].parts()[2]
+    sel = pred_pz > min(pz - 10) and pred_pz < max(pz + 10)
     predicted_reflections = predicted_reflections.select(sel)
 
     processes = [
@@ -358,14 +766,11 @@ def run_simple_integrate(params, experiments, reflections):
     logger.info(integration_report.as_str(prefix=" "))
 
     """
-    Filter for integrated reflections and remove shoeboxes
+    Remove shoeboxes
     """
 
     del predicted_reflections["shoebox"]
-    sel = predicted_reflections.get_flags(
-        predicted_reflections.flags.integrated, all=False
-    )
-    predicted_reflections = predicted_reflections.select(sel)
+    predicted_reflections.experiment_identifiers()[0] = experiment.identifier
     return predicted_reflections
 
 

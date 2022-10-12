@@ -234,17 +234,18 @@ namespace dials {
            arg("delta_mosaicity"))));
 
       class_<BBoxCalculatorTOF>("BBoxCalculatorTOF", no_init)
-        .def(init<const boost::python::object&, const Detector&, double, double>(
+        .def(init<const PolyBeam&, const Detector&, const TOFSequence&, double, double>(
           (arg("beam"),
            arg("detector"),
+           arg("sequence"),
            arg("delta_divergence"),
            arg("delta_mosaicity"))))
         .def("__call__",
              &BBoxCalculatorTOF::single,
-             (arg("s0"), arg("s1"), arg("frame"), arg("panel")))
+             (arg("s0"), arg("s1"), arg("frame"), arg("L1"), arg("panel")))
         .def("__call__",
              &BBoxCalculatorTOF::array,
-             (arg("s0"), arg("s1"), arg("frame"), arg("panel")));
+             (arg("s0"), arg("s1"), arg("frame"), arg("L1"), arg("panel")));
 
       class_<BBoxMultiCalculator>("BBoxMultiCalculator")
         .def("append", &BBoxMultiCalculator::push_back)
@@ -344,11 +345,15 @@ namespace dials {
 
       class_<MaskCalculatorTOF, bases<MaskCalculatorIface> >("MaskCalculatorTOF",
                                                              no_init)
-        .def(init<const Detector&, const boost::python::object&, double, double>(
-          (arg("detector"),
-           arg("scan"),
-           arg("delta_divergence"),
-           arg("delta_mosaicity"))));
+        .def(init<const Detector&,
+                  const boost::python::object&,
+                  const boost::python::object&,
+                  double,
+                  double>((arg("detector"),
+                           arg("scan"),
+                           arg("beam"),
+                           arg("delta_divergence"),
+                           arg("delta_mosaicity"))));
 
       class_<MaskMultiCalculator>("MaskMultiCalculator")
         .def("append", &MaskMultiCalculator::push_back)
@@ -411,9 +416,11 @@ namespace dials {
 
       // Export coordinate system
       class_<CoordinateSystemTOF>("CoordinateSystemTOF", no_init)
-        .def(init<vec3<double>, vec3<double> >((arg("s0"), arg("s1"))))
+        .def(
+          init<vec3<double>, vec3<double>, double>((arg("s0"), arg("s1"), arg("L1"))))
         .def("s0", &CoordinateSystemTOF::s0)
         .def("s1", &CoordinateSystemTOF::s1)
+        .def("L1", &CoordinateSystemTOF::L1)
         .def("p_star", &CoordinateSystemTOF::p_star)
         .def("e1_axis", &CoordinateSystemTOF::e1_axis)
         .def("e2_axis", &CoordinateSystemTOF::e2_axis)

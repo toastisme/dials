@@ -471,7 +471,7 @@ namespace dials { namespace model {
      * @returns The intensity
      */
     Intensity summed_intensity() const {
-      // Do the intengration
+      // Do the integration
       Summation<FloatType> summation(
         data.const_ref(), background.const_ref(), mask.const_ref());
 
@@ -529,6 +529,13 @@ namespace dials { namespace model {
       }
       flat = true;
       DIALS_ASSERT(is_consistent());
+    }
+
+    void add_correction(const af::shared<double> correction) {
+      DIALS_ASSERT(correction.size() == data.size());
+      for (std::size_t i = 0; i < data.size(); ++i) {
+        data[i] *= correction[i];
+      }
     }
   };
 

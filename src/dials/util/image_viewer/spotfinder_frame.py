@@ -2409,7 +2409,7 @@ class PixelLinePlot(wx.Frame):
             "min_delta_y_range": 1,
             "min_delta_x_range": 500,
             "default_xlim": (0, 17500),
-            "default_ylim": (0, 1000),
+            "default_ylim": (0, 200),
             "default_window_size": (1024, 450),
             "default_window_position": (0, self.GetSize()[0] - 500),
         }

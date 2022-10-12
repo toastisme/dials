@@ -377,12 +377,15 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(reflections.contains("xyzcal.mm"));
       DIALS_ASSERT(reflections.contains("s0_cal"));
       DIALS_ASSERT(reflections.contains("wavelength_cal"));
+      DIALS_ASSERT(reflections.contains("L1"));
 
       // Get some data
       af::const_ref<Shoebox<> > sbox = reflections["shoebox"];
       af::const_ref<double> partiality = reflections["partiality"];
+      af::const_ref<double> wavelengths = reflections["wavelength_cal"];
       af::const_ref<vec3<double> > s1 = reflections["s1"];
       af::const_ref<vec3<double> > s0 = reflections["s0_cal"];
+      af::const_ref<double> L1 = reflections["L1"];
       af::const_ref<vec3<double> > xyzpx = reflections["xyzcal.px"];
       af::const_ref<vec3<double> > xyzmm = reflections["xyzcal.mm"];
       af::ref<std::size_t> flags = reflections["flags"];
@@ -394,7 +397,7 @@ namespace dials { namespace algorithms {
         // Check if we want to use this reflection
         if (check1(flags[i], partiality[i], sbox[i])) {
           // Create the coordinate system
-          CoordinateSystemTOF cs(s0[i], s1[i]);
+          CoordinateSystemTOF cs(s0[i], s1[i], L1[i]);
 
           // Create the data array
           af::versa<double, af::c_grid<3> > data(sbox[i].data.accessor());
@@ -412,25 +415,33 @@ namespace dials { namespace algorithms {
                          detail::check_mask_code(Valid | Foreground));
 
           // Compute the transform
-          TransformForwardNoModel transform(
-            spec_, cs, sbox[i].bbox, sbox[i].panel, data.const_ref(), mask.const_ref());
+          bool transform_successful = true;
+          TransformForwardNoModel transform(spec_,
+                                            cs,
+                                            sbox[i].bbox,
+                                            sbox[i].panel,
+                                            data.const_ref(),
+                                            mask.const_ref(),
+                                            transform_successful);
+          DIALS_ASSERT(transform_successful);
+          if (transform_successful) {
+            // Get the indices and weights of the profiles
+            af::shared<std::size_t> indices =
+              sampler_->nearest_n(sbox[i].panel, xyzpx[i]);
+            af::shared<double> weights(indices.size());
+            for (std::size_t j = 0; j < indices.size(); ++j) {
+              double weight = sampler_->weight(indices[j], sbox[i].panel, xyzpx[i]);
+              weights[j] = weight;
+            }
+            // Add the profile
+            add(indices.const_ref(),
+                weights.const_ref(),
+                transform.profile().const_ref(),
+                sbox[i].panel);
 
-          // Get the indices and weights of the profiles
-          af::shared<std::size_t> indices =
-            sampler_->nearest_n(sbox[i].panel, xyzpx[i]);
-          af::shared<double> weights(indices.size());
-          for (std::size_t j = 0; j < indices.size(); ++j) {
-            double weight = sampler_->weight(indices[j], sbox[i].panel, xyzpx[i]);
-            weights[j] = weight;
+            // Set the flags
+            flags[i] |= af::UsedInModelling;
           }
-          // Add the profile
-          add(indices.const_ref(),
-              weights.const_ref(),
-              transform.profile().const_ref(),
-              sbox[i].panel);
-
-          // Set the flags
-          flags[i] |= af::UsedInModelling;
         }
       }
     }
@@ -713,6 +724,7 @@ namespace dials { namespace algorithms {
       DIALS_ASSERT(reflections.contains("partiality"));
       DIALS_ASSERT(reflections.contains("s1"));
       DIALS_ASSERT(reflections.contains("s0_cal"));
+      DIALS_ASSERT(reflections.contains("L1"));
       DIALS_ASSERT(reflections.contains("xyzcal.px"));
       DIALS_ASSERT(reflections.contains("xyzcal.mm"));
       DIALS_ASSERT(reflections.contains("wavelength_cal"));
@@ -721,6 +733,7 @@ namespace dials { namespace algorithms {
       af::const_ref<Shoebox<> > sbox = reflections["shoebox"];
       af::const_ref<vec3<double> > s1 = reflections["s1"];
       af::const_ref<vec3<double> > s0 = reflections["s0_cal"];
+      af::const_ref<double> L1 = reflections["L1"];
       af::const_ref<vec3<double> > xyzpx = reflections["xyzcal.px"];
       af::const_ref<vec3<double> > xyzmm = reflections["xyzcal.mm"];
       af::ref<std::size_t> flags = reflections["flags"];
@@ -751,7 +764,7 @@ namespace dials { namespace algorithms {
             mask_const_reference mask1 = mask(index).const_ref();
 
             // Create the coordinate system
-            CoordinateSystemTOF cs(s0[0], s1[i]);
+            CoordinateSystemTOF cs(s0[0], s1[i], L1[i]);
 
             // Create the data array
             af::versa<double, af::c_grid<3> > data(sbox[i].data.accessor());
@@ -770,37 +783,41 @@ namespace dials { namespace algorithms {
                            detail::check_mask_code(Valid | Foreground));
 
             // Compute the transform
+            bool transform_successful = true;
             TransformForwardNoModel transform(spec_,
                                               cs,
                                               sbox[i].bbox,
                                               sbox[i].panel,
                                               data.const_ref(),
                                               background.const_ref(),
-                                              mask.const_ref());
+                                              mask.const_ref(),
+                                              transform_successful);
 
-            // Get the transformed shoebox
-            data_const_reference c = transform.profile().const_ref();
-            data_const_reference b = transform.background().const_ref();
-            mask_const_reference mask2 = transform.mask().const_ref();
-            af::versa<bool, af::c_grid<3> > m(mask2.accessor());
-            DIALS_ASSERT(mask1.size() == mask2.size());
-            for (std::size_t j = 0; j < m.size(); ++j) {
-              m[j] = mask1[j] && mask2[j];
+            if (transform_successful) {
+              // Get the transformed shoebox
+              data_const_reference c = transform.profile().const_ref();
+              data_const_reference b = transform.background().const_ref();
+              mask_const_reference mask2 = transform.mask().const_ref();
+              af::versa<bool, af::c_grid<3> > m(mask2.accessor());
+              DIALS_ASSERT(mask1.size() == mask2.size());
+              for (std::size_t j = 0; j < m.size(); ++j) {
+                m[j] = mask1[j] && mask2[j];
+              }
+
+              // Do the profile fitting
+              ProfileFitter<double> fit(c, b, m.const_ref(), p, 1e-3, 100);
+              // DIALS_ASSERT(fit.niter() < 100);
+
+              // Set the data in the reflection
+              intensity_val[i] = fit.intensity()[0];
+              intensity_var[i] = fit.variance()[0];
+              reference_cor[i] = fit.correlation();
+              // reference_rmsd[i] = fit.rmsd();
+
+              // Set the integrated flag
+              flags[i] |= af::IntegratedPrf;
+              success[i] = true;
             }
-
-            // Do the profile fitting
-            ProfileFitter<double> fit(c, b, m.const_ref(), p, 1e-3, 100);
-            // DIALS_ASSERT(fit.niter() < 100);
-
-            // Set the data in the reflection
-            intensity_val[i] = fit.intensity()[0];
-            intensity_var[i] = fit.variance()[0];
-            reference_cor[i] = fit.correlation();
-            // reference_rmsd[i] = fit.rmsd();
-
-            // Set the integrated flag
-            flags[i] |= af::IntegratedPrf;
-            success[i] = true;
 
           } catch (dials::error const &e) {
             // std::cout << e.what() << std::endl;

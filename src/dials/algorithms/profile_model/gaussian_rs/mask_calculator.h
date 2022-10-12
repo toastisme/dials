@@ -40,6 +40,7 @@ namespace dials {
   using dxtbx::model::Detector;
   using dxtbx::model::Goniometer;
   using dxtbx::model::Panel;
+  using dxtbx::model::PolyBeam;
   using dxtbx::model::Scan;
   using dxtbx::model::TOFSequence;
   using scitbx::vec2;
@@ -75,6 +76,7 @@ namespace dials {
                                 vec3<double> s1,
                                 vec3<double> s0,
                                 double frame,
+                                double L1,
                                 std::size_t panel,
                                 bool adjacent = false) const = 0;
 
@@ -82,6 +84,7 @@ namespace dials {
                                const af::const_ref<vec3<double> > &s1,
                                const af::const_ref<vec3<double> > &s0,
                                const af::const_ref<double> &frame,
+                               const af::const_ref<double> &L1,
                                const af::const_ref<std::size_t> &panel) const = 0;
 
     virtual af::shared<double> volume_with_s0(
@@ -90,6 +93,7 @@ namespace dials {
       const af::const_ref<vec3<double> > &s1,
       const af::const_ref<vec3<double> > &s0,
       const af::const_ref<double> &frame,
+      const af::const_ref<double> &L1,
       const af::const_ref<std::size_t> &panel) const = 0;
   };
 
@@ -194,6 +198,7 @@ namespace dials {
                                 vec3<double> s1,
                                 vec3<double> s0,
                                 double frame,
+                                double L1,
                                 std::size_t panel,
                                 bool adjacent = false) const {
       DIALS_ASSERT(shoebox.is_consistent());
@@ -234,6 +239,7 @@ namespace dials {
                                const af::const_ref<vec3<double> > &s1,
                                const af::const_ref<vec3<double> > &s0,
                                const af::const_ref<double> &frame,
+                               const af::const_ref<double> &L1,
                                const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
@@ -265,6 +271,7 @@ namespace dials {
       const af::const_ref<vec3<double> > &s1,
       const af::const_ref<vec3<double> > &s0,
       const af::const_ref<double> &frame,
+      const af::const_ref<double> &L1,
       const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(bbox.size() == s1.size());
       DIALS_ASSERT(bbox.size() == frame.size());
@@ -593,9 +600,12 @@ namespace dials {
      */
     MaskCalculatorTOF(const Detector &detector,
                       const boost::python::object &scan,
+                      const boost::python::object &beam,
                       double delta_b,
                       double delta_m)
-        : detector_(detector), scan_(boost::python::extract<TOFSequence>(scan)) {
+        : detector_(detector),
+          scan_(boost::python::extract<TOFSequence>(scan)),
+          beam_(boost::python::extract<PolyBeam>(beam)) {
       DIALS_ASSERT(delta_b > 0.0);
       DIALS_ASSERT(delta_m > 0.0);
       vec2<int> array_range = scan_.get_array_range();
@@ -633,13 +643,14 @@ namespace dials {
                                 vec3<double> s1,
                                 vec3<double> s0,
                                 double frame,
+                                double L1,
                                 std::size_t panel,
                                 bool adjacent = false) const {
       DIALS_ASSERT(shoebox.is_consistent());
       if (shoebox.flat) {
-        single_flat(shoebox, s1, s0, frame, panel);
+        single_flat(shoebox, s1, s0, frame, L1, panel);
       } else {
-        single_normal(shoebox, s1, s0, frame, panel, adjacent);
+        single_normal(shoebox, s1, s0, frame, L1, panel, adjacent);
       }
     }
 
@@ -668,12 +679,13 @@ namespace dials {
                                const af::const_ref<vec3<double> > &s1,
                                const af::const_ref<vec3<double> > &s0,
                                const af::const_ref<double> &frame,
+                               const af::const_ref<double> &L1,
                                const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
       DIALS_ASSERT(shoeboxes.size() == panel.size());
       for (std::size_t i = 0; i < shoeboxes.size(); ++i) {
-        this->single_with_s0(shoeboxes[i], s1[i], s0[i], frame[i], panel[i]);
+        this->single_with_s0(shoeboxes[i], s1[i], s0[i], frame[i], L1[i], panel[i]);
       }
     }
 
@@ -693,6 +705,7 @@ namespace dials {
       const af::const_ref<vec3<double> > &s1,
       const af::const_ref<vec3<double> > &s0,
       const af::const_ref<double> &frame,
+      const af::const_ref<double> &L1,
       const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(bbox.size() == s1.size());
       DIALS_ASSERT(bbox.size() == frame.size());
@@ -700,7 +713,7 @@ namespace dials {
       af::shared<double> fraction(bbox.size());
       for (std::size_t i = 0; i < bbox.size(); ++i) {
         fraction[i] = volume_single(
-          volume.get(panel[i]), bbox[i], s1[i], s0[i], frame[i], panel[i], i);
+          volume.get(panel[i]), bbox[i], s1[i], s0[i], frame[i], L1[i], panel[i], i);
       }
       return fraction;
     }
@@ -712,6 +725,7 @@ namespace dials {
                          vec3<double> s1,
                          vec3<double> s0,
                          double frame,
+                         double L1,
                          std::size_t panel_number,
                          std::size_t index) const {
       DIALS_ASSERT(volume.is_consistent());
@@ -754,7 +768,7 @@ namespace dials {
       const Panel &panel = detector_[panel_number];
 
       // Create the coordinate system and generators
-      CoordinateSystemTOF cs(s0, s1);
+      CoordinateSystemTOF cs(s0, s1, L1);
       double s0_length = s0.length();
 
       // Loop through all the pixels in the shoebox, transform the point
@@ -814,6 +828,7 @@ namespace dials {
                        vec3<double> s1,
                        vec3<double> s0,
                        double frame,
+                       double L1,
                        std::size_t panel_number,
                        bool adjacent = false) const {
       // Get some bits from the shoebox
@@ -856,7 +871,7 @@ namespace dials {
       DIALS_ASSERT(mask.accessor()[2] == xsize);
 
       // Create the coordinate system and generators
-      CoordinateSystemTOF cs(s0, s1);
+      CoordinateSystemTOF cs(s0, s1, L1);
       double s0_length = s0.length();
 
       // Loop through all the pixels in the shoebox, transform the point
@@ -880,6 +895,8 @@ namespace dials {
         }
       }
 
+      double L = beam_.get_sample_to_moderator_distance() * std::pow(10, -3) + L1;
+
       for (int j = 0; j < ysize; ++j) {
         for (int i = 0; i < xsize; ++i) {
           double dxy1 = dxy_array(j, i);
@@ -889,9 +906,10 @@ namespace dials {
           double dxy = std::min(std::min(dxy1, dxy2), std::min(dxy3, dxy4));
           for (std::size_t k = 0; k < zsize; ++k) {
             if (z0 + (int)k >= index0_ && z0 + (int)k < index1_) {
-              double wavelength1 = scan_.get_wavelength_from_frame(z0 + k - index0_);
-              double wavelength2 =
-                scan_.get_wavelength_from_frame(z0 + k + 1 - index0_);
+              double tof1 = scan_.get_tof_from_frame(z0 + k - index0_);
+              double tof2 = scan_.get_tof_from_frame(z0 + k + 1 - index0_);
+              double wavelength1 = scan_.get_tof_wavelength_in_ang(L, tof1);
+              double wavelength2 = scan_.get_tof_wavelength_in_ang(L, tof2);
               double gz1 = cs.from_wavelength(wavelength1);
               double gz2 = cs.from_wavelength(wavelength2);
               double gz = std::abs(gz1) < std::abs(gz2) ? gz1 : gz2;
@@ -922,6 +940,7 @@ namespace dials {
                      vec3<double> s1,
                      vec3<double> s0,
                      double frame,
+                     double L1,
                      std::size_t panel_number) const {
       // Get some bits from the shoebox
       af::ref<int, af::c_grid<3> > mask = shoebox.mask.ref();
@@ -959,7 +978,7 @@ namespace dials {
       DIALS_ASSERT(mask.accessor()[2] == xsize);
 
       // Create the coordinate system and generators
-      CoordinateSystemTOF cs(s0, s1);
+      CoordinateSystemTOF cs(s0, s1, L1);
 
       double s0_length = s0.length();
 
@@ -993,6 +1012,7 @@ namespace dials {
 
     Detector detector_;
     TOFSequence scan_;
+    PolyBeam beam_;
     int index0_;
     int index1_;
     af::shared<double> delta_b_r_;
@@ -1105,6 +1125,7 @@ namespace dials {
                                 vec3<double> s1,
                                 vec3<double> s0,
                                 double frame,
+                                double L1,
                                 std::size_t panel_number,
                                 bool adjacent = false) const {
       DIALS_ASSERT(shoebox.is_consistent());
@@ -1194,6 +1215,7 @@ namespace dials {
                                const af::const_ref<vec3<double> > &s1,
                                const af::const_ref<vec3<double> > &s0,
                                const af::const_ref<double> &frame,
+                               const af::const_ref<double> &L1,
                                const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(shoeboxes.size() == s1.size());
       DIALS_ASSERT(shoeboxes.size() == frame.size());
@@ -1225,6 +1247,7 @@ namespace dials {
       const af::const_ref<vec3<double> > &s1,
       const af::const_ref<vec3<double> > &s0,
       const af::const_ref<double> &frame,
+      const af::const_ref<double> &L1,
       const af::const_ref<std::size_t> &panel) const {
       DIALS_ASSERT(bbox.size() == s1.size());
       DIALS_ASSERT(bbox.size() == frame.size());

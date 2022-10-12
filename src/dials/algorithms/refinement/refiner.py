@@ -247,6 +247,7 @@ class RefinerFactory:
             "shoebox",
             "delpsical.weights",
             "wavelength",
+            "tof",
             "s0",
         ]
         # NB xyzobs.px.value & xyzcal.px required by SauterPoon outlier rejector
@@ -365,19 +366,21 @@ class RefinerFactory:
         # the used_in_refinement flag to the predictions
         obs = refman.get_obs()
         ref_predictor(obs)
+
         x_obs, y_obs, phi_obs = obs["xyzobs.mm.value"].parts()
         x_calc, y_calc, phi_calc = obs["xyzcal.mm"].parts()
         obs["x_resid"] = x_calc - x_obs
         obs["y_resid"] = y_calc - y_obs
 
         if experiments.is_single_tof_experiment():
+
             obs["wavelength_resid"] = obs["wavelength_cal"] - obs["wavelength"]
             obs["wavelength_resid2"] = (obs["wavelength_cal"] - obs["wavelength"]) ** 2
             sequence = experiments[0].sequence
             frame_resid = flex.double(len(obs))
             for i in range(len(obs)):
-                frame_cal = sequence.get_frame_from_wavelength(obs["wavelength_cal"][i])
-                frame = sequence.get_frame_from_wavelength(obs["wavelength"][i])
+                frame_cal = sequence.get_frame_from_tof(obs["tof_cal"][i])
+                frame = sequence.get_frame_from_tof(obs["tof"][i])
                 frame_resid[i] = frame_cal - frame
 
             obs["wavelength_resid_frame"] = frame_resid

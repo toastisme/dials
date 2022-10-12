@@ -1510,10 +1510,8 @@ namespace dials { namespace algorithms {
       ray = predict_ray_(h, ub);
       double wavelength = predict_ray_.get_wavelength();
       vec2<double> r = beam_.get_wavelength_range();
-      if (wavelength >= r[0] && wavelength <= r[1]) {
-        vec3<double> s0 = predict_ray_.get_s0();
-        append_for_ray(p, h, ray, panel, wavelength, s0);
-      }
+      vec3<double> s0 = predict_ray_.get_s0();
+      append_for_ray(p, h, ray, panel, wavelength, s0);
     }
 
     /**

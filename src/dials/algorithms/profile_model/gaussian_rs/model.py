@@ -535,6 +535,7 @@ class Model(ProfileModelExt):
                 reflections["s0_cal"],
                 reflections["s1"],
                 reflections["xyzcal.px"].parts()[2],
+                reflections["L1"],
                 reflections["panel"],
             )
         else:
@@ -589,6 +590,7 @@ class Model(ProfileModelExt):
                     reflections["s1"],
                     reflections["s0_cal"],
                     reflections["xyzcal.px"].parts()[2],
+                    reflections["L1"],
                     reflections["panel"],
                 )
             return mask_foreground(

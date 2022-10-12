@@ -143,7 +143,6 @@ namespace dials {
    */
   class CoordinateSystemTOF {
   public:
-
     /**
      * Initialise coordinate system. s0 should be the same length as s1.
      * These quantities are not checked because this class will be created for
@@ -151,20 +150,36 @@ namespace dials {
      * @param s0 The incident beam vector
      * @param s1 The diffracted beam vector
      */
-    CoordinateSystemTOF(vec3<double> s0, vec3<double> s1)
+    CoordinateSystemTOF(vec3<double> s0, vec3<double> s1, double L1)
         : s0_(s0),
           s1_(s1),
-          p_star_(s1-s0),
+          p_star_(s1 - s0),
+          L1_(L1),
           e1_(s1.cross(s0).normalize()),
           e2_(s1.cross(e1_).normalize()),
-          e3_((s1 + s0).normalize()){}
+          e3_((s1 + s0).normalize()) {}
 
-    vec3<double> s0() const {return s0_;}
-    vec3<double> s1() const {return s1_;}
-    vec3<double> p_star() const {return p_star_;}
-    vec3<double> e1_axis() const {return e1_;}
-    vec3<double> e2_axis() const {return e2_;}
-    vec3<double> e3_axis() const {return e3_;}
+    vec3<double> s0() const {
+      return s0_;
+    }
+    vec3<double> s1() const {
+      return s1_;
+    }
+    double L1() const {
+      return L1_;
+    }
+    vec3<double> p_star() const {
+      return p_star_;
+    }
+    vec3<double> e1_axis() const {
+      return e1_;
+    }
+    vec3<double> e2_axis() const {
+      return e2_;
+    }
+    vec3<double> e3_axis() const {
+      return e3_;
+    }
 
     /**
      * Transform the beam vector to the reciprocal space coordinate system.
@@ -172,27 +187,22 @@ namespace dials {
      * @param s0_dash The incident beam vector
      * @returns The e1, e2, e3 coordinates
      */
-    vec2<double> from_beam_vector(
-      const vec3<double> &s_dash
-      ) const {
+    vec2<double> from_beam_vector(const vec3<double> &s_dash) const {
       double s1_length = s1_.length();
       double s0_length = s0_.length();
       DIALS_ASSERT(s1_length > 0);
       DIALS_ASSERT(s0_length > 0);
-      //vec3<double> p_star0 = s_dash-s0_dash;
+      // vec3<double> p_star0 = s_dash-s0_dash;
       vec3<double> e1 = e1_ / s1_length;
       vec3<double> e2 = e2_ / s1_length;
-      //vec3<double> e3 = (s1_+s0_)/(s1_length + s0_length);
+      // vec3<double> e3 = (s1_+s0_)/(s1_length + s0_length);
       /*
         return vec3<double>(
         e1 * (s_dash - s1_),
         e2 * (s_dash - s1_),
         e3 * (p_star0 - p_star_)/p_star_.length());
         */
-        return vec2<double>(
-        e1 * (s_dash - s1_),
-        e2 * (s_dash - s1_)
-        );
+      return vec2<double>(e1 * (s_dash - s1_), e2 * (s_dash - s1_));
     }
 
     /**
@@ -218,16 +228,16 @@ namespace dials {
      * @param c3 The XDS e3 coordinate
      * @param s_dash The beam vector from the e1 and e2 coordinates
      * @returns The wavelength of the e3 coordinate (s)
-     * 
+     *
      * Solved be rearranging c3 = e3(p_star0 - p_star) / s1_length,
      * noting that p_star0 = s_dash - s0_dash,
      * and s0_dash = unit_s0/wavelength_dash
      */
-    double to_wavelength(double c3, vec3<double> s_dash) const{
-      double s1_length = s1_.length();
-      DIALS_ASSERT(s1_length > 0);
+    double to_wavelength(double c3, vec3<double> s_dash) const {
+      double p_star_length = p_star_.length();
+      DIALS_ASSERT(p_star_length > 0);
       vec3<double> unit_s0 = s0_.normalize();
-      return 1/((e3_*s_dash - c3*s1_length - e3_*p_star_)/(e3_*unit_s0));
+      return (e3_ * unit_s0) / (e3_ * s_dash - e3_ * p_star_ - c3 * p_star_length);
     }
 
     /**
@@ -239,12 +249,10 @@ namespace dials {
       double p_star_length = p_star_.length();
       DIALS_ASSERT(p_star_length > 0);
       vec3<double> scaled_e3 = e3_ / p_star_length;
-      vec3<double> s0 = s0_.normalize()/wavelength;
-      vec3<double> p_star0 = s1_ - s0; 
-      return scaled_e3
-             * (p_star0 - p_star_);
+      vec3<double> s0 = s0_.normalize() / wavelength;
+      vec3<double> p_star0 = s1_ - s0;
+      return scaled_e3 * (p_star0 - p_star_);
     }
-
 
   private:
     vec3<double> s0_;
@@ -253,6 +261,7 @@ namespace dials {
     vec3<double> e1_;
     vec3<double> e2_;
     vec3<double> e3_;
+    double L1_;
   };
 
   /**
