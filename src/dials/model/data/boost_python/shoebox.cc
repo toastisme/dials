@@ -231,6 +231,7 @@ namespace dials { namespace model { namespace boost_python {
       .def("values", &values_with_mask<shoebox_type>)
       .def("beam_vectors", &beam_vectors<shoebox_type>)
       .def("beam_vectors", &beam_vectors_with_mask<shoebox_type>)
+      .def("add_correction", &shoebox_type::add_correction, (arg("correction")))
       .def("__eq__", &shoebox_type::operator==)
       .def("__ne__", &shoebox_type::operator!=);
 

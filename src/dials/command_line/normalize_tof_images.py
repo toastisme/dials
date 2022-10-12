@@ -83,9 +83,10 @@ def shrink_spectra(spectra_arr, shrink_factor):
     )
 
 
-def expand_spectra(spectra_arr, expand_factor, remainder):
+def expand_spectra(spectra_arr, expand_factor, remainder, divide=False):
 
-    spectra_arr = spectra_arr / expand_factor
+    if divide:
+        spectra_arr = spectra_arr / expand_factor
     spectra_arr = np.repeat(spectra_arr, expand_factor, axis=2)
 
     if remainder > 0:
@@ -138,15 +139,18 @@ def process_correction_spectra(vanadium_instance, empty_instance, shrink_factor)
     # Preprocess to remove noise / decrease computation time
     logger.info("Smoothing empty spectra")
     empty_spectra, _ = shrink_spectra(empty_spectra, shrink_factor)
-    empty_spectra = smooth_spectra(empty_spectra, smooth_param=110000)
+
+    empty_spectra = smooth_spectra(empty_spectra, smooth_param=0.005)
+
     logger.info("Smoothing vanadium spectra")
     vanadium_spectra, remainder = shrink_spectra(vanadium_spectra, shrink_factor)
-    vanadium_spectra = smooth_spectra(vanadium_spectra, smooth_param=110000)
+
+    vanadium_spectra = smooth_spectra(vanadium_spectra, smooth_param=0.005)
 
     # Subtract empty spectra to correct for empty values
     vanadium_spectra = vanadium_spectra - empty_spectra
 
-    empty_spectra = expand_spectra(empty_spectra, shrink_factor, remainder)
+    empty_spectra = expand_spectra(empty_spectra, shrink_factor, remainder, divide=True)
     vanadium_spectra = expand_spectra(vanadium_spectra, shrink_factor, remainder)
 
     # Normalise with absorption correction
@@ -182,6 +186,10 @@ def get_corrected_image_name(expt: Experiment, file_suffix: str) -> str:
     reader = expt.imageset.reader()
     current_filename, ext = splitext(reader.paths()[0])
     return current_filename + file_suffix + ext
+
+
+def correct_spectra_for_bin_width(expt_instance, spectra, detector):
+    return spectra / expt_instance.get_momentum_correction(detector)
 
 
 def run():
@@ -254,9 +262,15 @@ def run():
         scattering_x_section=scattering_x_section,
         absorption_x_section=absorption_x_section,
     )
+
     spectra = spectra / absorption_correction
     spectra[np.isinf(spectra)] = 0
     spectra[np.isnan(spectra)] = 0
+
+    logger.info("Correcting for ToF bin width")
+    spectra = correct_spectra_for_bin_width(
+        expt_instance, spectra, experiments[0].detector
+    )
 
     output_filename = get_corrected_image_name(
         experiments[0], params.output.image_file_suffix

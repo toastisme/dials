@@ -1,4 +1,4 @@
-# LIBTBX_SET_DISPATCHER_NAME dev.dials.simple_integrate
+# LIBTBX_SET_DISPATCHER_NAME dev.dials.simple_tof_integrate
 from __future__ import annotations
 
 import logging
@@ -36,18 +36,34 @@ logger = logging.getLogger("dials.command_line.simple_integrate")
 phil_scope = parse(
     """
 output {
-experiments = 'simple_integrated.expt'
+experiments = 'integrated.expt'
     .type = str
     .help = "The experiments output filename"
-reflections = 'simple_integrated.refl'
+reflections = 'integrated.refl'
     .type = str
     .help = "The integrated output filename"
+output_hkl = True
+    .type = bool
+    .help = "Output the integrated intensities as a SHELX hkl file"
+hkl =  'integrated.hkl'
+    .type = str
+    .help = "The hkl output filename"
 phil = 'dials.simple_integrate.phil'
     .type = str
     .help = "The output phil file"
-log = 'dials.simple_integrate.log'
+log = 'simple_tof_integrate.log'
     .type = str
     .help = "The log filename"
+}
+corrections {
+lorentz = True
+    .type = bool
+    .help = "Apply the Lorentz Correction"
+}
+method{
+profile_fitting = False
+    .type = bool
+    .help = "Use integration by profile fitting"
 }
 """
 )
@@ -270,18 +286,95 @@ class ReferenceProfile:
         self.idx = idx
 
 
+def print_data(reflections, panel):
+    r = reflections.select(reflections["panel"] == panel)
+    s = ""
+    for i in range(len(r)):
+        s += (
+            f'{r[i]["tof"]*10**6} {r[i]["wavelength"]} {r[i]["xyzobs.px.value"]} {r[i]["intensity.sum.value"]} {np.sqrt(r[i]["intensity.sum.variance"])} {r[i]["miller_index"]}'
+            + "\n"
+        )
+    print(s)
+
+
+def add_lorentz_correction(experiment, reflections):
+    def get_lorentz_correction(detector, sequence, unit_s0, L0, coords, panel):
+        px, py, frame = coords.parts()
+        tof = sequence.get_tof_from_frames(frame)
+        x, y = (
+            detector[panel]
+            .pixel_to_millimeter(cctbx.array_family.flex.vec2_double(px, py))
+            .parts()
+        )
+
+        s1 = detector[panel].get_lab_coord(cctbx.array_family.flex.vec2_double(x, y))
+        L1 = s1.norms() * 10**-3
+        wl4 = sequence.get_tof_wavelengths_in_ang(L0 + L1, tof) ** 4
+        s1 = s1 / s1.norms()
+        sinsqt = np.square(np.sin(np.arccos(s1.dot(unit_s0))))
+        return sinsqt / wl4
+
+    beam = experiment.beam
+    sequence = experiment.sequence
+    detector = experiment.detector
+    L0 = beam.get_sample_to_moderator_distance() * 10**-3
+    unit_s0 = beam.get_unit_s0()
+
+    for i in range(len(reflections)):
+        correction = get_lorentz_correction(
+            detector,
+            sequence,
+            unit_s0,
+            L0,
+            reflections[i]["shoebox"].coords(),
+            reflections[i]["panel"],
+        )
+        reflections[i]["shoebox"].add_correction(correction)
+
+    return reflections
+
+
 def output_reflections_as_hkl(reflections, filename):
+    def get_corrected_intensity_and_sigma(reflections, idx):
+        intensity = reflections["intensity.sum.value"][idx]
+        variance = reflections["intensity.sum.variance"][idx]
+        return intensity, np.sqrt(variance)
+
+    def valid_intensity(intensity):
+        from math import isinf, isnan
+
+        if isnan(intensity) or isinf(intensity):
+            return False
+        return intensity > 0 and intensity < 100000
+
     with open(filename, "w") as g:
         for i in range(len(reflections)):
             h, k, l = reflections["miller_index"][i]
             batch_number = 1
-            intensity = round(reflections["intensity.sum.value"][i], 2)
-            variance = round(reflections["intensity.sum.variance"][i], 2)
+            intensity, sigma = get_corrected_intensity_and_sigma(reflections, i)
+            if not valid_intensity(intensity):
+                continue
+            intensity = round(intensity, 2)
+            sigma = round(sigma, 2)
             wavelength = round(reflections["wavelength_cal"][i], 4)
             g.write(
-                f"  {h} {k} {l} {intensity} {variance} {batch_number} {wavelength}\n"
+                ""
+                + "{:4d}{:4d}{:4d}{:8.1f}{:8.2f}{:4d}{:8.4f}\n".format(
+                    int(h),
+                    int(k),
+                    int(l),
+                    float(intensity),
+                    float(sigma),
+                    int(batch_number),
+                    float(wavelength),
+                )
             )
-        g.write("   0   0   0    0.00    0.00   0  0.0000")
+        g.write(
+            ""
+            + "{:4d}{:4d}{:4d}{:8.1f}{:9.2f}{:4d}{:8.4f}\n".format(
+                int(0), int(0), int(0), float(0.00), float(0.00), int(0), float(0.0000)
+            )
+        )
 
 
 def output_expt_as_ins(expt, filename):
@@ -415,7 +508,7 @@ def run():
 
     phil = phil_scope.fetch()
 
-    usage = "usage: dev.dials.simple_integrate.py models.expt reflections.expt"
+    usage = "usage: dev.dials.simple_tof_integrate.py refined.expt refined.refl"
     parser = ArgumentParser(
         usage=usage,
         phil=phil,
@@ -444,8 +537,8 @@ def run():
     integrated_reflections = run_simple_integrate(params, experiments, reflections)
     integrated_reflections.as_msgpack_file(params.output.reflections)
     experiments.as_file(params.output.experiments)
-    output_reflections_as_hkl(integrated_reflections, "simple_integrated.hkl")
-    output_expt_as_ins(experiments[0], "simple_integrated.ins")
+    if params.output.output_hkl:
+        output_reflections_as_hkl(integrated_reflections, params.output.hkl)
 
 
 def run_simple_integrate(params, experiments, reflections):
@@ -454,10 +547,7 @@ def run_simple_integrate(params, experiments, reflections):
 
     experiment = experiments[0]
 
-    # Remove bad reflections (e.g. those not indexed)
     reflections, _ = process_reference(reflections)
-    # Mask neighbouring pixels to shoeboxes
-    # reflections = filter_reference_pixels(reflections, experiments)
 
     """
     Predict reflections using experiment crystal
@@ -489,20 +579,13 @@ def run_simple_integrate(params, experiments, reflections):
     This is used to predict reflection properties.
     """
 
-    ###TEST
-    # reflections = reflections.select(reflections["panel"]==5)
-    # predicted_reflections = predicted_reflections.select(predicted_reflections["panel"]==5)
-    # predicted_reflections =  predicted_reflections[:1]
-    # reflections =  reflections[:1]
-    ###TEST
-
     # Filter reflections to use to create the model
     used_in_ref = reflections.get_flags(reflections.flags.used_in_refinement)
     model_reflections = reflections.select(used_in_ref)
 
     # sigma_m in 3.1 of Kabsch 2010
-    sigma_m = 0.005
-    sigma_b = 0.005
+    sigma_m = 0.01
+    sigma_b = 0.01
     # The Gaussian model given in 2.3 of Kabsch 2010
     experiment.profile = GaussianRSProfileModel(
         params=params, n_sigma=3, sigma_b=sigma_b, sigma_m=sigma_m
@@ -517,6 +600,10 @@ def run_simple_integrate(params, experiments, reflections):
     """
 
     predicted_reflections.compute_bbox(experiments)
+    x1, x2, y1, y2, t1, t2 = predicted_reflections["bbox"].parts()
+    predicted_reflections = predicted_reflections.select(
+        t2 < experiment.sequence.get_image_range()[1]
+    )
     predicted_reflections.compute_d(experiments)
     predicted_reflections.compute_partiality(experiments)
 
@@ -541,6 +628,11 @@ def run_simple_integrate(params, experiments, reflections):
         image = experiment.imageset.get_corrected_data(i)
         mask = experiment.imageset.get_mask(i)
         shoebox_processor.next_data_only(make_image(image, mask))
+
+    if params.corrections.lorentz:
+        predicted_reflections = add_lorentz_correction(
+            experiment, predicted_reflections
+        )
 
     predicted_reflections.is_overloaded(experiments)
     predicted_reflections.compute_mask(experiments)
@@ -579,6 +671,8 @@ def run_simple_integrate(params, experiments, reflections):
     )
     predicted_reflections["num_pixels.foreground"] = nvalfg
 
+    predicted_reflections.experiment_identifiers()[0] = experiment.identifier
+
     """
     Load modeller that will calculate reference profiles and
     do the actual profile fitting integration.
@@ -586,15 +680,13 @@ def run_simple_integrate(params, experiments, reflections):
 
     sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
     reference_reflections = predicted_reflections.select(sel)
-    reference_reflections.as_msgpack_file(
-        "/home/davidmcdonagh/work/dials/modules/dials/src/dials/command_line/predicted_reference.refl"
-    )
 
-    # Avoid creating reference profiles in areas outside of observed reflections
-    # pz = reflections["xyzobs.px.value"].parts()[2]
-    # experiment.sequence.set_image_range((int(min(pz) - 10), int(max(pz) + 10)))
+    if params.method.profile_fitting is False:
+        integration_report = IntegrationReport(experiments, predicted_reflections)
+        logger.info("")
+        logger.info(integration_report.as_str(prefix=" "))
+        return predicted_reflections
 
-    # Default params when running dials.integrate with C2sum_1_*.cbf.gz
     fit_method = 1  # reciprocal space fitter (called explicitly below)
     grid_method = 2  # regular grid
     grid_size = 5  # Downsampling grid size described in 3.3 of Kabsch 2010
@@ -628,7 +720,6 @@ def run_simple_integrate(params, experiments, reflections):
     sel = ~sel
     reference_reflections = reference_reflections.select(sel)
 
-    """
     processes = [
         pool.apply_async(reference_profile_modeller.model_tof_return, args=(r,))
         for r in split_reflections(reference_reflections, nproc, by_panel=True)
@@ -636,22 +727,14 @@ def run_simple_integrate(params, experiments, reflections):
     result = [p.get() for p in processes]
     for i in result:
         reference_profile_modeller.accumulate(i)
-    """
-    reference_profile_modeller.model_tof(reference_reflections)
-    # reference_profile_modeller.normalize_profiles()
+
+    reference_profile_modeller.normalize_profiles()
 
     profile_model_report = ProfileModelReport(
         experiments, [reference_profile_modeller], model_reflections
     )
     logger.info("")
     logger.info(profile_model_report.as_str(prefix=" "))
-    reference_profiles = get_reference_profiles_as_reflections(
-        reference_profile_modeller
-    )
-
-    reference_profiles.as_msgpack_file(
-        "/home/davidmcdonagh/work/dials/modules/dials/src/dials/command_line/reference_profiles.refl"
-    )
 
     """
     Carry out the integration by fitting to reference profiles in 1D.
@@ -683,14 +766,10 @@ def run_simple_integrate(params, experiments, reflections):
     logger.info(integration_report.as_str(prefix=" "))
 
     """
-    Filter for integrated reflections and remove shoeboxes
+    Remove shoeboxes
     """
 
     del predicted_reflections["shoebox"]
-    sel = predicted_reflections.get_flags(
-        predicted_reflections.flags.integrated, all=False
-    )
-    predicted_reflections = predicted_reflections.select(sel)
     predicted_reflections.experiment_identifiers()[0] = experiment.identifier
     return predicted_reflections
 

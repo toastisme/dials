@@ -1076,7 +1076,7 @@ class _:
         sel = self["panel"] == panel
         x0, x1, y0, y1, z0, z1 = self["bbox"].select(sel).parts()
         if "xyzobs.px.value" in self:
-            centroids = self["xyzcal.px"].select(sel)
+            centroids = self["xyzobs.px.value"].select(sel)
         else:
             centroids = None
         py = int(pixel_pos[0])
@@ -1512,7 +1512,10 @@ Found %s"""
                 if self.contains_beam_data():
                     import numpy as np
 
-                    wavelengths = self["wavelength"].select(sel)
+                    if calculated:
+                        wavelengths = self["wavelength_cal"].select(sel)
+                    else:
+                        wavelengths = self["wavelength"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
                     s1 = s1 / s1.norms()
                     for s1_idx in range(len(s1)):

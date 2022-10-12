@@ -234,11 +234,10 @@ namespace dials {
      * and s0_dash = unit_s0/wavelength_dash
      */
     double to_wavelength(double c3, vec3<double> s_dash) const {
-      double s1_length = s1_.length();
-      DIALS_ASSERT(s1_length > 0);
+      double p_star_length = p_star_.length();
+      DIALS_ASSERT(p_star_length > 0);
       vec3<double> unit_s0 = s0_.normalize();
-      return (e3_ * unit_s0) / (e3_ * s_dash - e3_ * p_star_ - c3 * s1_length);
-      // return 1/((e3_*s_dash - c3*s1_length - e3_*p_star_)/(e3_*unit_s0));
+      return (e3_ * unit_s0) / (e3_ * s_dash - e3_ * p_star_ - c3 * p_star_length);
     }
 
     /**

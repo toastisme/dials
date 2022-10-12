@@ -451,14 +451,9 @@ namespace dials {
       // Get the array indices at the rotation angles
       double z1 = sequence_.get_frame_from_tof(tof1);
       double z2 = sequence_.get_frame_from_tof(tof2);
-      /*
-      if (z1 < 0){
-        z1 = 0;
-      }
-      */
       double2 z(z1, z2);
 
-      int6 bbox(x0, x1, y0, y1, (int)floor(min(z)), (int)ceil(max(z)));
+      int6 bbox(x0, x1, y0, y1, frame - 5, frame + 65);
       DIALS_ASSERT(bbox[1] > bbox[0]);
       DIALS_ASSERT(bbox[3] > bbox[2]);
       DIALS_ASSERT(bbox[5] > bbox[4]);

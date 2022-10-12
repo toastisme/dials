@@ -12,7 +12,7 @@ import gltbx
 import gltbx.gl as gl
 import libtbx.phil
 import wxtbx.utils
-from dxtbx.model import MultiAxisGoniometer
+from dxtbx.model import MultiAxisGoniometer, Scan
 from scitbx.array_family import flex
 from scitbx.math import minimum_covering_sphere
 
@@ -495,7 +495,11 @@ class GeometryWindow(wx_viewer.show_points_and_lines_mixin):
             self.draw_axis(axis.elems, "phi")
         self.draw_axis(beam.get_unit_s0(), "beam")
         crystal = self.parent.crystal
-        if self.settings.show_crystal_axes and crystal is not None:
+        if (
+            self.settings.show_crystal_axes
+            and crystal is not None
+            and isinstance(self.parent.imageset.get_sequence(), Scan)
+        ):
             crystal = copy.deepcopy(crystal)
             scan = self.parent.imageset.get_sequence()
             fixed_rotation = matrix.sqr(gonio.get_fixed_rotation())
