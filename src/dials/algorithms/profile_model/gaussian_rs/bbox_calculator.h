@@ -23,7 +23,6 @@
 #include <dxtbx/model/sequence.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
 #include <dials/algorithms/profile_model/gaussian_rs/coordinate_system.h>
-#include <iostream>
 
 namespace dials {
   namespace algorithms {
@@ -464,7 +463,7 @@ namespace dials {
      * Calculate the rois for an array of reflections given by the array of
      * diffracted beam vectors and rotation angles.
      * @param s1 The array of diffracted beam vectors
-     * @param phi The array wf rotation angles.
+     * @param phi The array of rotation angles.
      */
     virtual af::shared<int6> array(const af::const_ref<vec3<double> > &s0,
                                    const af::const_ref<vec3<double> > &s1,

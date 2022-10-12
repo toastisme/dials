@@ -820,7 +820,7 @@ namespace dials { namespace algorithms {
             }
 
           } catch (dials::error const &e) {
-            std::cout << e.what() << std::endl;
+            // std::cout << e.what() << std::endl;
             continue;
           }
         }
