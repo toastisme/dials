@@ -56,7 +56,7 @@ log = 'simple_tof_integrate.log'
     .help = "The log filename"
 }
 corrections {
-lorentz = True
+lorentz = False
     .type = bool
     .help = "Apply the Lorentz Correction"
 }

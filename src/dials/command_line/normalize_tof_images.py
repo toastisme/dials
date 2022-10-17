@@ -29,6 +29,20 @@ empty_run = None
     .type = str
     .help = "Empty run to correct empty counts"
 }
+corrections{
+lorentz = True
+    .type = bool
+    .help = "Apply the Lorentz correction"
+spherical_absorption = True
+    .type = bool
+    .help = "Apply a spherical absorption correction"
+vanadium_and_empty = True
+    .type = bool
+    .help = "Divide the target by the vanadium run and subtract the empty run"
+normalize_by_bin_width = True
+    .type = bool
+    .help = "Divide target intensities by ToF bin widths in units of k=2pi/lambda"
+}
 output {
 experiments = 'imported.expt'
     .type = str
@@ -110,7 +124,7 @@ def calculate_absorption_correction(
 ):
 
     if spectra is None:
-        spectra = fmt_instance.get_raw_spectra(normalize_by_proton_charge=True)
+        spectra = fmt_instance.get_raw_spectra(normalize_by_proton_charge=False)
 
     spherical_absorption = SphericalAbsorption(
         radius=radius,
@@ -127,12 +141,14 @@ def calculate_absorption_correction(
     )
 
 
-def process_correction_spectra(vanadium_instance, empty_instance, shrink_factor):
+def process_correction_spectra(
+    params, vanadium_instance, empty_instance, shrink_factor
+):
 
     vanadium_spectra = vanadium_instance.get_raw_spectra(
-        normalize_by_proton_charge=True
+        normalize_by_proton_charge=False
     )
-    empty_spectra = empty_instance.get_raw_spectra(normalize_by_proton_charge=True)
+    empty_spectra = empty_instance.get_raw_spectra(normalize_by_proton_charge=False)
 
     assert vanadium_spectra.shape == empty_spectra.shape
 
@@ -154,8 +170,9 @@ def process_correction_spectra(vanadium_instance, empty_instance, shrink_factor)
     vanadium_spectra = expand_spectra(vanadium_spectra, shrink_factor, remainder)
 
     # Normalise with absorption correction
-    absorption_correction = get_vanadium_absorption_correction(vanadium_instance)
-    vanadium_spectra = vanadium_spectra / absorption_correction
+    if params.corrections.spherical_absorption:
+        absorption_correction = get_vanadium_absorption_correction(vanadium_instance)
+        vanadium_spectra = vanadium_spectra / absorption_correction
 
     return vanadium_spectra, empty_spectra
 
@@ -186,6 +203,27 @@ def get_corrected_image_name(expt: Experiment, file_suffix: str) -> str:
     reader = expt.imageset.reader()
     current_filename, ext = splitext(reader.paths()[0])
     return current_filename + file_suffix + ext
+
+
+def apply_lorentz_correction(expt_instance, L0, sequence, spectra, two_theta_spectra):
+    def get_lorentz_correction(sequence, L0, L1, tof, sin_sq_two_theta):
+        wl4 = sequence.get_tof_wavelength_in_ang(L0 + L1, tof) ** 4
+        return sin_sq_two_theta / wl4
+
+    L1_spectra = expt_instance.get_raw_spectra_L1()  # (45100,)
+    tof = expt_instance.get_tof_in_seconds()  # (1821,)
+    # spectra (1, 45100, 1821)
+    # two_theta_spectra (45100,)
+    two_theta_spectra = np.square(np.sin(two_theta_spectra * 0.5))
+
+    for i in range(spectra.shape[1]):
+        for j in range(spectra.shape[2]):
+            correction = get_lorentz_correction(
+                sequence, L0, L1_spectra[i], tof[j], two_theta_spectra[i]
+            )
+            spectra[0, i, j] = spectra[0, i, j] * correction
+
+    return spectra
 
 
 def correct_spectra_for_bin_width(expt_instance, spectra, detector):
@@ -219,58 +257,72 @@ def run():
     """
 
     experiments = params.input.experiments[0].data
-    expt_instance = (
-        experiments[0]
-        .imageset.get_format_class()
-        .get_instance(
-            experiments[0].imageset.paths()[0],
-            **experiments[0].imageset.data().get_params(),
-        )
-    )
-    vanadium_instance = fc(params.input.vanadium_run)
-    empty_instance = fc(params.input.empty_run)
-
-    vanadium_spectra, empty_spectra = process_correction_spectra(
-        vanadium_instance, empty_instance, shrink_factor=7
+    experiment = experiments[0]
+    expt_instance = experiment.imageset.get_format_class().get_instance(
+        experiment.imageset.paths()[0],
+        **experiment.imageset.data().get_params(),
     )
 
     """
     Correct experiment spectra
     """
 
-    spectra = expt_instance.get_raw_spectra(normalize_by_proton_charge=True)
+    spectra = expt_instance.get_raw_spectra(normalize_by_proton_charge=False)
 
-    # Correct for empty counts
-    spectra = spectra - empty_spectra
+    if params.corrections.vanadium_and_empty:
+        vanadium_instance = fc(params.input.vanadium_run)
+        empty_instance = fc(params.input.empty_run)
 
-    # Normalize intensities
-    spectra = spectra / vanadium_spectra
-    spectra[np.isinf(spectra)] = 0
-    spectra[np.isnan(spectra)] = 0
+        vanadium_spectra, empty_spectra = process_correction_spectra(
+            params, vanadium_instance, empty_instance, shrink_factor=7
+        )
 
-    # Apply absorption correction
-    nacl_sample_number_density = 0.0223
-    nacl_radius = 0.3
-    scattering_x_section = 10.040
-    absorption_x_section = 17.015
+        # Correct for empty counts
+        spectra = spectra - empty_spectra
 
-    logger.info("Calculating target absorption correction")
-    absorption_correction = calculate_absorption_correction(
-        fmt_instance=expt_instance,
-        radius=nacl_radius,
-        sample_number_density=nacl_sample_number_density,
-        scattering_x_section=scattering_x_section,
-        absorption_x_section=absorption_x_section,
-    )
+        # Normalize intensities
+        spectra = spectra / vanadium_spectra
+        spectra[np.isinf(spectra)] = 0
+        spectra[np.isnan(spectra)] = 0
 
-    spectra = spectra / absorption_correction
-    spectra[np.isinf(spectra)] = 0
-    spectra[np.isnan(spectra)] = 0
+    if params.corrections.spherical_absorption:
 
-    logger.info("Correcting for ToF bin width")
-    spectra = correct_spectra_for_bin_width(
-        expt_instance, spectra, experiments[0].detector
-    )
+        logger.info("Calculating target absorption correction")
+        nacl_sample_number_density = 0.0223
+        nacl_radius = 0.3
+        scattering_x_section = 10.040
+        absorption_x_section = 17.015
+
+        absorption_correction = calculate_absorption_correction(
+            fmt_instance=expt_instance,
+            radius=nacl_radius,
+            sample_number_density=nacl_sample_number_density,
+            scattering_x_section=scattering_x_section,
+            absorption_x_section=absorption_x_section,
+        )
+
+        spectra = spectra / absorption_correction
+        spectra[np.isinf(spectra)] = 0
+        spectra[np.isnan(spectra)] = 0
+
+    if params.corrections.normalize_by_bin_width:
+
+        logger.info("Correcting for ToF bin width")
+
+        spectra = correct_spectra_for_bin_width(
+            expt_instance, spectra, experiments[0].detector
+        )
+
+    if params.corrections.lorentz:
+
+        logger.info("Applying Lorentz correction")
+
+        sequence = experiment.sequence
+        L0 = experiment.beam.get_sample_to_moderator_distance() * 10**-3
+        two_theta = np.array(expt_instance.get_raw_spectra_two_theta())
+        spectra = apply_lorentz_correction(
+            expt_instance, L0, sequence, spectra, two_theta
+        )
 
     output_filename = get_corrected_image_name(
         experiments[0], params.output.image_file_suffix
