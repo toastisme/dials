@@ -55,11 +55,6 @@ log = 'simple_tof_integrate.log'
     .type = str
     .help = "The log filename"
 }
-corrections {
-lorentz = True
-    .type = bool
-    .help = "Apply the Lorentz Correction"
-}
 method{
 profile_fitting = False
     .type = bool
@@ -297,43 +292,6 @@ def print_data(reflections, panel):
     print(s)
 
 
-def add_lorentz_correction(experiment, reflections):
-    def get_lorentz_correction(detector, sequence, unit_s0, L0, coords, panel):
-        px, py, frame = coords.parts()
-        tof = sequence.get_tof_from_frames(frame)
-        x, y = (
-            detector[panel]
-            .pixel_to_millimeter(cctbx.array_family.flex.vec2_double(px, py))
-            .parts()
-        )
-
-        s1 = detector[panel].get_lab_coord(cctbx.array_family.flex.vec2_double(x, y))
-        L1 = s1.norms() * 10**-3
-        wl4 = sequence.get_tof_wavelengths_in_ang(L0 + L1, tof) ** 4
-        s1 = s1 / s1.norms()
-        sinsqt = np.square(np.sin(np.arccos(s1.dot(unit_s0))))
-        return sinsqt / wl4
-
-    beam = experiment.beam
-    sequence = experiment.sequence
-    detector = experiment.detector
-    L0 = beam.get_sample_to_moderator_distance() * 10**-3
-    unit_s0 = beam.get_unit_s0()
-
-    for i in range(len(reflections)):
-        correction = get_lorentz_correction(
-            detector,
-            sequence,
-            unit_s0,
-            L0,
-            reflections[i]["shoebox"].coords(),
-            reflections[i]["panel"],
-        )
-        reflections[i]["shoebox"].add_correction(correction)
-
-    return reflections
-
-
 def output_reflections_as_hkl(reflections, filename):
     def get_corrected_intensity_and_sigma(reflections, idx):
         intensity = reflections["intensity.sum.value"][idx]
@@ -345,7 +303,7 @@ def output_reflections_as_hkl(reflections, filename):
 
         if isnan(intensity) or isinf(intensity):
             return False
-        return intensity > 0 and intensity < 100000
+        return intensity > 0
 
     with open(filename, "w") as g:
         for i in range(len(reflections)):
@@ -628,11 +586,6 @@ def run_simple_integrate(params, experiments, reflections):
         image = experiment.imageset.get_corrected_data(i)
         mask = experiment.imageset.get_mask(i)
         shoebox_processor.next_data_only(make_image(image, mask))
-
-    if params.corrections.lorentz:
-        predicted_reflections = add_lorentz_correction(
-            experiment, predicted_reflections
-        )
 
     predicted_reflections.is_overloaded(experiments)
     predicted_reflections.compute_mask(experiments)

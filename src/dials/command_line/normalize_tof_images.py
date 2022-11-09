@@ -4,12 +4,14 @@ from __future__ import annotations
 import logging
 import multiprocessing
 from os.path import splitext
+from typing import Optional, Tuple
 
 import numpy as np
-from scipy import interpolate
+from scipy.signal import savgol_filter
 
-from dxtbx.format.FormatISISSXD import FormatISISSXD as fc
-from dxtbx.model import Experiment
+from dxtbx.format import Format
+from dxtbx.model import Beam, Detector, Experiment, TOFSequence
+from libtbx import Auto, phil
 
 import dials.util.log
 from dials.algorithms.scaling.tof_absorption_correction import SphericalAbsorption
@@ -22,53 +24,137 @@ logger = logging.getLogger("dials.command_line.normalize_tof_images")
 phil_scope = parse(
     """
 input{
-vanadium_run = None
-    .type = str
-    .help = "Vanaduim run to normalize intensities"
-empty_run = None
-    .type = str
-    .help = "Empty run to correct empty counts"
+    incident_run = None
+        .type = str
+        .help = "Path to incident run to normalize intensities (e.g. Vanadium)."
+    empty_run = None
+        .type = str
+        .help = "Path to empty run to correct empty counts."
+}
+corrections{
+    lorentz = True
+        .type = bool
+        .help = "Apply the Lorentz correction to target spectrum."
+    spherical_absorption = True
+        .type = bool
+        .help = "Apply a spherical absorption correction."
+    incident_and_empty = True
+        .type = bool
+        .help = "Divide the target by the incident (e.g. Vanadium) run"q
+                "and subtract the empty run."
+    normalize_by_bin_width = True
+        .type = bool
+        .help = "Multiply ToF bin widths by their ToF width."
+    smoothing_window_length = 51
+        .type = int
+        .help = "The length of the filter window used in the savgol_filter"
+                "for smoothing incident and empty runs."
+    smoothing_polyorder = 3
+        .type = int
+        .help = "The order of polynormial used in the savgol_filter for "
+                "smoothing incident and empty run."
+    shrink_factor = 7
+        .type = int
+        .help = "Factor used to shrink incident and empty spectra to speed up"
+                "computation time."
+}
+incident_spectrum{
+    sample_number_density = 0.0722
+        .type = float
+        .help = "Sample number density for incident run."
+                "Default is Vanadium used at SXD"
+    sample_radius = 0.3
+        .type = float
+        .help = "Sample radius incident run."
+                "Default is Vanadium used at SXD"
+    scattering_x_section = 5.158
+        .type = float
+        .help = "Sample scattering cross section used for incident run."
+                "Default is Vanadium used at SXD"
+    absorption_x_section = 4.4883
+        .type = float
+        .help = "Sample absorption cross section for incident run."
+                "Default is Vanadium used at SXD"
+}
+target_spectrum{
+    sample_number_density = None
+        .type = float
+        .help = "Sample number density for target run."
+    sample_radius = None
+        .type = float
+        .help = "Sample radius target run."
+    scattering_x_section = None
+        .type = float
+        .help = "Sample scattering cross section used for target run."
+    absorption_x_section = None
+        .type = float
+        .help = "Sample absorption cross section for target run."
+}
+mp{
+    nproc = Auto
+        .type = int(value_min=1)
+        .help = "Number of processors to use during parallelized steps."
+        "If set to Auto DIALS will choose automatically."
 }
 output {
-experiments = 'imported.expt'
-    .type = str
-    .help = "The experiments output filename"
-image_file_suffix = '_corrected'
-    .type = str
-    .help = "Suffix of the corrected image file"
-phil = 'dials.normalize_tof_images.phil'
-    .type = str
-    .help = "The output phil file"
-log = 'dials.normalize_tof_images.log'
-    .type = str
-    .help = "The log filename"
+    experiments = 'imported.expt'
+        .type = str
+        .help = "The experiments output filename."
+    image_file_suffix = '_corrected'
+        .type = str
+        .help = "Suffix of the corrected image file."
+    phil = 'dials.normalize_tof_images.phil'
+        .type = str
+        .help = "The output phil file."
+    log = 'dials.normalize_tof_images.log'
+        .type = str
+        .help = "The log filename."
 }
 """
 )
 
 
-def run_interpolate(x, y, smooth_param):
-    tck = interpolate.splrep(x, y, k=3, s=smooth_param)
-    return interpolate.splev(x, tck, der=0)
+def run_interpolate(y: np.array, window_length: int, polyorder: int) -> np.array:
+    return savgol_filter(y, window_length, polyorder)
 
 
-def smooth_spectra(spectra_arr, smooth_param):
-    nproc = 14
+def smooth_spectra(
+    spectra_arr: np.array, window_length: int, polyorder: int, nproc: int
+) -> np.array:
+
+    """
+    Smooth spectra array along ToF to reduce noise.
+    Assumes spectra_arr has shape (1, spectra_num, ToF).
+    window_length and polyorder are params for savgol_filter.
+    See  https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.savgol_filter.html
+    """
+
+    assert (
+        spectra_arr.ndim == 3
+    ), "spectra_arr assumed to have shape (1, spectra_num, ToF)"
+
     pool = multiprocessing.Pool(nproc)
-    x = range(len(spectra_arr[0, 0]))
 
     processes = [
-        pool.apply_async(run_interpolate, args=(x, y, smooth_param))
+        pool.apply_async(run_interpolate, args=(y, window_length, polyorder))
         for y in spectra_arr[0]
     ]
-    result = [p.get() for p in processes]
+    result = np.array([p.get() for p in processes])
 
-    for idx, _ in enumerate(spectra_arr[0]):
-        spectra_arr[0, idx] = result[idx]
-    return spectra_arr
+    return result.reshape(1, result.shape[0], result.shape[1])
 
 
-def shrink_spectra(spectra_arr, shrink_factor):
+def shrink_spectra(spectra_arr: np.array, shrink_factor: int) -> np.array:
+
+    """
+    Reduce spectra size by shrink_factor.
+    Assumes spectra_arr has shape (1, spectra_num, ToF).
+    Main purpose of this is to speed up computation.
+    """
+
+    assert (
+        spectra_arr.ndim == 3
+    ), "spectra_arr assumed to have shape (1, spectra_num, ToF)"
 
     # Slice off end if it does not neatly divide
     remainder = spectra_arr.shape[-1] % shrink_factor
@@ -83,7 +169,18 @@ def shrink_spectra(spectra_arr, shrink_factor):
     )
 
 
-def expand_spectra(spectra_arr, expand_factor, remainder, divide=False):
+def expand_spectra(
+    spectra_arr: np.array, expand_factor: int, remainder: int, divide: bool = False
+) -> np.array:
+
+    """
+    Expand spectra by expand_factor, then pad by remainder.
+    Remainder is padded using the final value for each spectra.
+    """
+
+    assert (
+        spectra_arr.ndim == 3
+    ), "spectra_arr assumed to have shape (1, spectra_num, ToF)"
 
     if divide:
         spectra_arr = spectra_arr / expand_factor
@@ -101,13 +198,20 @@ def expand_spectra(spectra_arr, expand_factor, remainder, divide=False):
 
 
 def calculate_absorption_correction(
-    fmt_instance,
-    radius,
-    sample_number_density,
-    scattering_x_section,
-    absorption_x_section,
-    spectra=None,
-):
+    fmt_instance: Format,
+    detector: Detector,
+    beam: Beam,
+    radius: float,
+    sample_number_density: float,
+    scattering_x_section: float,
+    absorption_x_section: float,
+    spectra: Optional[np.array] = None,
+) -> np.array:
+
+    """
+    Calculates the spherical absorption correction for spectra (or spectra from
+    fmt_instance if spectra is None)
+    """
 
     if spectra is None:
         spectra = fmt_instance.get_raw_spectra(normalize_by_proton_charge=True)
@@ -119,7 +223,8 @@ def calculate_absorption_correction(
         absorption_x_section=absorption_x_section,
     )
 
-    two_theta = np.array(fmt_instance.get_raw_spectra_two_theta())
+    two_theta = np.array(fmt_instance.get_raw_spectra_two_theta(detector, beam))
+    # TODO correct wavelengths for each pixel location
     wavelengths = np.array(fmt_instance.get_wavelength_channels_in_ang())
 
     return spherical_absorption.get_absorption_correction_vec(
@@ -127,49 +232,87 @@ def calculate_absorption_correction(
     )
 
 
-def process_correction_spectra(vanadium_instance, empty_instance, shrink_factor):
+def process_incident_and_empty_spectra(
+    params: phil.scope_extract,
+    experiment: Experiment,
+    incident_instance: Format,
+    empty_instance: Format,
+    shrink_factor: int,
+) -> Tuple(np.array, np.array):
 
-    vanadium_spectra = vanadium_instance.get_raw_spectra(
+    """
+    Smooths both the incident and empty runs.
+    Corrects incident run for empty run and absorption.
+    """
+
+    incident_spectra = incident_instance.get_raw_spectra(
         normalize_by_proton_charge=True
     )
+
     empty_spectra = empty_instance.get_raw_spectra(normalize_by_proton_charge=True)
 
-    assert vanadium_spectra.shape == empty_spectra.shape
+    assert incident_spectra.shape == empty_spectra.shape
 
     # Preprocess to remove noise / decrease computation time
     logger.info("Smoothing empty spectra")
     empty_spectra, _ = shrink_spectra(empty_spectra, shrink_factor)
 
-    empty_spectra = smooth_spectra(empty_spectra, smooth_param=0.005)
+    empty_spectra = smooth_spectra(
+        empty_spectra,
+        params.corrections.smoothing_window_length,
+        params.corrections.smoothing_polyorder,
+        params.mp.nproc,
+    )
 
-    logger.info("Smoothing vanadium spectra")
-    vanadium_spectra, remainder = shrink_spectra(vanadium_spectra, shrink_factor)
+    logger.info("Smoothing incident spectra")
+    incident_spectra, remainder = shrink_spectra(incident_spectra, shrink_factor)
 
-    vanadium_spectra = smooth_spectra(vanadium_spectra, smooth_param=0.005)
+    incident_spectra = smooth_spectra(
+        incident_spectra,
+        params.corrections.smoothing_window_length,
+        params.corrections.smoothing_polyorder,
+        params.mp.nproc,
+    )
 
     # Subtract empty spectra to correct for empty values
-    vanadium_spectra = vanadium_spectra - empty_spectra
+    incident_spectra = incident_spectra - empty_spectra
 
+    # TODO Mantid appears to divide empty spectra but not incident
+    # Need to confirm and check why
     empty_spectra = expand_spectra(empty_spectra, shrink_factor, remainder, divide=True)
-    vanadium_spectra = expand_spectra(vanadium_spectra, shrink_factor, remainder)
+    incident_spectra = expand_spectra(
+        incident_spectra, shrink_factor, remainder, divide=False
+    )
 
     # Normalise with absorption correction
-    absorption_correction = get_vanadium_absorption_correction(vanadium_instance)
-    vanadium_spectra = vanadium_spectra / absorption_correction
+    if params.corrections.spherical_absorption:
+        absorption_correction = get_incident_absorption_correction(
+            params, incident_instance, experiment.detector, experiment.beam
+        )
+        incident_spectra = incident_spectra / absorption_correction
 
-    return vanadium_spectra, empty_spectra
+    return incident_spectra, empty_spectra
 
 
-def get_vanadium_absorption_correction(vanadium_instance):
-    vanadium_sample_number_density = 0.0722
-    vanadium_radius = 0.3
-    scattering_x_section = 5.158
-    absorption_x_section = 4.883
-    logger.info("Calculating vanadium absorption correction")
+def get_incident_absorption_correction(
+    params: phil.scope_extract,
+    incident_spectrum_instance: Format,
+    detector: Detector,
+    beam: Beam,
+) -> np.array:
+
+    sample_number_density = params.incident_spectrum.sample_number_density
+    radius = params.incident_spectrum.sample_radius
+    scattering_x_section = params.incident_spectrum.scattering_x_section
+    absorption_x_section = params.incident_spectrum.absorption_x_section
+
+    logger.info("Calculating incident spectrum absorption correction")
     absorption_correction = calculate_absorption_correction(
-        fmt_instance=vanadium_instance,
-        radius=vanadium_radius,
-        sample_number_density=vanadium_sample_number_density,
+        fmt_instance=incident_spectrum_instance,
+        detector=detector,
+        beam=beam,
+        radius=radius,
+        sample_number_density=sample_number_density,
         scattering_x_section=scattering_x_section,
         absorption_x_section=absorption_x_section,
     )
@@ -177,6 +320,9 @@ def get_vanadium_absorption_correction(vanadium_instance):
 
 
 def update_image_path(expt: Experiment, new_image_path: str) -> Experiment:
+    """
+    Change image_path of expt to new_image_path
+    """
     reader = expt.imageset.reader()
     reader.set_path(new_image_path)
     return expt
@@ -188,11 +334,109 @@ def get_corrected_image_name(expt: Experiment, file_suffix: str) -> str:
     return current_filename + file_suffix + ext
 
 
-def correct_spectra_for_bin_width(expt_instance, spectra, detector):
-    return spectra / expt_instance.get_momentum_correction(detector)
+def apply_lorentz_correction(
+    expt_instance: Format,
+    experiment: Experiment,
+    spectra: np.array,
+    two_theta_spectra: np.array,
+) -> np.array:
+
+    """
+    Returns spectra with the Lorentz correction applied.
+    (sin^2(theta)/lambda^4)
+    """
+
+    def get_lorentz_correction(
+        sequence: TOFSequence,
+        L0: float,
+        L1: float,
+        tof: float,
+        sin_sq_two_theta: float,
+    ):
+        wl = sequence.get_tof_wavelength_in_ang(L0 + L1, tof)
+        correction = sin_sq_two_theta / wl**4
+        return correction
+
+    sequence = experiment.sequence
+    L0 = experiment.beam.get_sample_to_moderator_distance() * 10**-3
+    L1_spectra = expt_instance.get_raw_spectra_L1(experiment.detector)
+    tof = expt_instance.get_tof_in_seconds()
+    two_theta_spectra_sq = np.square(np.sin(two_theta_spectra * 0.5))
+
+    for i in range(spectra.shape[1]):
+        for j in range(spectra.shape[2]):
+            correction = get_lorentz_correction(
+                sequence, L0, L1_spectra[i], tof[j], two_theta_spectra_sq[i]
+            )
+            spectra[0, i, j] = spectra[0, i, j] * correction
+    return spectra
 
 
-def run():
+def correct_spectra_for_bin_width(expt_instance: Format, spectra: np.array) -> np.array:
+
+    """
+    Divides each value in spectra by its ToF bin width to correct for
+    intensities being artificially increased for larger bin widths.
+    """
+
+    spectra = spectra / expt_instance.get_bin_width_correction()
+    return spectra
+
+
+def sanity_check_params(params: phil.scope_extract) -> None:
+
+    # Params of incident_and_empty
+    if params.corrections.incident_and_empty:
+
+        assert params.input.incident_run is not None, (
+            "Trying to correct for incident run but "
+            "input.incident_run has not been specified"
+        )
+        assert params.input.empty_run is not None, (
+            "Trying to correct for empty run but "
+            "input.empty_run has not been specified"
+        )
+
+    # Params for absorption correction
+    if params.corrections.spherical_absorption:
+
+        assert params.target_spectrum.sample_number_density is not None, (
+            "Trying to correct target for absorption but "
+            "target_spectrum.sample_number_density has not been set"
+        )
+        assert params.target_spectrum.sample_radius is not None, (
+            "Trying to correct target for absorption but "
+            "target_spectrum.sample_radius has not been set"
+        )
+        assert params.target_spectrum.scattering_x_section is not None, (
+            "Trying to correct target for absorption but "
+            "target_spectrum.scattering_x_section has not been set"
+        )
+        assert params.target_spectrum.absorption_x_section is not None, (
+            "Trying to correct target for absorption but "
+            "target_spectrum.absorption_x_section has not been set"
+        )
+
+        if params.corrections.incident_and_empty:
+            assert params.incident_spectrum.sample_number_density is not None, (
+                "Trying to correct incident for absorption but "
+                "incident_spectrum.sample_number_density has not been set"
+            )
+            assert params.incident_spectrum.sample_radius is not None, (
+                "Trying to correct incident for absorption but "
+                "incident_spectrum.sample_radius has not been set"
+            )
+            assert params.incident_spectrum.scattering_x_section is not None, (
+                "Trying to correct incident for absorption but "
+                "incident_spectrum.scattering_x_section has not been set"
+            )
+            assert params.incident_spectrum.absorption_x_section is not None, (
+                "Trying to correct incident for absorption but "
+                "incident_spectrum.absorption_x_section has not been set"
+            )
+
+
+def run() -> None:
 
     """
     Input setup
@@ -200,7 +444,7 @@ def run():
 
     phil = phil_scope.fetch()
 
-    usage = "usage: dev.dials.normalize_tof_images imported.expt vanadium_run=vanadium_run.nxs empty_run=empty_run.nxs"
+    usage = "usage: dev.dials.normalize_tof_images imported.expt incident_run=vanadium_run.nxs empty_run=empty_run.nxs"
     parser = ArgumentParser(
         usage=usage,
         phil=phil,
@@ -214,24 +458,22 @@ def run():
     dials.util.log.config(verbosity=options.verbose, logfile=params.output.log)
     logger.info(dials_version())
 
+    sanity_check_params(params)
+
+    if params.mp.nproc is Auto:
+        params.mp.nproc = multiprocessing.cpu_count()
+        logger.info(f"Using {params.mp.nproc} processors.")
+
     """
     Load the files
     """
 
     experiments = params.input.experiments[0].data
-    expt_instance = (
-        experiments[0]
-        .imageset.get_format_class()
-        .get_instance(
-            experiments[0].imageset.paths()[0],
-            **experiments[0].imageset.data().get_params(),
-        )
-    )
-    vanadium_instance = fc(params.input.vanadium_run)
-    empty_instance = fc(params.input.empty_run)
-
-    vanadium_spectra, empty_spectra = process_correction_spectra(
-        vanadium_instance, empty_instance, shrink_factor=7
+    experiment = experiments[0]
+    experiment_cls = experiment.imageset.get_format_class()
+    expt_instance = experiment_cls.get_instance(
+        experiment.imageset.paths()[0],
+        **experiment.imageset.data().get_params(),
     )
 
     """
@@ -240,37 +482,67 @@ def run():
 
     spectra = expt_instance.get_raw_spectra(normalize_by_proton_charge=True)
 
-    # Correct for empty counts
-    spectra = spectra - empty_spectra
+    if params.corrections.incident_and_empty:
 
-    # Normalize intensities
-    spectra = spectra / vanadium_spectra
-    spectra[np.isinf(spectra)] = 0
-    spectra[np.isnan(spectra)] = 0
+        incident_instance = experiment_cls(params.input.incident_run)
+        empty_instance = experiment_cls(params.input.empty_run)
 
-    # Apply absorption correction
-    nacl_sample_number_density = 0.0223
-    nacl_radius = 0.3
-    scattering_x_section = 10.040
-    absorption_x_section = 17.015
+        incident_spectra, empty_spectra = process_incident_and_empty_spectra(
+            params,
+            experiment,
+            incident_instance,
+            empty_instance,
+            params.corrections.shrink_factor,
+        )
 
-    logger.info("Calculating target absorption correction")
-    absorption_correction = calculate_absorption_correction(
-        fmt_instance=expt_instance,
-        radius=nacl_radius,
-        sample_number_density=nacl_sample_number_density,
-        scattering_x_section=scattering_x_section,
-        absorption_x_section=absorption_x_section,
-    )
+        # Correct for empty counts
+        spectra = spectra - empty_spectra
 
-    spectra = spectra / absorption_correction
-    spectra[np.isinf(spectra)] = 0
-    spectra[np.isnan(spectra)] = 0
+        # Normalize intensities
+        spectra = spectra / incident_spectra
+        spectra[np.isinf(spectra)] = 0
+        spectra[np.isnan(spectra)] = 0
 
-    logger.info("Correcting for ToF bin width")
-    spectra = correct_spectra_for_bin_width(
-        expt_instance, spectra, experiments[0].detector
-    )
+    if params.corrections.spherical_absorption:
+
+        logger.info("Calculating target absorption correction")
+        sample_number_density = params.target_spectrum.sample_number_density
+        radius = params.target_spectrum.sample_radius
+        scattering_x_section = params.target_spectrum.scattering_x_section
+        absorption_x_section = params.target_spectrum.absorption_x_section
+
+        absorption_correction = calculate_absorption_correction(
+            fmt_instance=expt_instance,
+            detector=experiment.detector,
+            beam=experiment.beam,
+            radius=radius,
+            sample_number_density=sample_number_density,
+            scattering_x_section=scattering_x_section,
+            absorption_x_section=absorption_x_section,
+        )
+
+        spectra = spectra / absorption_correction
+        spectra[np.isinf(spectra)] = 0
+        spectra[np.isnan(spectra)] = 0
+
+    if params.corrections.normalize_by_bin_width:
+
+        logger.info("Correcting for ToF bin width")
+
+        spectra = correct_spectra_for_bin_width(expt_instance, spectra)
+
+    if params.corrections.lorentz:
+
+        logger.info("Applying Lorentz correction")
+
+        two_theta = np.array(
+            expt_instance.get_raw_spectra_two_theta(
+                experiment.detector, experiment.beam
+            )
+        )
+        spectra = apply_lorentz_correction(
+            expt_instance, experiment, spectra, two_theta
+        )
 
     output_filename = get_corrected_image_name(
         experiments[0], params.output.image_file_suffix
