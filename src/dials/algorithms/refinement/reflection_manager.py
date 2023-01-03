@@ -3,11 +3,13 @@ principally ReflectionManager."""
 
 from __future__ import annotations
 
+import copy
 import logging
 import math
 import random
 
 import libtbx
+from dxtbx.model.experiment_list import ExperimentList
 from libtbx.phil import parse
 from scitbx import matrix
 from scitbx.math import five_number_summary
@@ -209,67 +211,27 @@ class BlockCalculator:
 
 class ReflectionManagerFactory:
     @staticmethod
-    def from_parameters_reflections_experiments(
-        params, reflections, experiments, do_stills=False
-    ):
-        """Given a set of parameters and models, build a reflection manager
+    def stills_manager(
+        params, reflections, experiments: ExperimentList
+    ) -> StillsReflectionManager:
 
-        Params:
-            params The input parameters
+        refman = StillsReflectionManager
 
-        Returns:
-            The reflection manager instance
-        """
+        ## Outlier detection
 
-        # While a random subset of reflections is used, continue to
-        # set random.seed to get consistent behaviour
-        if params.random_seed is not None:
-            random.seed(params.random_seed)
-            flex.set_random_seed(params.random_seed)
-            logger.debug("Random seed set to %d", params.random_seed)
-
-        # check whether we deal with stills or scans
-        if do_stills:
-            refman = StillsReflectionManager
-            # check incompatible weighting strategy
-            if params.weighting_strategy.override == "statistical":
-                raise DialsRefineConfigError(
-                    'The "statistical" weighting strategy is not compatible '
-                    "with stills refinement"
-                )
-        else:
-            refman = ReflectionManager
-            # check incompatible weighting strategy
-            if params.weighting_strategy.override in ["stills", "external_deltapsi"]:
-                msg = (
-                    'The "{}" weighting strategy is not compatible with '
-                    "scan refinement"
-                ).format(params.weighting_strategy.override)
-                raise DialsRefineConfigError(msg)
-
-        # set automatic outlier rejection options
         if params.outlier.algorithm in ("auto", libtbx.Auto):
-            if do_stills:
-                params.outlier.algorithm = "sauter_poon"
-            else:
-                params.outlier.algorithm = "mcd"
+            params.outlier.algorithm = "sauter_poon"
+        if params.outlier.sauter_poon.px_sz is libtbx.Auto:
+            # get this from the first panel of the first detector
+            params.outlier.sauter_poon.px_sz = experiments.detectors()[0][
+                0
+            ].get_pixel_size()
 
-        if params.outlier.algorithm == "sauter_poon":
-            if params.outlier.sauter_poon.px_sz is libtbx.Auto:
-                # get this from the first panel of the first detector
-                params.outlier.sauter_poon.px_sz = experiments.detectors()[0][
-                    0
-                ].get_pixel_size()
-
-        # do outlier rejection?
         if params.outlier.algorithm in ("null", None):
             outlier_detector = None
         else:
-            if do_stills:
-                colnames = ["x_resid", "y_resid"]
-                params.outlier.block_width = None
-            else:
-                colnames = ["x_resid", "y_resid", "phi_resid"]
+            colnames = ["x_resid", "y_resid"]
+            params.outlier.block_width = None
             from dials.algorithms.refinement.outlier_detection import (
                 CentroidOutlierFactory,
             )
@@ -278,36 +240,18 @@ class ReflectionManagerFactory:
                 params, colnames
             )
 
-        # override default weighting strategy?
-        weighting_strategy = None
+        ## Weighting strategy
+
+        # check incompatible weighting strategy
         if params.weighting_strategy.override == "statistical":
-            from dials.algorithms.refinement.weighting_strategies import (
-                StatisticalWeightingStrategy,
+            raise DialsRefineConfigError(
+                'The "statistical" weighting strategy is not compatible '
+                "with stills refinement"
             )
+        if params.weighting_strategy.override == "constant":
+            params.weighting_strategy.override = "constant_stills"
 
-            weighting_strategy = StatisticalWeightingStrategy()
-        elif params.weighting_strategy.override == "stills":
-            from dials.algorithms.refinement.weighting_strategies import (
-                StillsWeightingStrategy,
-            )
-
-            weighting_strategy = StillsWeightingStrategy(
-                params.weighting_strategy.delpsi_constant
-            )
-        elif params.weighting_strategy.override == "external_deltapsi":
-            from dials.algorithms.refinement.weighting_strategies import (
-                ExternalDelPsiWeightingStrategy,
-            )
-
-            weighting_strategy = ExternalDelPsiWeightingStrategy()
-        elif params.weighting_strategy.override == "constant":
-            from dials.algorithms.refinement.weighting_strategies import (
-                ConstantWeightingStrategy,
-            )
-
-            weighting_strategy = ConstantWeightingStrategy(
-                *params.weighting_strategy.constants, stills=do_stills
-            )
+        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy(params)
 
         return refman(
             reflections=reflections,
@@ -320,6 +264,329 @@ class ReflectionManagerFactory:
             outlier_detector=outlier_detector,
             weighting_strategy_override=weighting_strategy,
         )
+
+    @staticmethod
+    def scan_manager(
+        params, reflections, experiments: ExperimentList
+    ) -> ReflectionManager:
+
+        refman = ReflectionManager
+
+        ## Outlier detection
+
+        if params.outlier.algorithm in ("auto", libtbx.Auto):
+            params.outlier.algorithm = "mcd"
+        if params.outlier.algorithm == "sauter_poon":
+            if params.outlier.sauter_poon.px_sz is libtbx.Auto:
+                # get this from the first panel of the first detector
+                params.outlier.sauter_poon.px_sz = experiments.detectors()[0][
+                    0
+                ].get_pixel_size()
+
+        ## Weighting strategy
+
+        # check incompatible weighting strategy
+        if params.weighting_strategy.override in ["stills", "external_deltapsi"]:
+            msg = (
+                'The "{}" weighting strategy is not compatible with ' "scan refinement"
+            ).format(params.weighting_strategy.override)
+            raise DialsRefineConfigError(msg)
+
+        if params.outlier.algorithm in ("null", None):
+            outlier_detector = None
+        else:
+            colnames = ["x_resid", "y_resid", "phi_resid"]
+            from dials.algorithms.refinement.outlier_detection import (
+                CentroidOutlierFactory,
+            )
+
+            outlier_detector = CentroidOutlierFactory.from_parameters_and_colnames(
+                params, colnames
+            )
+
+        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy(params)
+
+        return refman(
+            reflections=reflections,
+            experiments=experiments,
+            nref_per_degree=params.reflections_per_degree,
+            max_sample_size=params.maximum_sample_size,
+            min_sample_size=params.minimum_sample_size,
+            close_to_spindle_cutoff=params.close_to_spindle_cutoff,
+            scan_margin=params.scan_margin,
+            outlier_detector=outlier_detector,
+            weighting_strategy_override=weighting_strategy,
+        )
+
+    @staticmethod
+    def laue_manager(params, reflections, experiments):
+
+        refman = LaueReflectionManager
+
+        ## Outlier detection
+        if params.outlier.algorithm in ("auto", libtbx.Auto):
+            params.outlier.algorithm = "sauter_poon"
+        if params.outlier.sauter_poon.px_sz is libtbx.Auto:
+            # get this from the first panel of the first detector
+            params.outlier.sauter_poon.px_sz = experiments.detectors()[0][
+                0
+            ].get_pixel_size()
+
+        if params.outlier.algorithm in ("null", None):
+            outlier_detector = None
+        else:
+            colnames = ["x_resid", "y_resid", "wavelength_resid"]
+            params.outlier.block_width = None
+            from dials.algorithms.refinement.outlier_detection import (
+                CentroidOutlierFactory,
+            )
+
+            outlier_detector = CentroidOutlierFactory.from_parameters_and_colnames(
+                params, colnames
+            )
+
+        ## Weighting strategy
+
+        # check incompatible weighting strategy
+        if params.weighting_strategy.override == "statistical":
+            raise DialsRefineConfigError(
+                'The "statistical" weighting strategy is not compatible '
+                "with laue refinement"
+            )
+        if params.weighting_strategy.override == "constant":
+            params.weighting_strategy.override = "constant_stills"
+
+        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy(params)
+
+        return refman(
+            reflections=reflections,
+            experiments=experiments,
+            nref_per_degree=params.reflections_per_degree,
+            max_sample_size=params.maximum_sample_size,
+            min_sample_size=params.minimum_sample_size,
+            close_to_spindle_cutoff=params.close_to_spindle_cutoff,
+            scan_margin=params.scan_margin,
+            outlier_detector=outlier_detector,
+            weighting_strategy_override=weighting_strategy,
+        )
+
+    @staticmethod
+    def get_weighting_strategy(params):
+        if params.weighting_strategy.override == "statistical":
+            from dials.algorithms.refinement.weighting_strategies import (
+                StatisticalWeightingStrategy,
+            )
+
+            return StatisticalWeightingStrategy()
+        elif params.weighting_strategy.override == "stills":
+            from dials.algorithms.refinement.weighting_strategies import (
+                StillsWeightingStrategy,
+            )
+
+            return StillsWeightingStrategy(params.weighting_strategy.delpsi_constant)
+        elif params.weighting_strategy.override == "external_deltapsi":
+            from dials.algorithms.refinement.weighting_strategies import (
+                ExternalDelPsiWeightingStrategy,
+            )
+
+            return ExternalDelPsiWeightingStrategy()
+        elif params.weighting_strategy.override == "constant":
+            from dials.algorithms.refinement.weighting_strategies import (
+                ConstantWeightingStrategy,
+            )
+
+            return ConstantWeightingStrategy(*params.weighting_strategy.constants)
+        elif params.weighting_strategy.override == "constant_stills":
+            from dials.algorithms.refinement.weighting_strategies import (
+                ConstantStillsWeightingStrategy,
+            )
+
+            return ConstantStillsWeightingStrategy(*params.weighting_strategy.constants)
+        elif params.weighting_strategy.override == "laue_statistical":
+            from dials.algorithms.refinement.weighting_strategies import (
+                LaueStatisticalWeightingStrategy,
+            )
+
+            return LaueStatisticalWeightingStrategy()
+        return None
+
+    @staticmethod
+    def from_parameters_reflections_experiments(params, reflections, experiments):
+        """Given a set of parameters and models, build a reflection manager
+
+        Params:
+            params The input parameters
+
+        Returns:
+            The reflection manager instance
+        """
+
+        def using_stills_refinement(experiments: ExperimentList) -> bool:
+
+            single_as_still = (
+                params.refinement.parameterisation.treat_single_image_as_still
+            )
+            exps_are_stills = []
+            for exp in experiments:
+                if exp.scan is None:
+                    exps_are_stills.append(True)
+                elif exp.scan.get_num_images() == 1:
+                    if single_as_still:
+                        exps_are_stills.append(True)
+                    elif exp.scan.is_still():
+                        exps_are_stills.append(True)
+                    else:
+                        exps_are_stills.append(False)
+                else:
+                    if exp.scan.is_still():
+                        raise DialsRefineConfigError("Cannot refine a zero-width scan")
+                    exps_are_stills.append(False)
+
+            # check experiment types are consistent
+            if not all(exps_are_stills[0] == e for e in exps_are_stills):
+                raise DialsRefineConfigError(
+                    "Cannot refine a mixture of stills and scans"
+                )
+            return exps_are_stills[0]
+
+        def using_laue_refinement(params, reflections) -> bool:
+            if params.refinement.parameterisation.laue is False:
+                return False
+            if "wavelength" not in reflections:
+                raise DialsRefineConfigError(
+                    "Trying to do Laue refinement without wavelengths in reflections"
+                )
+            return True
+
+        def using_scan_varying_refinement(params) -> bool:
+            return params.refinment.parameterisation.scan_varying
+
+        def scan_varying_setup(params, experiments: ExperimentList, reflections):
+            def trim_scans_to_observations(
+                experiments: ExperimentList, reflections
+            ) -> ExperimentList:
+                """Check the range of each scan matches the range of observed data and
+                trim the scan to match if it is too wide"""
+
+                # Get observed image number (or at least observed phi)
+                obs_phi = reflections["xyzobs.mm.value"].parts()[2]
+                try:
+                    obs_z = reflections["xyzobs.px.value"].parts()[2]
+                except KeyError:
+                    obs_z = None
+
+                # Get z_min and z_max from shoeboxes if present
+                try:
+                    shoebox = reflections["shoebox"]
+                    bb = shoebox.bounding_boxes()
+                    z_min, z_max = bb.parts()[4:]
+                    if z_min.all_eq(0):
+                        shoebox = None
+                except KeyError:
+                    shoebox = None
+
+                for iexp, exp in enumerate(experiments):
+
+                    sel = reflections["id"] == iexp
+                    isel = sel.iselection()
+                    if obs_z is not None:
+                        exp_z = obs_z.select(isel)
+                    else:
+                        exp_phi = obs_phi.select(isel)
+                        exp_z = exp.scan.get_array_index_from_angle(exp_phi, deg=False)
+
+                    start, stop = exp.scan.get_array_range()
+                    min_exp_z = flex.min(exp_z)
+                    max_exp_z = flex.max(exp_z)
+
+                    # If observed array range is correct, skip to next experiment
+                    if int(min_exp_z) == start and int(math.ceil(max_exp_z)) == stop:
+                        continue
+
+                    # Extend array range either by shoebox size, or 0.5 deg if shoebox not available
+                    if shoebox is not None:
+                        obs_start = flex.min(z_min.select(isel))
+                        obs_stop = flex.max(z_max.select(isel))
+                    else:
+                        obs_start = int(min_exp_z)
+                        obs_stop = int(math.ceil(max_exp_z))
+                        half_deg_in_images = int(
+                            math.ceil(0.5 / exp.scan.get_oscillation()[1])
+                        )
+                        obs_start -= half_deg_in_images
+                        obs_stop += half_deg_in_images
+
+                    # Convert obs_start, obs_stop from position in array range to integer image number
+                    if obs_start > start or obs_stop < stop:
+                        im_start = max(start, obs_start) + 1
+                        im_stop = min(obs_stop, stop)
+
+                        logger.warning(
+                            "The reflections for experiment {0} do not fill the scan range. The scan will be trimmed "
+                            "to images {{{1},{2}}} to match the range of observed data".format(
+                                iexp, im_start, im_stop
+                            )
+                        )
+
+                        # Ensure the scan is unique to this experiment and set trimmed limits
+                        exp.scan = copy.deepcopy(exp.scan)
+                        new_oscillation = (
+                            exp.scan.get_angle_from_image_index(im_start),
+                            exp.scan.get_oscillation()[1],
+                        )
+                        exp.scan.set_image_range((im_start, im_stop))
+                        exp.scan.set_oscillation(new_oscillation)
+
+                return experiments
+
+            # Refiner does not accept scan_varying=Auto. This is a special case for
+            # doing macrocycles of refinement in dials.refine.
+            if params.refinement.parameterisation.scan_varying is libtbx.Auto:
+                params.refinement.parameterisation.scan_varying = False
+
+            # Calculate reflection block_width for scan-varying refinement. Trim scans
+            # to the extent of the observations, if requested.
+            if params.refinement.parameterisation.scan_varying:
+                if params.refinement.parameterisation.trim_scan_to_observations:
+                    experiments = trim_scans_to_observations(experiments, reflections)
+
+                from dials.algorithms.refinement.reflection_manager import (
+                    BlockCalculator,
+                )
+
+                block_calculator = BlockCalculator(experiments, reflections)
+                if params.refinement.parameterisation.compose_model_per == "block":
+                    reflections = block_calculator.per_width(
+                        params.refinement.parameterisation.block_width, deg=True
+                    )
+                elif params.refinement.parameterisation.compose_model_per == "image":
+                    reflections = block_calculator.per_image()
+
+                return experiments, reflections
+
+        # While a random subset of reflections is used, continue to
+        # set random.seed to get consistent behaviour
+        if params.random_seed is not None:
+            random.seed(params.random_seed)
+            flex.set_random_seed(params.random_seed)
+            logger.debug("Random seed set to %d", params.random_seed)
+
+        if using_stills_refinement(experiments):
+            return ReflectionManagerFactory.stills_manager(
+                params.refinement.reflections, reflections, experiments
+            )
+        elif using_laue_refinement(params, reflections):
+            return ReflectionManagerFactory.laue_manager(
+                params.refinement.reflections, reflections, experiments
+            )
+        else:
+            if using_scan_varying_refinement(params):
+                experiments, reflections = scan_varying_setup(
+                    params, experiments, reflections
+                )
+            return ReflectionManagerFactory.scan_manager(
+                params.refinement.reflections, reflections, experiments
+            )
 
 
 class ReflectionManager:
@@ -427,6 +694,9 @@ class ReflectionManager:
 
         # not known until the manager is finalised
         self._sample_size = None
+
+    def get_experiments(self) -> ExperimentList:
+        return self._experiments
 
     def get_centroid_analyser(self, debug=False):
         """Create a CentroidAnalysis object for the current reflections"""
@@ -726,6 +996,13 @@ class ReflectionManager:
         self._reflections = self._reflections.select(sel)
         return self._reflections
 
+    def update_residuals(self):
+        x_obs, y_obs, phi_obs = self._reflections["xyzobs.mm.value"].parts()
+        x_calc, y_calc, phi_calc = self._reflections["xyzcal.mm"].parts()
+        self._reflections["x_resid"] = x_calc - x_obs
+        self._reflections["y_resid"] = y_calc - y_obs
+        self._reflections["phi_resid"] = phi_calc - phi_obs
+
 
 class StillsReflectionManager(ReflectionManager):
     """Overloads for a Reflection Manager that does not exclude
@@ -797,3 +1074,168 @@ class StillsReflectionManager(ReflectionManager):
         )
         logger.info(msg)
         logger.info(dials.util.tabulate(rows, header) + "\n")
+
+
+class LaueReflectionManager(ReflectionManager):
+    """Overloads for a Reflection Manager that does not exclude
+    reflections too close to the spindle, and reports only information
+    about X, and Y residuals"""
+
+    _weighting_strategy = weighting_strategies.LaueStatisticalWeightingStrategy()
+    experiment_type = "laue"
+
+    def __init__(
+        self,
+        reflections,
+        experiments,
+        nref_per_degree=None,
+        max_sample_size=None,
+        min_sample_size=0,
+        close_to_spindle_cutoff=0.02,
+        scan_margin=0.0,
+        outlier_detector=None,
+        weighting_strategy_override=None,
+    ):
+
+        if len(reflections) == 0:
+            raise ValueError("Empty reflections table provided to ReflectionManager")
+
+        # keep track of models
+        self._experiments = experiments
+        goniometers = [e.goniometer for e in self._experiments]
+        self._axes = [
+            matrix.col(g.get_rotation_axis()) if g else None for g in goniometers
+        ]
+
+        # unset the refinement flags (creates flags field if needed)
+        reflections.unset_flags(
+            flex.size_t_range(len(reflections)),
+            flex.reflection_table.flags.used_in_refinement,
+        )
+
+        # check that the observed beam vectors are stored: if not, compute them
+        n_s1_set = set_obs_s1(reflections, experiments)
+        if n_s1_set > 0:
+            logger.debug("Set scattering vectors for %d reflections", n_s1_set)
+
+        # keep track of the original indices of the reflections
+        reflections["iobs"] = flex.size_t_range(len(reflections))
+
+        # Check for monotonically increasing value range. If not, ref_table isn't sorted,
+        # and proceed to sort by id and panel. This is required for the C++ extension
+        # modules to allow for nlogn subselection of values used in refinement.
+        l_id = reflections["id"]
+        id0 = l_id[0]
+        for id_x in l_id[1:]:
+            if id0 <= id_x:
+                id0 = id_x
+            else:
+                reflections.sort("id")  # Ensuring the ref_table is sorted by id
+                reflections.subsort(
+                    "id", "panel"
+                )  # Ensuring that within each sorted id block, sorting is next performed by panel
+                break
+
+        # set up the reflection inclusion criteria
+        self._close_to_spindle_cutoff = close_to_spindle_cutoff  # close to spindle
+        self._scan_margin = DEG2RAD * scan_margin  # close to the scan edge
+        self._outlier_detector = outlier_detector  # for outlier rejection
+        self._nref_per_degree = nref_per_degree  # random subsets
+        self._max_sample_size = max_sample_size  # sample size ceiling
+        self._min_sample_size = min_sample_size  # sample size floor
+
+        # exclude reflections that fail some inclusion criteria
+        refs_to_keep = self._id_refs_to_keep(reflections)
+        self._accepted_refs_size = len(refs_to_keep)
+
+        # set entering flags for all reflections
+        reflections.calculate_entering_flags(self._experiments)
+
+        # reset all use flags
+        self.reset_accepted_reflections(reflections)
+
+        # put full list of indexed reflections aside and select only the reflections
+        # that were not excluded to manage
+        self._indexed = reflections
+        self._reflections = reflections.select(refs_to_keep)
+
+        # set exclusion flag for reflections that failed the tests
+        refs_to_excl = flex.bool(len(self._indexed), True)
+        refs_to_excl.set_selected(refs_to_keep, False)
+        self._indexed.set_flags(
+            refs_to_excl, self._indexed.flags.excluded_for_refinement
+        )
+
+        # set weights for all kept reflections
+        if weighting_strategy_override is not None:
+            self._weighting_strategy = weighting_strategy_override
+        self._weighting_strategy.calculate_weights(self._reflections)
+
+        # not known until the manager is finalised
+        self._sample_size = None
+
+    def _id_refs_to_keep(self, obs_data):
+        """Create a selection of observations that pass certain conditions.
+        Stills-specific version removes checks relevant only to experiments
+        with a rotation axis."""
+
+        # first exclude reflections with miller index set to 0,0,0
+        sel1 = obs_data["miller_index"] != (0, 0, 0)
+
+        # exclude reflections with overloads, as these have worse centroids
+        sel2 = ~obs_data.get_flags(obs_data.flags.overloaded)
+
+        # combine selections
+        sel = sel1 & sel2
+        inc = flex.size_t_range(len(obs_data)).select(sel)
+
+        return inc
+
+    def print_stats_on_matches(self):
+        """Print some basic statistics on the matches"""
+
+        l = self.get_matches()
+        nref = len(l)
+        if nref == 0:
+            logger.warning(
+                "Unable to calculate summary statistics for zero observations"
+            )
+            return
+
+        from scitbx.math import five_number_summary
+
+        try:
+            x_resid = l["x_resid"]
+            y_resid = l["y_resid"]
+            wavelength_resid = l["wavelength_resid"]
+            w_x, w_y, w_z = l["xyzobs.mm.weights"].parts()
+        except KeyError:
+            raise
+
+        header = ["", "Min", "Q1", "Med", "Q3", "Max"]
+        rows = []
+        row_data = five_number_summary(x_resid)
+        rows.append(["Xc - Xo (mm)"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(y_resid)
+        rows.append(["Yc - Yo (mm)"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(wavelength_resid)
+        rows.append(["Wavelengthc - Wavelengtho (A)"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(w_x)
+        rows.append(["X weights"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(w_y)
+        rows.append(["Y weights"] + [f"{e:.4g}" for e in row_data])
+        row_data = five_number_summary(w_z)
+        rows.append(["Wavelength weights"] + [f"{e:.4g}" for e in row_data])
+
+        msg = (
+            f"\nSummary statistics for {nref} observations" + " matched to predictions:"
+        )
+        logger.info(msg)
+        logger.info(dials.util.tabulate(rows, header) + "\n")
+
+    def update_residuals(self):
+        x_obs, y_obs, wavelength_obs = self._reflections["xyzobs.mm.value"].parts()
+        x_calc, y_calc, wavelength_calc = self._reflections["xyzcal.mm"].parts()
+        self._reflections["x_resid"] = x_calc - x_obs
+        self._reflections["y_resid"] = y_calc - y_obs
+        self._reflections["wavelength_resid"] = wavelength_calc - wavelength_obs

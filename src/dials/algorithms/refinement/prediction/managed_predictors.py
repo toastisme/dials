@@ -11,9 +11,13 @@ from __future__ import annotations
 
 from math import pi
 
+from dxtbx.model.experiment_list import ExperimentList
 from scitbx.array_family import flex
 
-from dials.algorithms.spot_prediction import ScanStaticRayPredictor
+from dials.algorithms.spot_prediction import (
+    LaueReflectionPredictor,
+    ScanStaticRayPredictor,
+)
 from dials.algorithms.spot_prediction import ScanStaticReflectionPredictor as sc
 from dials.algorithms.spot_prediction import ScanVaryingReflectionPredictor as sv
 from dials.algorithms.spot_prediction import StillsReflectionPredictor as st
@@ -165,22 +169,41 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
         predictor.for_reflection_table(reflections, UB)
 
 
+class LaueExperimentsPredictor(ExperimentsPredictor):
+    def _predict_one_experiment(self, experiment, reflections):
+
+        min_s0_idx = min(
+            range(len(reflections["wavelength"])),
+            key=reflections["wavelength"].__getitem__,
+        )
+        min_s0 = reflections["s0"][min_s0_idx]
+        dmin = experiment.detector.get_max_resolution(min_s0)
+        predictor = LaueReflectionPredictor(experiment, dmin)
+        UB = experiment.crystal.get_A()
+        predictor.for_reflection_table(reflections, UB)
+
+
 class ExperimentsPredictorFactory:
     @staticmethod
-    def from_experiments(experiments, force_stills=False, spherical_relp=False):
-
-        # Determine whether or not to use a stills predictor
-        if not force_stills:
+    def from_parameters_experiments(
+        experiments: ExperimentList, params
+    ) -> ExperimentsPredictor:
+        def using_stills_prediction(experiments: ExperimentList) -> bool:
             for exp in experiments:
                 if exp.goniometer is None:
-                    force_stills = True
-                    break
+                    return True
+            return False
 
-        # Construct the predictor
-        if force_stills:
+        def using_laue_prediction(params) -> bool:
+            return params.refinement.parameterisation.laue
+
+        if using_stills_prediction(experiments):
             predictor = StillsExperimentsPredictor(experiments)
-            predictor.spherical_relp_model = spherical_relp
+            predictor.spherical_relp_model = (
+                params.refinement.parameterisation.spherical_relp_model
+            )
+            return predictor
+        elif using_laue_prediction(params):
+            return LaueExperimentsPredictor(experiments)
         else:
-            predictor = ScansExperimentsPredictor(experiments)
-
-        return predictor
+            return ScansExperimentsPredictor(experiments)

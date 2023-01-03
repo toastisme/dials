@@ -74,11 +74,10 @@ class ExternalDelPsiWeightingStrategy(StatisticalWeightingStrategy):
 
 
 class ConstantWeightingStrategy:
-    def __init__(self, wx, wy, wz, stills=False):
+    def __init__(self, wx, wy, wz):
         self._wx = wx
         self._wy = wy
         self._wz = wz
-        self._stills = stills
 
     def calculate_weights(self, reflections):
         """Set weights to constant terms. If stills, the z weights are
@@ -88,11 +87,50 @@ class ConstantWeightingStrategy:
         wx = flex.double(len(reflections), self._wx)
         wy = flex.double(len(reflections), self._wy)
         wz = flex.double(len(reflections), self._wz)
-        if self._stills:
-            null = flex.double(len(reflections), 0)
-            reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, null)
-            reflections["delpsical.weights"] = wz
-        else:
-            reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, wz)
+        reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, wz)
+
+        return reflections
+
+
+class ConstantStillsWeightingStrategy:
+    def __init__(self, wx, wy, wz):
+        self._wx = wx
+        self._wy = wy
+        self._wz = wz
+
+    def calculate_weights(self, reflections):
+        """Set weights to constant terms. If stills, the z weights are
+        the 'delpsical.weights' attribute of the reflection table. Otherwise, use
+        the usual 'xyzobs.mm.weights'"""
+
+        wx = flex.double(len(reflections), self._wx)
+        wy = flex.double(len(reflections), self._wy)
+        wz = flex.double(len(reflections), self._wz)
+        null = flex.double(len(reflections), 0)
+        reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, null)
+        reflections["delpsical.weights"] = wz
+
+        return reflections
+
+
+class LaueStatisticalWeightingStrategy(StatisticalWeightingStrategy):
+    """Defines a single method that provides a ReflectionManager with a strategy
+    for calculating weights for refinement. This version uses statistical weights
+    for X and Y and wavelength"""
+
+    def __init__(self):
+        pass
+
+    def calculate_weights(self, reflections):
+        # call parent class method to set X and Y weights
+        reflections = super().calculate_weights(reflections)
+
+        wx, wy, _ = reflections["xyzobs.mm.weights"].parts()
+        wavelength_var = (
+            reflections["wavelength"]
+            - sum(reflections["wavelength"]) / len(reflections)
+        ) ** 2
+        wz = 1 / wavelength_var
+        reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, wz)
 
         return reflections

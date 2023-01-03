@@ -15,6 +15,10 @@ from dials.algorithms.refinement.parameterisation.scan_varying_model_parameters 
     phil_str as sv_phil_str,
 )
 from dials.algorithms.refinement.refinement_helpers import string_sel
+from dials.algorithms.refinement.reflection_manager import (
+    LaueReflectionManager,
+    StillsReflectionManager,
+)
 from dials.algorithms.refinement.restraints.restraints_parameterisation import (
     uc_phil_str as uc_restraints_phil_str,
 )
@@ -31,6 +35,7 @@ from .detector_parameters import (
 )
 from .goniometer_parameters import GoniometerParameterisation
 from .prediction_parameters import (
+    LauePredictionParameterisation,
     XYPhiPredictionParameterisation,
     XYPhiPredictionParameterisationSparse,
 )
@@ -780,9 +785,7 @@ def _parameterise_goniometers(options, experiments, analysis):
     return gon_params
 
 
-def build_prediction_parameterisation(
-    options, experiments, reflection_manager, do_stills=False
-):
+def build_prediction_parameterisation(options, experiments, reflection_manager):
     """Given a set of parameters, create a parameterisation from a set of
     experimental models.
 
@@ -818,13 +821,21 @@ def build_prediction_parameterisation(
     analysis = _centroid_analysis(options, experiments, reflection_manager)
 
     # Parameterise each unique model
-    beam_params = _parameterise_beams(options, experiments, analysis)
     xl_ori_params, xl_uc_params = _parameterise_crystals(options, experiments, analysis)
     det_params = _parameterise_detectors(options, experiments, analysis)
     gon_params = _parameterise_goniometers(options, experiments, analysis)
+    beam_params = []
+
+    if isinstance(reflection_manager, LaueReflectionManager):
+        PredParam = LauePredictionParameterisation
+        return PredParam(
+            experiments, det_params, beam_params, xl_ori_params, xl_uc_params
+        )
+
+    beam_params = _parameterise_beams(options, experiments, analysis)
 
     # Build the prediction equation parameterisation
-    if do_stills:  # doing stills
+    if isinstance(reflection_manager, StillsReflectionManager):  # doing stills
         if options.sparse:
             if options.spherical_relp_model:
                 PredParam = SphericalRelpStillsPredictionParameterisationSparse
@@ -838,7 +849,6 @@ def build_prediction_parameterisation(
         pred_param = PredParam(
             experiments, det_params, beam_params, xl_ori_params, xl_uc_params
         )
-
     else:  # doing scans
         if options.scan_varying:
             if options.sparse:

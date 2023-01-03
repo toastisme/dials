@@ -155,3 +155,23 @@ def StillsReflectionPredictor(experiment, dmin=None, spherical_relp=False, **kwa
         experiment.crystal.get_space_group().type(),
         dmin,
     )
+
+
+def LaueReflectionPredictor(experiment, dmin: float):
+    """
+    A constructor for the reflection predictor.
+
+    :param experiment: The experiment to predict for
+    :param dmin: The maximum resolution to predict to
+    :param margin: The margin for prediction
+    :return: The spot predictor
+    """
+
+    return dials_algorithms_spot_prediction_ext.LaueReflectionPredictor(
+        experiment.beam.get_unit_s0(),
+        experiment.detector,
+        experiment.crystal.get_A(),
+        experiment.crystal.get_unit_cell(),
+        experiment.crystal.get_space_group().type(),
+        dmin,
+    )

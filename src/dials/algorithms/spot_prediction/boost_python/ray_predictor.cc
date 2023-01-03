@@ -59,4 +59,11 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def("__call__", &call_with_miller_index_array);
   }
 
+  void export_laue_ray_predictor() {
+    // Create and return the wrapper for the spot predictor object
+    class_<LaueRayPredictor>("LaueRayPredictor", no_init)
+      .def(init<vec3<double> >((arg("unit_s0"))))
+      .def("__call__", &LaueRayPredictor::operator(), (arg("miller_index"), arg("UB")));
+  }
+
 }}}  // namespace dials::algorithms::boost_python
