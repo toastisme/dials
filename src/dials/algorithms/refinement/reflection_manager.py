@@ -7,6 +7,7 @@ import copy
 import logging
 import math
 import random
+from typing import Tuple
 
 import libtbx
 from dxtbx.model.experiment_list import ExperimentList
@@ -212,7 +213,9 @@ class BlockCalculator:
 class ReflectionManagerFactory:
     @staticmethod
     def stills_manager(
-        params, reflections, experiments: ExperimentList
+        params: libtbx.phil.scope_extract,
+        reflections: flex.reflection_table,
+        experiments: ExperimentList,
     ) -> StillsReflectionManager:
 
         refman = StillsReflectionManager
@@ -251,7 +254,9 @@ class ReflectionManagerFactory:
         if params.weighting_strategy.override == "constant":
             params.weighting_strategy.override = "constant_stills"
 
-        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy(params)
+        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy_override(
+            params
+        )
 
         return refman(
             reflections=reflections,
@@ -267,7 +272,9 @@ class ReflectionManagerFactory:
 
     @staticmethod
     def scan_manager(
-        params, reflections, experiments: ExperimentList
+        params: libtbx.phil.scope_extract,
+        reflections: flex.reflection_table,
+        experiments: ExperimentList,
     ) -> ReflectionManager:
 
         refman = ReflectionManager
@@ -304,7 +311,9 @@ class ReflectionManagerFactory:
                 params, colnames
             )
 
-        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy(params)
+        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy_override(
+            params
+        )
 
         return refman(
             reflections=reflections,
@@ -319,7 +328,11 @@ class ReflectionManagerFactory:
         )
 
     @staticmethod
-    def laue_manager(params, reflections, experiments):
+    def laue_manager(
+        params: libtbx.phil.scope_extract,
+        reflections: flex.reflection_table,
+        experiments: ExperimentList,
+    ) -> LaueReflectionManager:
 
         refman = LaueReflectionManager
 
@@ -356,7 +369,9 @@ class ReflectionManagerFactory:
         if params.weighting_strategy.override == "constant":
             params.weighting_strategy.override = "constant_stills"
 
-        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy(params)
+        weighting_strategy = ReflectionManagerFactory.get_weighting_strategy_override(
+            params
+        )
 
         return refman(
             reflections=reflections,
@@ -371,7 +386,7 @@ class ReflectionManagerFactory:
         )
 
     @staticmethod
-    def get_weighting_strategy(params):
+    def get_weighting_strategy_override(params: libtbx.phil.scope_extract):
         if params.weighting_strategy.override == "statistical":
             from dials.algorithms.refinement.weighting_strategies import (
                 StatisticalWeightingStrategy,
@@ -411,16 +426,11 @@ class ReflectionManagerFactory:
         return None
 
     @staticmethod
-    def from_parameters_reflections_experiments(params, reflections, experiments):
-        """Given a set of parameters and models, build a reflection manager
-
-        Params:
-            params The input parameters
-
-        Returns:
-            The reflection manager instance
-        """
-
+    def from_parameters_reflections_experiments(
+        params: libtbx.phil.scope_extract,
+        reflections: flex.reflection_table,
+        experiments: ExperimentList,
+    ) -> ReflectionManager:
         def using_stills_refinement(experiments: ExperimentList) -> bool:
 
             single_as_still = (
@@ -449,7 +459,10 @@ class ReflectionManagerFactory:
                 )
             return exps_are_stills[0]
 
-        def using_laue_refinement(params, reflections) -> bool:
+        def using_laue_refinement(
+            params: libtbx.phil.scope_extract, reflections: flex.reflection_table
+        ) -> bool:
+
             if params.refinement.parameterisation.laue is False:
                 return False
             if "wavelength" not in reflections:
@@ -458,13 +471,18 @@ class ReflectionManagerFactory:
                 )
             return True
 
-        def using_scan_varying_refinement(params) -> bool:
+        def using_scan_varying_refinement(params: libtbx.phil.scope_extract) -> bool:
             return params.refinment.parameterisation.scan_varying
 
-        def scan_varying_setup(params, experiments: ExperimentList, reflections):
+        def scan_varying_setup(
+            params: libtbx.phil.scope_extract,
+            experiments: ExperimentList,
+            reflections: flex.reflection_table,
+        ) -> Tuple[ExperimentList, flex.reflection_table]:
             def trim_scans_to_observations(
                 experiments: ExperimentList, reflections
             ) -> ExperimentList:
+
                 """Check the range of each scan matches the range of observed data and
                 trim the scan to match if it is too wide"""
 
@@ -566,10 +584,12 @@ class ReflectionManagerFactory:
 
         # While a random subset of reflections is used, continue to
         # set random.seed to get consistent behaviour
-        if params.random_seed is not None:
-            random.seed(params.random_seed)
-            flex.set_random_seed(params.random_seed)
-            logger.debug("Random seed set to %d", params.random_seed)
+        if params.refinement.reflections.random_seed is not None:
+            random.seed(params.refinement.reflections.random_seed)
+            flex.set_random_seed(params.refinement.reflections.random_seed)
+            logger.debug(
+                "Random seed set to %d", params.refinement.reflections.random_seed
+            )
 
         if using_stills_refinement(experiments):
             return ReflectionManagerFactory.stills_manager(
@@ -603,13 +623,13 @@ class ReflectionManager:
 
     def __init__(
         self,
-        reflections,
-        experiments,
+        reflections: flex.reflection_table,
+        experiments: ExperimentList,
         nref_per_degree=None,
         max_sample_size=None,
         min_sample_size=0,
-        close_to_spindle_cutoff=0.02,
-        scan_margin=0.0,
+        close_to_spindle_cutoff: float = 0.02,
+        scan_margin: float = 0.0,
         outlier_detector=None,
         weighting_strategy_override=None,
     ):

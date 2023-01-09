@@ -39,6 +39,10 @@ phil_str = """
               "If there are more reflections than this in the manager then"
               "the minimiser must do the full calculation in blocks."
       .type = int(value_min=1)
+    laue = False
+      .help = "If True the target includes terms for the wavelength of each"
+              "reflection."
+      .type = bool
 """
 phil_scope = parse(phil_str)
 
@@ -711,7 +715,7 @@ class LaueLeastSquaresResidualWithRmsdCutoff(Target):
 
     _grad_names = ["dX_dp", "dY_dp", "dwavelength_dp"]
     rmsd_names = ["RMSD_X", "RMSD_Y", "RMSD_wavelength"]
-    rmsd_units = ["mm", "mm"]
+    rmsd_units = ["mm", "mm", "A"]
 
     def __init__(
         self,
