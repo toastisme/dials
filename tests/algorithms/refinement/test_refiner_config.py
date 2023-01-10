@@ -12,7 +12,7 @@ from dxtbx.model.experiment_list import ExperimentListFactory
 from libtbx import phil
 
 from dials.algorithms.refinement import DialsRefineConfigError, RefinerFactory
-from dials.algorithms.refinement.refiner import _trim_scans_to_observations, phil_scope
+from dials.algorithms.refinement.refiner import phil_scope
 from dials.array_family import flex
 from dials.util.slice import slice_reflections
 
@@ -75,7 +75,9 @@ def test_trim_scans_to_observations(dials_data):
         assert a == pytest.approx(b)
 
     # If image range unchanged, nothing should happen
-    trim_expt = _trim_scans_to_observations(deepcopy(experiments), reflections)
+    trim_expt = RefinerFactory.trim_scans_to_observations(
+        deepcopy(experiments), reflections
+    )
     new_im_ranges = [e.scan.get_image_range() for e in trim_expt]
     for a, b in zip(image_ranges, new_im_ranges):
         assert a == b
@@ -86,7 +88,7 @@ def test_trim_scans_to_observations(dials_data):
 
     # Now trimmed scans should have array ranges equal to their min, max
     # shoebox z coords
-    trim_expt = _trim_scans_to_observations(deepcopy(experiments), sliced)
+    trim_expt = RefinerFactory.trim_scans_to_observations(deepcopy(experiments), sliced)
     new_array_ranges = [e.scan.get_array_range() for e in trim_expt]
 
     for i, e in enumerate(trim_expt):
@@ -105,7 +107,7 @@ def test_trim_scans_to_observations(dials_data):
     # Now delete shoebox data. Trimmed scans will be wider than the observed
     # range by >0.5 deg at each end
     del sliced["shoebox"]
-    trim_expt = _trim_scans_to_observations(deepcopy(experiments), sliced)
+    trim_expt = RefinerFactory.trim_scans_to_observations(deepcopy(experiments), sliced)
     new_array_ranges = [e.scan.get_array_range() for e in trim_expt]
 
     for i, e in enumerate(trim_expt):

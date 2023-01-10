@@ -299,6 +299,10 @@ phil_str = (
               "for prediction and gradients."
       .type = bool
       .expert_level = 1
+    laue = False
+      .help = "If True derivatives include terms for the wavelength of each"
+              "reflection."
+      .type = bool
 """
     % format_data
 )

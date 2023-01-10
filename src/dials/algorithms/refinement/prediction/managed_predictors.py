@@ -195,6 +195,8 @@ class ExperimentsPredictorFactory:
             return False
 
         def using_laue_prediction(params) -> bool:
+            if params is None:
+                return False
             return params.refinement.parameterisation.laue
 
         if using_stills_prediction(experiments):

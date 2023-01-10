@@ -7,6 +7,8 @@ from __future__ import annotations
 import copy
 import logging
 import math
+from enum import Enum
+from typing import Tuple
 
 import psutil
 
@@ -105,6 +107,13 @@ refinement
 RAD2DEG = 180 / math.pi
 
 
+class RefinementType(Enum):
+    scan = 1
+    stills = 2
+    laue = 3
+    scan_varying = 4
+
+
 def _copy_experiments_for_refining(experiments):
     """
     Make a partial copy of experiments, copying properties used in refinement.
@@ -185,6 +194,87 @@ class RefinerFactory:
 
         return rt
 
+    @staticmethod
+    def get_refinement_type(
+        experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
+    ) -> RefinementType:
+        def using_stills_refinement(experiments: ExperimentList) -> bool:
+
+            single_as_still = (
+                params.refinement.parameterisation.treat_single_image_as_still
+            )
+            exps_are_stills = []
+            for exp in experiments:
+                if exp.scan is None:
+                    exps_are_stills.append(True)
+                elif exp.scan.get_num_images() == 1:
+                    if single_as_still:
+                        exps_are_stills.append(True)
+                    elif exp.scan.is_still():
+                        exps_are_stills.append(True)
+                    else:
+                        exps_are_stills.append(False)
+                else:
+                    if exp.scan.is_still():
+                        raise DialsRefineConfigError("Cannot refine a zero-width scan")
+                    exps_are_stills.append(False)
+
+            # check experiment types are consistent
+            if not all(exps_are_stills[0] == e for e in exps_are_stills):
+                raise DialsRefineConfigError(
+                    "Cannot refine a mixture of stills and scans"
+                )
+            return exps_are_stills[0]
+
+        def using_laue_refinement(
+            params: libtbx.phil.scope_extract, reflections: flex.reflection_table
+        ) -> bool:
+
+            if (
+                not params.refinement.target.laue
+                and not params.refinement.parameterisation.laue
+            ):
+                return False
+            if "wavelength" not in reflections:
+                raise DialsRefineConfigError(
+                    "Trying to do Laue refinement without wavelengths in reflections"
+                )
+            return True
+
+        def using_scan_varying_refinement(params: libtbx.phil.scope_extract) -> bool:
+            return params.refinement.parameterisation.scan_varying
+
+        if using_stills_refinement(experiments):
+            return RefinementType.stills
+        elif using_laue_refinement(params, reflections):
+            return RefinementType.laue
+        elif using_scan_varying_refinement(params):
+            return RefinementType.scan_varying
+        else:
+            return RefinementType.scan
+
+    @staticmethod
+    def preprocess(
+        experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
+        refinement_type: RefinementType,
+    ) -> Tuple[ExperimentList, flex.reflection_table]:
+
+        """
+        Any modifications that need to be made to experiments or
+        reflections prior to refinement.
+        """
+
+        if refinement_type == RefinementType.scan_varying:
+            experiments, reflections = RefinerFactory.scan_varying_setup(
+                experiments, reflections, params
+            )
+
+        return experiments, reflections
+
     @classmethod
     def from_parameters_data_experiments(cls, params, reflections, experiments):
         # TODO Checks on the input
@@ -200,18 +290,137 @@ class RefinerFactory:
 
         return cls._build_components(params, reflections, experiments)
 
+    @staticmethod
+    def scan_varying_setup(
+        experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
+    ) -> Tuple[ExperimentList, flex.reflection_table]:
+
+        # Refiner does not accept scan_varying=Auto. This is a special case for
+        # doing macrocycles of refinement in dials.refine.
+        if params.refinement.parameterisation.scan_varying is libtbx.Auto:
+            params.refinement.parameterisation.scan_varying = False
+
+        # Calculate reflection block_width for scan-varying refinement. Trim scans
+        # to the extent of the observations, if requested.
+        if params.refinement.parameterisation.scan_varying:
+            if params.refinement.parameterisation.trim_scan_to_observations:
+                experiments = RefinerFactory.trim_scans_to_observations(
+                    experiments, reflections
+                )
+
+            from dials.algorithms.refinement.reflection_manager import BlockCalculator
+
+            block_calculator = BlockCalculator(experiments, reflections)
+            if params.refinement.parameterisation.compose_model_per == "block":
+                reflections = block_calculator.per_width(
+                    params.refinement.parameterisation.block_width, deg=True
+                )
+            elif params.refinement.parameterisation.compose_model_per == "image":
+                reflections = block_calculator.per_image()
+
+            return experiments, reflections
+
+    @staticmethod
+    def trim_scans_to_observations(
+        experiments: ExperimentList, reflections
+    ) -> ExperimentList:
+
+        """Check the range of each scan matches the range of observed data and
+        trim the scan to match if it is too wide"""
+
+        # Get observed image number (or at least observed phi)
+        obs_phi = reflections["xyzobs.mm.value"].parts()[2]
+        try:
+            obs_z = reflections["xyzobs.px.value"].parts()[2]
+        except KeyError:
+            obs_z = None
+
+        # Get z_min and z_max from shoeboxes if present
+        try:
+            shoebox = reflections["shoebox"]
+            bb = shoebox.bounding_boxes()
+            z_min, z_max = bb.parts()[4:]
+            if z_min.all_eq(0):
+                shoebox = None
+        except KeyError:
+            shoebox = None
+
+        for iexp, exp in enumerate(experiments):
+
+            sel = reflections["id"] == iexp
+            isel = sel.iselection()
+            if obs_z is not None:
+                exp_z = obs_z.select(isel)
+            else:
+                exp_phi = obs_phi.select(isel)
+                exp_z = exp.scan.get_array_index_from_angle(exp_phi, deg=False)
+
+            start, stop = exp.scan.get_array_range()
+            min_exp_z = flex.min(exp_z)
+            max_exp_z = flex.max(exp_z)
+
+            # If observed array range is correct, skip to next experiment
+            if int(min_exp_z) == start and int(math.ceil(max_exp_z)) == stop:
+                continue
+
+            # Extend array range either by shoebox size, or 0.5 deg if shoebox not available
+            if shoebox is not None:
+                obs_start = flex.min(z_min.select(isel))
+                obs_stop = flex.max(z_max.select(isel))
+            else:
+                obs_start = int(min_exp_z)
+                obs_stop = int(math.ceil(max_exp_z))
+                half_deg_in_images = int(math.ceil(0.5 / exp.scan.get_oscillation()[1]))
+                obs_start -= half_deg_in_images
+                obs_stop += half_deg_in_images
+
+            # Convert obs_start, obs_stop from position in array range to integer image number
+            if obs_start > start or obs_stop < stop:
+                im_start = max(start, obs_start) + 1
+                im_stop = min(obs_stop, stop)
+
+                logger.warning(
+                    "The reflections for experiment {0} do not fill the scan range. The scan will be trimmed "
+                    "to images {{{1},{2}}} to match the range of observed data".format(
+                        iexp, im_start, im_stop
+                    )
+                )
+
+                # Ensure the scan is unique to this experiment and set trimmed limits
+                exp.scan = copy.deepcopy(exp.scan)
+                new_oscillation = (
+                    exp.scan.get_angle_from_image_index(im_start),
+                    exp.scan.get_oscillation()[1],
+                )
+                exp.scan.set_image_range((im_start, im_stop))
+                exp.scan.set_oscillation(new_oscillation)
+
+        return experiments
+
     @classmethod
     def _build_components(cls, params, reflections, experiments):
         """low level build"""
 
+        refinement_type = RefinerFactory.get_refinement_type(
+            experiments,
+            reflections,
+            params,
+        )
+
+        experiments, reflections = RefinerFactory.preprocess(
+            experiments,
+            reflections,
+            params,
+            refinement_type,
+        )
+
         logger.debug("\nBuilding reflection manager")
         logger.debug("Input reflection list size = %d observations", len(reflections))
-
-        refman = ReflectionManagerFactory.from_parameters_reflections_experiments(
-            params, reflections, experiments
+        refman = ReflectionManagerFactory.from_experiments_reflections_params(
+            experiments, reflections, params.refinement.reflections, refinement_type
         )
-        # Some reflection managers modify the experiments
-        experiments = refman.get_experiments()
 
         logger.debug(
             "Number of observations that pass initial inclusion criteria = %d",

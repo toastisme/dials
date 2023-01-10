@@ -3,11 +3,9 @@ principally ReflectionManager."""
 
 from __future__ import annotations
 
-import copy
 import logging
 import math
 import random
-from typing import Tuple
 
 import libtbx
 from dxtbx.model.experiment_list import ExperimentList
@@ -15,6 +13,7 @@ from libtbx.phil import parse
 from scitbx import matrix
 from scitbx.math import five_number_summary
 
+import dials.algorithms.refinement.refiner as refiner
 import dials.util
 from dials.algorithms.refinement import DialsRefineConfigError, weighting_strategies
 from dials.algorithms.refinement.analysis.centroid_analysis import CentroidAnalyser
@@ -105,6 +104,10 @@ phil_str = (
                 "whether the case is for stills or scans. The default gives"
                 "unit weighting."
         .type = floats(size = 3, value_min = 0)
+    laue = False
+      .help = "If True use LaueReflectionManager for to manage polychromatic"
+              "reflections."
+      .type = bool
     }
 
     %(outlier_phil)s
@@ -213,9 +216,9 @@ class BlockCalculator:
 class ReflectionManagerFactory:
     @staticmethod
     def stills_manager(
-        params: libtbx.phil.scope_extract,
-        reflections: flex.reflection_table,
         experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
     ) -> StillsReflectionManager:
 
         refman = StillsReflectionManager
@@ -272,9 +275,9 @@ class ReflectionManagerFactory:
 
     @staticmethod
     def scan_manager(
-        params: libtbx.phil.scope_extract,
-        reflections: flex.reflection_table,
         experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
     ) -> ReflectionManager:
 
         refman = ReflectionManager
@@ -329,9 +332,9 @@ class ReflectionManagerFactory:
 
     @staticmethod
     def laue_manager(
-        params: libtbx.phil.scope_extract,
-        reflections: flex.reflection_table,
         experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
     ) -> LaueReflectionManager:
 
         refman = LaueReflectionManager
@@ -426,187 +429,37 @@ class ReflectionManagerFactory:
         return None
 
     @staticmethod
-    def from_parameters_reflections_experiments(
-        params: libtbx.phil.scope_extract,
-        reflections: flex.reflection_table,
+    def from_experiments_reflections_params(
         experiments: ExperimentList,
+        reflections: flex.reflection_table,
+        params: libtbx.phil.scope_extract,
+        refinement_type: refiner.RefinementType,
     ) -> ReflectionManager:
-        def using_stills_refinement(experiments: ExperimentList) -> bool:
-
-            single_as_still = (
-                params.refinement.parameterisation.treat_single_image_as_still
-            )
-            exps_are_stills = []
-            for exp in experiments:
-                if exp.scan is None:
-                    exps_are_stills.append(True)
-                elif exp.scan.get_num_images() == 1:
-                    if single_as_still:
-                        exps_are_stills.append(True)
-                    elif exp.scan.is_still():
-                        exps_are_stills.append(True)
-                    else:
-                        exps_are_stills.append(False)
-                else:
-                    if exp.scan.is_still():
-                        raise DialsRefineConfigError("Cannot refine a zero-width scan")
-                    exps_are_stills.append(False)
-
-            # check experiment types are consistent
-            if not all(exps_are_stills[0] == e for e in exps_are_stills):
-                raise DialsRefineConfigError(
-                    "Cannot refine a mixture of stills and scans"
-                )
-            return exps_are_stills[0]
-
-        def using_laue_refinement(
-            params: libtbx.phil.scope_extract, reflections: flex.reflection_table
-        ) -> bool:
-
-            if params.refinement.parameterisation.laue is False:
-                return False
-            if "wavelength" not in reflections:
-                raise DialsRefineConfigError(
-                    "Trying to do Laue refinement without wavelengths in reflections"
-                )
-            return True
-
-        def using_scan_varying_refinement(params: libtbx.phil.scope_extract) -> bool:
-            return params.refinment.parameterisation.scan_varying
-
-        def scan_varying_setup(
-            params: libtbx.phil.scope_extract,
-            experiments: ExperimentList,
-            reflections: flex.reflection_table,
-        ) -> Tuple[ExperimentList, flex.reflection_table]:
-            def trim_scans_to_observations(
-                experiments: ExperimentList, reflections
-            ) -> ExperimentList:
-
-                """Check the range of each scan matches the range of observed data and
-                trim the scan to match if it is too wide"""
-
-                # Get observed image number (or at least observed phi)
-                obs_phi = reflections["xyzobs.mm.value"].parts()[2]
-                try:
-                    obs_z = reflections["xyzobs.px.value"].parts()[2]
-                except KeyError:
-                    obs_z = None
-
-                # Get z_min and z_max from shoeboxes if present
-                try:
-                    shoebox = reflections["shoebox"]
-                    bb = shoebox.bounding_boxes()
-                    z_min, z_max = bb.parts()[4:]
-                    if z_min.all_eq(0):
-                        shoebox = None
-                except KeyError:
-                    shoebox = None
-
-                for iexp, exp in enumerate(experiments):
-
-                    sel = reflections["id"] == iexp
-                    isel = sel.iselection()
-                    if obs_z is not None:
-                        exp_z = obs_z.select(isel)
-                    else:
-                        exp_phi = obs_phi.select(isel)
-                        exp_z = exp.scan.get_array_index_from_angle(exp_phi, deg=False)
-
-                    start, stop = exp.scan.get_array_range()
-                    min_exp_z = flex.min(exp_z)
-                    max_exp_z = flex.max(exp_z)
-
-                    # If observed array range is correct, skip to next experiment
-                    if int(min_exp_z) == start and int(math.ceil(max_exp_z)) == stop:
-                        continue
-
-                    # Extend array range either by shoebox size, or 0.5 deg if shoebox not available
-                    if shoebox is not None:
-                        obs_start = flex.min(z_min.select(isel))
-                        obs_stop = flex.max(z_max.select(isel))
-                    else:
-                        obs_start = int(min_exp_z)
-                        obs_stop = int(math.ceil(max_exp_z))
-                        half_deg_in_images = int(
-                            math.ceil(0.5 / exp.scan.get_oscillation()[1])
-                        )
-                        obs_start -= half_deg_in_images
-                        obs_stop += half_deg_in_images
-
-                    # Convert obs_start, obs_stop from position in array range to integer image number
-                    if obs_start > start or obs_stop < stop:
-                        im_start = max(start, obs_start) + 1
-                        im_stop = min(obs_stop, stop)
-
-                        logger.warning(
-                            "The reflections for experiment {0} do not fill the scan range. The scan will be trimmed "
-                            "to images {{{1},{2}}} to match the range of observed data".format(
-                                iexp, im_start, im_stop
-                            )
-                        )
-
-                        # Ensure the scan is unique to this experiment and set trimmed limits
-                        exp.scan = copy.deepcopy(exp.scan)
-                        new_oscillation = (
-                            exp.scan.get_angle_from_image_index(im_start),
-                            exp.scan.get_oscillation()[1],
-                        )
-                        exp.scan.set_image_range((im_start, im_stop))
-                        exp.scan.set_oscillation(new_oscillation)
-
-                return experiments
-
-            # Refiner does not accept scan_varying=Auto. This is a special case for
-            # doing macrocycles of refinement in dials.refine.
-            if params.refinement.parameterisation.scan_varying is libtbx.Auto:
-                params.refinement.parameterisation.scan_varying = False
-
-            # Calculate reflection block_width for scan-varying refinement. Trim scans
-            # to the extent of the observations, if requested.
-            if params.refinement.parameterisation.scan_varying:
-                if params.refinement.parameterisation.trim_scan_to_observations:
-                    experiments = trim_scans_to_observations(experiments, reflections)
-
-                from dials.algorithms.refinement.reflection_manager import (
-                    BlockCalculator,
-                )
-
-                block_calculator = BlockCalculator(experiments, reflections)
-                if params.refinement.parameterisation.compose_model_per == "block":
-                    reflections = block_calculator.per_width(
-                        params.refinement.parameterisation.block_width, deg=True
-                    )
-                elif params.refinement.parameterisation.compose_model_per == "image":
-                    reflections = block_calculator.per_image()
-
-                return experiments, reflections
 
         # While a random subset of reflections is used, continue to
         # set random.seed to get consistent behaviour
-        if params.refinement.reflections.random_seed is not None:
-            random.seed(params.refinement.reflections.random_seed)
-            flex.set_random_seed(params.refinement.reflections.random_seed)
-            logger.debug(
-                "Random seed set to %d", params.refinement.reflections.random_seed
-            )
+        if params.random_seed is not None:
+            random.seed(params.random_seed)
+            flex.set_random_seed(params.random_seed)
+            logger.debug("Random seed set to %d", params.random_seed)
 
-        if using_stills_refinement(experiments):
+        if refinement_type == refiner.RefinementType.stills:
             return ReflectionManagerFactory.stills_manager(
-                params.refinement.reflections, reflections, experiments
+                experiments, reflections, params
             )
-        elif using_laue_refinement(params, reflections):
+        elif refinement_type == refiner.RefinementType.laue:
             return ReflectionManagerFactory.laue_manager(
-                params.refinement.reflections, reflections, experiments
+                experiments, reflections, params
+            )
+        elif (
+            refinement_type == refiner.RefinementType.scan
+            or refinement_type == refiner.RefinementType.scan_varying
+        ):
+            return ReflectionManagerFactory.scan_manager(
+                experiments, reflections, params
             )
         else:
-            if using_scan_varying_refinement(params):
-                experiments, reflections = scan_varying_setup(
-                    params, experiments, reflections
-                )
-            return ReflectionManagerFactory.scan_manager(
-                params.refinement.reflections, reflections, experiments
-            )
+            raise NotImplementedError
 
 
 class ReflectionManager:
@@ -714,9 +567,6 @@ class ReflectionManager:
 
         # not known until the manager is finalised
         self._sample_size = None
-
-    def get_experiments(self) -> ExperimentList:
-        return self._experiments
 
     def get_centroid_analyser(self, debug=False):
         """Create a CentroidAnalysis object for the current reflections"""

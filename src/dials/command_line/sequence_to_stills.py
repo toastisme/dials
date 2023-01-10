@@ -192,8 +192,8 @@ def sequence_to_stills(experiments, reflections, params):
                     new_reflections[key][-1] = new_refl[key]
 
     # Re-predict using the reflection slices and the stills predictors
-    ref_predictor = ExperimentsPredictorFactory.from_experiments(
-        new_experiments, force_stills=new_experiments.all_stills()
+    ref_predictor = ExperimentsPredictorFactory.from_parameters_experiments(
+        new_experiments, params
     )
     new_reflections = ref_predictor(new_reflections)
 

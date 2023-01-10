@@ -318,10 +318,9 @@ class StillsIndexer(Indexer):
                     experiments,
                     reflections_for_refinement,
                 )
-                ref_predictor = ExperimentsPredictorFactory.from_experiments(
+                ref_predictor = ExperimentsPredictorFactory.from_parameters_experiments(
                     experiments,
-                    force_stills=True,
-                    spherical_relp=self.all_params.refinement.parameterisation.spherical_relp_model,
+                    self.all_params,
                 )
                 ref_predictor(refined_reflections)
                 refined_reflections["delpsical2"] = (
@@ -339,10 +338,9 @@ class StillsIndexer(Indexer):
                         graph_verbose=False,
                     )
                     experiments[expt_id].crystal = nv()
-                ref_predictor = ExperimentsPredictorFactory.from_experiments(
+                ref_predictor = ExperimentsPredictorFactory.from_parameters_experiments(
                     experiments,
-                    force_stills=True,
-                    spherical_relp=self.all_params.refinement.parameterisation.spherical_relp_model,
+                    self.all_params,
                 )
                 ref_predictor(refined_reflections)
 
@@ -605,10 +603,9 @@ class StillsIndexer(Indexer):
                     ExperimentsPredictorFactory,
                 )
 
-                ref_predictor = ExperimentsPredictorFactory.from_experiments(
+                ref_predictor = ExperimentsPredictorFactory.from_parameters_experiments(
                     experiments,
-                    force_stills=True,
-                    spherical_relp=params.refinement.parameterisation.spherical_relp_model,
+                    params,
                 )
                 rmsd, _ = calc_2D_rmsd_and_displacements(ref_predictor(indexed))
                 candidates.append(

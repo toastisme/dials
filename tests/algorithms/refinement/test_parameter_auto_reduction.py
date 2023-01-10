@@ -18,6 +18,7 @@ from dials.algorithms.refinement.parameterisation.prediction_parameters_stills i
 from dials.algorithms.refinement.prediction.managed_predictors import (
     StillsExperimentsPredictor,
 )
+from dials.algorithms.refinement.refiner import RefinementType
 from dials.algorithms.refinement.reflection_manager import ReflectionManagerFactory
 from dials.algorithms.refinement.reflection_manager import (
     phil_scope as refman_phil_scope,
@@ -34,11 +35,11 @@ def tc():
     # Predict the reflections in place and put in a reflection manager
     ref_predictor = StillsExperimentsPredictor(test.stills_experiments)
     ref_predictor(test.reflections)
-    test.refman = ReflectionManagerFactory.from_parameters_reflections_experiments(
-        refman_phil_scope.extract(),
-        test.reflections,
+    test.refman = ReflectionManagerFactory.from_experiments_reflections_params(
         test.stills_experiments,
-        do_stills=True,
+        test.reflections,
+        refman_phil_scope.extract(),
+        RefinementType.STILLS,
     )
     test.refman.finalise()
 
@@ -138,11 +139,11 @@ def test_check_and_remove():
     # Predict the reflections in place and put in a reflection manager
     ref_predictor = StillsExperimentsPredictor(test.stills_experiments)
     ref_predictor(test.reflections)
-    test.refman = ReflectionManagerFactory.from_parameters_reflections_experiments(
-        refman_phil_scope.extract(),
-        test.reflections,
+    test.refman = ReflectionManagerFactory.from_experiments_reflections_params(
         test.stills_experiments,
-        do_stills=True,
+        test.reflections,
+        refman_phil_scope.extract(),
+        RefinementType.STILLS,
     )
     test.refman.finalise()
 

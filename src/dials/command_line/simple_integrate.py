@@ -48,7 +48,7 @@ log = 'dials.simple_integrate.log'
 """
 Kabsch 2010 refers to
 Kabsch W., Integration, scaling, space-group assignment and
-post-refinment, Acta Crystallographica Section D, 2010, D66, 133-144
+post-refinement, Acta Crystallographica Section D, 2010, D66, 133-144
 
 Usage:
 $ dev.dials.simple_integrate.py refined.expt refined.refl

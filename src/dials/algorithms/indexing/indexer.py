@@ -637,9 +637,11 @@ class Indexer:
                         ExperimentsPredictorFactory,
                     )
 
-                    ref_predictor = ExperimentsPredictorFactory.from_experiments(
-                        experiments,
-                        spherical_relp=self.all_params.refinement.parameterisation.spherical_relp_model,
+                    ref_predictor = (
+                        ExperimentsPredictorFactory.from_parameters_experiments(
+                            self.all_params,
+                            experiments,
+                        )
                     )
                     ref_predictor(refined_reflections)
                 else:

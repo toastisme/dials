@@ -319,10 +319,20 @@ def test_spherical_relp_stills_pred_param(tc):
         xl_unit_cell_parameterisations=[tc.xluc_param],
     )
 
+    params = parse(
+        """
+        refinement{
+            parameterisation{
+                spherical_relp_model = True
+            }
+        }
+        """
+    ).extract()
+
     # Predict the reflections in place. Must do this ahead of calculating
     # the analytical gradients so quantities like s1 are correct
-    ref_predictor = ExperimentsPredictorFactory.from_experiments(
-        tc.stills_experiments, force_stills=True, spherical_relp=True
+    ref_predictor = ExperimentsPredictorFactory.from_parameters_experiments(
+        tc.stills_experiments, params
     )
     ref_predictor(tc.reflections)
 
