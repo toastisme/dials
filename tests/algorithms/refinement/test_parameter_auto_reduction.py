@@ -4,6 +4,7 @@ import pytest
 
 from dxtbx.model import Detector
 
+import dials.algorithms.refinement.refiner as refiner
 from dials.algorithms.refinement import DialsRefineConfigError
 from dials.algorithms.refinement.parameterisation.autoreduce import AutoReduce
 from dials.algorithms.refinement.parameterisation.autoreduce import (
@@ -18,7 +19,6 @@ from dials.algorithms.refinement.parameterisation.prediction_parameters_stills i
 from dials.algorithms.refinement.prediction.managed_predictors import (
     StillsExperimentsPredictor,
 )
-from dials.algorithms.refinement.refiner import RefinementType
 from dials.algorithms.refinement.reflection_manager import ReflectionManagerFactory
 from dials.algorithms.refinement.reflection_manager import (
     phil_scope as refman_phil_scope,
@@ -39,7 +39,7 @@ def tc():
         test.stills_experiments,
         test.reflections,
         refman_phil_scope.extract(),
-        RefinementType.STILLS,
+        refiner.RefinementType.stills,
     )
     test.refman.finalise()
 
@@ -143,7 +143,7 @@ def test_check_and_remove():
         test.stills_experiments,
         test.reflections,
         refman_phil_scope.extract(),
-        RefinementType.STILLS,
+        refiner.RefinementType.stills,
     )
     test.refman.finalise()
 

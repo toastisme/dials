@@ -437,7 +437,7 @@ class RefinerFactory:
 
         # create managed reflection predictor
         ref_predictor = ExperimentsPredictorFactory.from_parameters_experiments(
-            experiments, params
+            experiments, params, refinement_type
         )
 
         # Predict for the managed observations, set columns for residuals and set

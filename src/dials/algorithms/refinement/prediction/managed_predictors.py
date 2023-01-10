@@ -11,9 +11,11 @@ from __future__ import annotations
 
 from math import pi
 
+import libtbx
 from dxtbx.model.experiment_list import ExperimentList
 from scitbx.array_family import flex
 
+import dials.algorithms.refinement.refiner as refiner
 from dials.algorithms.spot_prediction import (
     LaueReflectionPredictor,
     ScanStaticRayPredictor,
@@ -186,7 +188,9 @@ class LaueExperimentsPredictor(ExperimentsPredictor):
 class ExperimentsPredictorFactory:
     @staticmethod
     def from_parameters_experiments(
-        experiments: ExperimentList, params
+        experiments: ExperimentList,
+        params: libtbx.phil.scope_extract,
+        refinement_type: refiner.RefinementType = None,
     ) -> ExperimentsPredictor:
         def using_stills_prediction(experiments: ExperimentList) -> bool:
             for exp in experiments:
@@ -199,6 +203,24 @@ class ExperimentsPredictorFactory:
                 return False
             return params.refinement.parameterisation.laue
 
+        if refinement_type is not None:
+            if refinement_type == refiner.RefinementType.stills:
+                predictor = StillsExperimentsPredictor(experiments)
+                predictor.spherical_relp_model = (
+                    params.refinement.parameterisation.spherical_relp_model
+                )
+                return predictor
+            elif refinement_type == refiner.RefinementType.laue:
+                return LaueExperimentsPredictor(experiments)
+            elif (
+                refinement_type == refiner.RefinementType.scan
+                or refiner.RefinementType.scan_varying
+            ):
+                return ScansExperimentsPredictor(experiments)
+            else:
+                raise NotImplementedError
+
+        # If refinement_type is not given set automatically
         if using_stills_prediction(experiments):
             predictor = StillsExperimentsPredictor(experiments)
             predictor.spherical_relp_model = (
