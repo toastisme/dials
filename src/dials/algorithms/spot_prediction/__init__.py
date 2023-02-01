@@ -32,6 +32,7 @@ __all__ = [
     "StillsDeltaPsiReflectionPredictor",
     "StillsRayPredictor",
     "StillsReflectionPredictor",
+    "LaueReflectionPredictor",
 ]
 
 

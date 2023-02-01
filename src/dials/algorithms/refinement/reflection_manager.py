@@ -422,10 +422,10 @@ class ReflectionManagerFactory:
             return ConstantStillsWeightingStrategy(*params.weighting_strategy.constants)
         elif params.weighting_strategy.override == "laue_statistical":
             from dials.algorithms.refinement.weighting_strategies import (
-                LaueStatisticalWeightingStrategy,
+                LaueMixedWeightingStrategy,
             )
 
-            return LaueStatisticalWeightingStrategy()
+            return LaueMixedWeightingStrategy()
         return None
 
     @staticmethod
@@ -951,7 +951,7 @@ class LaueReflectionManager(ReflectionManager):
     reflections too close to the spindle, and reports only information
     about X, and Y residuals"""
 
-    _weighting_strategy = weighting_strategies.LaueStatisticalWeightingStrategy()
+    _weighting_strategy = weighting_strategies.LaueMixedWeightingStrategy()
     experiment_type = "laue"
 
     def __init__(
@@ -1104,8 +1104,13 @@ class LaueReflectionManager(ReflectionManager):
         logger.info(dials.util.tabulate(rows, header) + "\n")
 
     def update_residuals(self):
-        x_obs, y_obs, wavelength_obs = self._reflections["xyzobs.mm.value"].parts()
-        x_calc, y_calc, wavelength_calc = self._reflections["xyzcal.mm"].parts()
+        x_obs, y_obs, _ = self._reflections["xyzobs.mm.value"].parts()
+        x_calc, y_calc, _ = self._reflections["xyzcal.mm"].parts()
+        wavelength_obs = self._reflections["Wavelength"]
+        wavelength_cal = self._reflections["wavelength_cal"]
         self._reflections["x_resid"] = x_calc - x_obs
         self._reflections["y_resid"] = y_calc - y_obs
-        self._reflections["wavelength_resid"] = wavelength_calc - wavelength_obs
+        self._reflections["wavelength_resid"] = wavelength_cal - wavelength_obs
+        self._reflections["wavelength_resid2"] = (
+            self._reflections["wavelength_resid"] ** 2
+        )

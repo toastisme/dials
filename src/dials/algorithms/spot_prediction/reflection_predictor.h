@@ -1331,7 +1331,7 @@ namespace dials { namespace algorithms {
     /**
      * Initialise the predictor
      */
-    LaueReflectionPredictor(const vec3<double> unit_s0,
+    LaueReflectionPredictor(const vec3<double> &unit_s0,
                             const Detector &detector,
                             mat3<double> ub,
                             const cctbx::uctbx::unit_cell &unit_cell,

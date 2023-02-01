@@ -113,7 +113,7 @@ class ConstantStillsWeightingStrategy:
         return reflections
 
 
-class LaueStatisticalWeightingStrategy(StatisticalWeightingStrategy):
+class LaueMixedWeightingStrategy(StatisticalWeightingStrategy):
     """Defines a single method that provides a ReflectionManager with a strategy
     for calculating weights for refinement. This version uses statistical weights
     for X and Y and wavelength"""
@@ -126,11 +126,7 @@ class LaueStatisticalWeightingStrategy(StatisticalWeightingStrategy):
         reflections = super().calculate_weights(reflections)
 
         wx, wy, _ = reflections["xyzobs.mm.weights"].parts()
-        wavelength_var = (
-            reflections["wavelength"]
-            - sum(reflections["wavelength"]) / len(reflections)
-        ) ** 2
-        wz = 1 / wavelength_var
+        wz = reflections["Wavelength"] * 0 + 132000000
         reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, wz)
 
         return reflections

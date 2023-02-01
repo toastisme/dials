@@ -180,6 +180,7 @@ class RefinerFactory:
             "flags",
             "shoebox",
             "delpsical.weights",
+            "Wavelength",
         ]
         # NB xyzobs.px.value & xyzcal.px required by SauterPoon outlier rejector
         # NB delpsical.weights is used by ExternalDelPsiWeightingStrategy
@@ -237,7 +238,7 @@ class RefinerFactory:
                 and not params.refinement.parameterisation.laue
             ):
                 return False
-            if "wavelength" not in reflections:
+            if "Wavelength" not in reflections:
                 raise DialsRefineConfigError(
                     "Trying to do Laue refinement without wavelengths in reflections"
                 )
@@ -246,10 +247,10 @@ class RefinerFactory:
         def using_scan_varying_refinement(params: libtbx.phil.scope_extract) -> bool:
             return params.refinement.parameterisation.scan_varying
 
-        if using_stills_refinement(experiments):
-            return RefinementType.stills
-        elif using_laue_refinement(params, reflections):
+        if using_laue_refinement(params, reflections):
             return RefinementType.laue
+        elif using_stills_refinement(experiments):
+            return RefinementType.stills
         elif using_scan_varying_refinement(params):
             return RefinementType.scan_varying
         else:
@@ -878,7 +879,7 @@ class Refiner:
         rmsd_multipliers = []
         header = ["Step", "Nref"]
         for (name, units) in zip(self._target.rmsd_names, self._target.rmsd_units):
-            if units == "mm":
+            if units == "mm" or units == "A":
                 header.append(name + "\n(mm)")
                 rmsd_multipliers.append(1.0)
             elif units == "rad":  # convert radians to degrees for reporting
@@ -957,6 +958,8 @@ class Refiner:
                 # will convert other angles in radians to degrees (e.g. for
                 # RMSD_DeltaPsi and RMSD_2theta)
                 header.append(name + "\n(deg)")
+            elif name == "RMSD_wavelength" and units == "A":
+                header.append(name + "\n(A)")
             else:  # skip other/unknown RMSDs
                 pass
 
@@ -997,6 +1000,8 @@ class Refiner:
                     rmsds.append(rmsd * images_per_rad)
                 elif units == "rad":
                     rmsds.append(rmsd * RAD2DEG)
+                elif name == "RMSD_wavelength" and units == "A":
+                    rmsds.append(rmsd)
             rows.append([str(iexp), str(num)] + [f"{r:.5g}" for r in rmsds])
 
         if len(rows) > 0:

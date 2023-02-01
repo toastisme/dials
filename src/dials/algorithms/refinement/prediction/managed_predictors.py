@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from math import pi
 
+import numpy as np
+
 import libtbx
 from dxtbx.model.experiment_list import ExperimentList
 from scitbx.array_family import flex
@@ -175,10 +177,17 @@ class LaueExperimentsPredictor(ExperimentsPredictor):
     def _predict_one_experiment(self, experiment, reflections):
 
         min_s0_idx = min(
-            range(len(reflections["wavelength"])),
-            key=reflections["wavelength"].__getitem__,
+            range(len(reflections["Wavelength"])),
+            key=reflections["Wavelength"].__getitem__,
         )
-        min_s0 = reflections["s0"][min_s0_idx]
+
+        if "s0" not in reflections:
+            unit_s0 = np.array(experiment.beam.get_unit_s0())
+            wl = reflections["Wavelength"][min_s0_idx]
+            min_s0 = unit_s0 / wl
+        else:
+            min_s0 = reflections["s0"][min_s0_idx]
+
         dmin = experiment.detector.get_max_resolution(min_s0)
         predictor = LaueReflectionPredictor(experiment, dmin)
         UB = experiment.crystal.get_A()

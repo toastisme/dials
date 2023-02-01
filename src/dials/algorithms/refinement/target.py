@@ -724,7 +724,7 @@ class LaueLeastSquaresResidualWithRmsdCutoff(Target):
         reflection_manager,
         prediction_parameterisation,
         restraints_parameterisation,
-        pixel_frac_binsize_cutoff: float = 0.33333,
+        frac_binsize_cutoff: float = 0.33333,
         absolute_cutoffs: Optional[list] = None,
         gradient_calculation_blocksize=None,
     ):
@@ -754,8 +754,8 @@ class LaueLeastSquaresResidualWithRmsdCutoff(Target):
             min_px_size_x = min(e[0] for e in pixel_sizes)
             min_px_size_y = min(e[1] for e in pixel_sizes)
             self._binsize_cutoffs = [
-                min_px_size_x * pixel_frac_binsize_cutoff,
-                min_px_size_y * pixel_frac_binsize_cutoff,
+                min_px_size_x * frac_binsize_cutoff,
+                min_px_size_y * frac_binsize_cutoff,
             ]
             # Wavelength cutoff
             self._binsize_cutoffs.append(0)
@@ -767,9 +767,9 @@ class LaueLeastSquaresResidualWithRmsdCutoff(Target):
     def _extract_residuals_and_weights(matches):
 
         # return residuals and weights as 1d flex.double vectors
-        residuals = flex.double.concatenate(
-            matches["x_resid"], matches["y_resid"], matches["wavelength_resid"]
-        )
+        residuals = flex.double.concatenate(matches["x_resid"], matches["y_resid"])
+
+        residuals = flex.double.concatenate(residuals, matches["wavelength_resid"])
 
         weights, w_y, w_z = matches["xyzobs.mm.weights"].parts()
         weights.extend(w_y)
