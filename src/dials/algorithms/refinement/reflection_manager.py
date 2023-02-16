@@ -89,7 +89,7 @@ phil_str = (
       .help = "Parameters to configure weighting strategy overrides"
       .expert_level = 1
     {
-      override = statistical stills constant external_deltapsi
+      override = statistical stills constant external_deltapsi laue
         .help = "selection of a strategy to override default weighting behaviour"
         .type = choice
 
@@ -104,6 +104,22 @@ phil_str = (
                 "whether the case is for stills or scans. The default gives"
                 "unit weighting."
         .type = floats(size = 3, value_min = 0)
+
+      init_wavelength_weight = 1000000
+        .help = "used by the laue strategy to choose the initial value"
+                "for wavelength weighting"
+        .type = float(value_min = 0)
+      delta_wavelength_weight = 10
+        .help = "used by the laue strategy to choose the wavelength weighting"
+                "for a given macrocycle"
+        .type = float(value_min = 0)
+      wavelength_weight_formula = *add multiply
+        .help = "Changes how delta_wavelength is applied to init_wavelength"
+                "after every macrocycle. If add, wavelength weight"
+                "= init_wavelength_weight + (delta_wavelength_weight* run_number)."
+                "If multiply,"
+                "weight=init_wavelength_weight * (delta_wavelength_weight) * run_number"
+        .type = choice
     laue = False
       .help = "If True use LaueReflectionManager for to manage polychromatic"
               "reflections."
@@ -420,12 +436,16 @@ class ReflectionManagerFactory:
             )
 
             return ConstantStillsWeightingStrategy(*params.weighting_strategy.constants)
-        elif params.weighting_strategy.override == "laue_statistical":
+        elif params.weighting_strategy.override == "laue":
             from dials.algorithms.refinement.weighting_strategies import (
                 LaueMixedWeightingStrategy,
             )
 
-            return LaueMixedWeightingStrategy()
+            return LaueMixedWeightingStrategy(
+                params.weighting_strategy.init_wavelength_weight,
+                params.weighting_strategy.delta_wavelength_weight,
+                params.weighting_strategy.wavelength_weight_formula,
+            )
         return None
 
     @staticmethod

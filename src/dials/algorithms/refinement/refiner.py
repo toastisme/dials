@@ -12,6 +12,7 @@ from typing import Tuple
 
 import psutil
 
+import cctbx.array_family.flex
 import libtbx
 from dxtbx.model.experiment_list import ExperimentList
 from libtbx.phil import parse
@@ -181,6 +182,7 @@ class RefinerFactory:
             "shoebox",
             "delpsical.weights",
             "Wavelength",
+            "run_number",
         ]
         # NB xyzobs.px.value & xyzcal.px required by SauterPoon outlier rejector
         # NB delpsical.weights is used by ExternalDelPsiWeightingStrategy
@@ -547,14 +549,19 @@ class RefinerFactory:
                     dense_jacobian_gigabytes,
                 )
 
-        # build refiner interface and return
-        if params.refinement.parameterisation.scan_varying:
-            refiner = ScanVaryingRefiner
-        else:
-            refiner = Refiner
+        refiner = RefinerFactory.get_refiner(refinement_type)
+
         return refiner(
             experiments, pred_param, param_reporter, refman, target, refinery
         )
+
+    @staticmethod
+    def get_refiner(refinement_type: RefinementType) -> Refiner:
+        if refinement_type == RefinementType.scan_varying:
+            return ScanVaryingRefiner
+        elif refinement_type == RefinementType.laue:
+            return LaueRefiner
+        return Refiner
 
     @staticmethod
     def config_sparse(params, experiments):
@@ -879,8 +886,11 @@ class Refiner:
         rmsd_multipliers = []
         header = ["Step", "Nref"]
         for (name, units) in zip(self._target.rmsd_names, self._target.rmsd_units):
-            if units == "mm" or units == "A":
+            if units == "mm":
                 header.append(name + "\n(mm)")
+                rmsd_multipliers.append(1.0)
+            elif units == "A":
+                header.append(name + "\n(A)")
                 rmsd_multipliers.append(1.0)
             elif units == "rad":  # convert radians to degrees for reporting
                 header.append(name + "\n(deg)")
@@ -1138,6 +1148,12 @@ class Refiner:
         Does nothing here, but used by subclasses"""
         pass
 
+    def update_reflections(self, reflections) -> None:
+        if "run_number" not in reflections:
+            reflections["run_number"] = cctbx.array_family.flex.int(len(reflections), 0)
+        reflections["run_number"] += 1
+        return reflections
+
     def selection_used_for_refinement(self):
         """Return a selection as a flex.bool in terms of the input reflection
         data of those reflections that were used in the final step of
@@ -1228,3 +1244,10 @@ class ScanVaryingRefiner(Refiner):
                 self._pred_param.set_model_state_uncertainties(
                     u_cov_list, b_cov_list, iexp
                 )
+
+
+class LaueRefiner(Refiner):
+    def update_reflections(self, reflections):
+        reflections = super().update_reflections(reflections)
+        reflections["Wavelength"] = reflections["wavelength_cal"]
+        return reflections

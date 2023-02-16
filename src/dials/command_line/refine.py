@@ -213,6 +213,7 @@ def run_macrocycle(params, reflections, experiments):
     # Update predictions for all indexed reflections
     logger.info("Updating predictions for indexed reflections")
     preds = refiner.predict_for_indexed()
+    preds = refiner.update_reflections(preds)
 
     # just copy over the columns of interest or columns that may have been
     # updated, leaving behind things added by e.g. scan-varying refinement
@@ -224,6 +225,7 @@ def run_macrocycle(params, reflections, experiments):
             "xyzcal.px",
             "entering",
             "delpsical.rad",
+            "run_number",
         ]:
             reflections[key] = preds[key]
 
@@ -278,6 +280,10 @@ def run_dials_refine(experiments, reflections, params):
 
     """
 
+    def remove_refinement_reflection_data(reflections):
+        del reflections["run_number"]
+        return reflections
+
     # Modify options if necessary
     if params.output.correlation_plot.filename is not None:
         params.refinement.refinery.journal.track_parameter_correlation = True
@@ -310,6 +316,7 @@ def run_dials_refine(experiments, reflections, params):
         refiner, reflections, history = run_macrocycle(params, reflections, experiments)
         experiments = refiner.get_experiments()
 
+    reflections = remove_refinement_reflection_data(reflections)
     return experiments, reflections, refiner, history
 
 
@@ -350,6 +357,8 @@ def run(args=None, phil=working_phil):
     reflections, experiments = reflections_and_experiments_from_files(
         params.input.reflections, params.input.experiments
     )
+
+    reflections[0]["id"] = reflections[0]["imageset_id"]
 
     # Configure the logging
     dials.util.log.config(verbosity=options.verbose, logfile=params.output.log)

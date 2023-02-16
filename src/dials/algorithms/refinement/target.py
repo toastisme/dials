@@ -800,6 +800,35 @@ class LaueLeastSquaresResidualWithRmsdCutoff(Target):
         )
         return rmsds
 
+    def _predict_core(self, reflections, skip_derivatives=False):
+        """perform prediction for the specified reflections"""
+
+        # If the prediction parameterisation has a compose method (true for the scan
+        # varying case) then call it. Prefer hasattr to try-except duck typing to
+        # avoid masking AttributeErrors that could be raised within the method.
+        if hasattr(self._prediction_parameterisation, "compose"):
+            self._prediction_parameterisation.compose(reflections, skip_derivatives)
+
+        # do prediction (updates reflection table in situ). Scan-varying prediction
+        # is done automatically if the crystal has scan-points (assuming reflections
+        # have ub_matrix set)
+        self._reflection_predictor(reflections)
+
+        x_obs, y_obs, _ = reflections["xyzobs.mm.value"].parts()
+        x_calc, y_calc, _ = reflections["xyzcal.mm"].parts()
+
+        # calculate residuals and assign columns
+        reflections["x_resid"] = x_calc - x_obs
+        reflections["x_resid2"] = reflections["x_resid"] ** 2
+        reflections["y_resid"] = y_calc - y_obs
+        reflections["y_resid2"] = reflections["y_resid"] ** 2
+        wavelength_obs = reflections["Wavelength"]
+        wavelength_cal = reflections["wavelength_cal"]
+        reflections["wavelength_resid"] = wavelength_cal - wavelength_obs
+        reflections["wavelength_resid2"] = reflections["wavelength_resid"] ** 2
+
+        return reflections
+
     def achieved(self):
         """RMSD criterion for target achieved"""
         r = self._rmsds if self._rmsds else self.rmsds()

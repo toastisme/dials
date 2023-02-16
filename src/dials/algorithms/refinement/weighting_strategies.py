@@ -116,17 +116,36 @@ class ConstantStillsWeightingStrategy:
 class LaueMixedWeightingStrategy(StatisticalWeightingStrategy):
     """Defines a single method that provides a ReflectionManager with a strategy
     for calculating weights for refinement. This version uses statistical weights
-    for X and Y and wavelength"""
+    for X and Y and a constant value for wavelength"""
 
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        init_weight: float = 10000000,
+        delta_weight: float = 1,
+        formula: str = "add",
+    ):
+        self._init_weight = init_weight
+        self._delta_weight = delta_weight
+        self._formula = formula
 
     def calculate_weights(self, reflections):
-        # call parent class method to set X and Y weights
-        reflections = super().calculate_weights(reflections)
 
+        # x,y use statistical weighting
+        reflections = super().calculate_weights(reflections)
         wx, wy, _ = reflections["xyzobs.mm.weights"].parts()
-        wz = reflections["Wavelength"] * 0 + 132000000
+        wz = wy * 0
+        if "run_number" not in reflections:
+            # Only 1 macrocycle is being run
+            wz = wz + self._init_weight
+        else:
+            rn = reflections["run_number"][0]
+            if self._formula == "add":
+                wz = wz + self._init_weight + (self._delta_weight * rn)
+            elif self._formula == "multiply":
+                wz = wz + self._init_weight * (self._delta_weight * rn)
+            else:
+                raise NotImplementedError
+
         reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, wz)
 
         return reflections
