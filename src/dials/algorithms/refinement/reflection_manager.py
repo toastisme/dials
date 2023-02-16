@@ -367,7 +367,7 @@ class ReflectionManagerFactory:
         if params.outlier.algorithm in ("null", None):
             outlier_detector = None
         else:
-            colnames = ["x_resid", "y_resid", "wavelength_resid"]
+            colnames = ["x_resid", "y_resid"]
             params.outlier.block_width = None
             from dials.algorithms.refinement.outlier_detection import (
                 CentroidOutlierFactory,
