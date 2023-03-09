@@ -1408,12 +1408,15 @@ Found %s"""
                         np.array(s1_norm[j]) - np.array(s0s[j]) / wavelengths[j]
                     )
                     energies[j] = get_energy(L0_in_m + s1_length, tof)
-                    spectra_idx_1D[j] = get_spectra_idx_1D(
-                        fmt_instance=fmt_instance,
-                        panel=i_panel,
-                        x_px=int(px[j]),
-                        y_px=int(py[j]),
-                    )
+                    try:
+                        spectra_idx_1D[j] = get_spectra_idx_1D(
+                            fmt_instance=fmt_instance,
+                            panel=i_panel,
+                            x_px=int(px[j]),
+                            y_px=int(py[j]),
+                        )
+                    except AttributeError:
+                        pass
 
                 self["wavelength"].set_selected(sel, wavelengths)
                 self["d_spacing"].set_selected(sel, d_spacing)
@@ -1469,6 +1472,7 @@ Found %s"""
                 add_tof_data(sel_expt)
             else:
                 add_monochromatic_data(sel_expt)
+        self.map_centroids_to_reciprocal_space(experiments)
 
     def map_centroids_to_reciprocal_space(
         self, experiments, calculated=False, crystal_frame=False
