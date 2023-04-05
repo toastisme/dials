@@ -457,7 +457,13 @@ class XrayFrame(XFBaseClass):
                 )
                 return self.pyslip.tiles.picture_fast_slow_to_map_relative(x, y)
 
-            panel_id, beam_pixel_fast, beam_pixel_slow = self.get_beam_center_px()
+            try:
+                panel_id, beam_pixel_fast, beam_pixel_slow = self.get_beam_center_px()
+            except RuntimeError:  # Detector has no beam center
+                panel_id = 0
+                beam_pixel_fast = 0
+                beam_pixel_slow = 0
+
             self.beam_center_cross_data = [
                 (
                     (
