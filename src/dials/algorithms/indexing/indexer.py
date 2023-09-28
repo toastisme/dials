@@ -907,6 +907,8 @@ class Indexer:
         predicted = refiner.predict_for_indexed()
         reflections["xyzcal.mm"] = predicted["xyzcal.mm"]
         reflections["entering"] = predicted["entering"]
+        if "wavelength_cal" in predicted:
+            reflections["wavelength_cal"] = predicted["wavelength_cal"]
         reflections.unset_flags(
             flex.bool(len(reflections), True), reflections.flags.centroid_outlier
         )

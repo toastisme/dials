@@ -531,6 +531,8 @@ def run_simple_integrate(params, experiments, reflections):
     )
     sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
     predicted_reflections = predicted_reflections.select(sel)
+    if "idx" in reflections:
+        predicted_reflections["idx"] = reflections["idx"]
 
     """
     Create profile model and add it to erperiment.

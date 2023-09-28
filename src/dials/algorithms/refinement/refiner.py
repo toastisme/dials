@@ -247,6 +247,7 @@ class RefinerFactory:
             "shoebox",
             "delpsical.weights",
             "wavelength",
+            "wavelength_cal",
             "tof",
             "s0",
         ]
