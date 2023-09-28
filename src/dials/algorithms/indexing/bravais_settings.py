@@ -111,6 +111,7 @@ class RefinedSettingsList(list):
                 "rmsd": item.rmsd,
                 "nspots": item.Nmatches,
                 "bravais": item["bravais"],
+                "volume": uc.volume(),
                 "unit_cell": uc.parameters(),
                 "cb_op": str(item["cb_op_inp_best"] * self.cb_op_to_primitive),
                 "max_cc": item.max_cc,

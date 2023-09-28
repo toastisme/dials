@@ -1065,8 +1065,7 @@ class _:
 
     def get_pixel_bbox_centroid_positions(
         self, panel: int, pixel_pos: Tuple[int, int]
-    ) -> Tuple[list, list, list]:
-
+    ) -> Tuple[list, list, list, list]:
         """
         Finds any bounding boxes within px and py on panel
         and returns their pz positions along with
@@ -1080,11 +1079,16 @@ class _:
             centroids = self["xyzobs.px.value"].select(sel)
         else:
             centroids = None
+        if "miller_index" in self:
+            miller_indices = self["miller_index"].select(sel)
+        else:
+            miller_indices = None
         py = int(pixel_pos[0])
         px = int(pixel_pos[1])
         bbox_pos = []
         centroid_pos = []
         refl_ids = []
+        selected_miller_indices = []
         for i in range(len(x0)):
             if px >= x0[i] and px <= x1[i]:
                 if py >= y0[i] and py <= y1[i]:
@@ -1095,7 +1099,12 @@ class _:
                         ci = centroids[i][2]
                         x, y = z0[i], z1[i]
                         assert ci >= x and ci <= y, f"{ci} {x} {y}"
-        return bbox_pos, centroid_pos, refl_ids
+                    if miller_indices:
+                        selected_miller_indices.append(miller_indices[i])
+                    else:
+                        selected_miller_indices.append((0, 0, 0))
+
+        return bbox_pos, centroid_pos, refl_ids, selected_miller_indices
 
     def find_overlaps(self, experiments=None, border=0):
         """
@@ -1337,7 +1346,6 @@ Found %s"""
                 self["xyzobs.mm.variance"].set_selected(sel, centroid_variance)
 
     def add_beam_data(self, experiments):
-
         """
         Adds wavelength, tof, s0, and unit_s0 columns to self.
         All experiments with a TOFSequence have values set from their time-of-flight.
@@ -1519,10 +1527,7 @@ Found %s"""
                 if self.contains_beam_data():
                     import numpy as np
 
-                    if calculated:
-                        wavelengths = self["wavelength_cal"].select(sel)
-                    else:
-                        wavelengths = self["wavelength"].select(sel)
+                    wavelengths = self["wavelength"].select(sel)
                     S = cctbx.array_family.flex.vec3_double(len(s1))
                     s1 = s1 / s1.norms()
                     for s1_idx in range(len(s1)):
