@@ -1588,7 +1588,7 @@ Found %s"""
             if not experiment.goniometer:
                 continue
             axis = matrix.col(experiment.goniometer.get_rotation_axis())
-            s0 = matrix.col(experiment.beam.get_s0())
+            s0 = matrix.col(experiment.beam.get_unit_s0())
             vec = s0.cross(axis)
             sel = self["id"] == iexp
             enterings.set_selected(sel, self["s1"].dot(vec) < 0.0)
