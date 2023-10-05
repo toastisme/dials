@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 from typing import Any, Tuple, Union
 
+from dxtbx.model import TOFSequence
 from libtbx.phil import parse
 from scitbx import sparse
 from scitbx.array_family import flex
@@ -235,7 +236,7 @@ class Target:
             sel = reflections["id"] == iexp
 
             # keep all reflections if there is no rotation axis
-            if exp.goniometer is None:
+            if exp.goniometer is None or isinstance(exp.sequence, TOFSequence):
                 to_keep.set_selected(sel, True)
                 continue
 
