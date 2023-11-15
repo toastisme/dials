@@ -184,7 +184,10 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def("__call__", predict_observed_with_panel)
       .def("__call__", predict_observed_with_panel_list)
       .def("for_reflection_table", &Predictor::for_reflection_table)
-      .def("for_reflection_table", &Predictor::for_reflection_table_with_individual_ub);
+      .def("for_reflection_table", &Predictor::for_reflection_table_with_individual_ub)
+      .def("all_reflections_for_asu",
+           &Predictor::all_reflections_for_asu,
+           (arg("goniometer"), arg("phi")));
   }
   void export_reflection_predictor() {
     export_scan_static_reflection_predictor();

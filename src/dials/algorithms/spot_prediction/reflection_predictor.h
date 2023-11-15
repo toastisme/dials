@@ -28,6 +28,7 @@
 #include <dials/algorithms/spot_prediction/stills_ray_predictor.h>
 #include <dials/algorithms/spot_prediction/ray_intersection.h>
 #include <iostream>
+#include <cctbx/miller/index_generator.h>
 
 namespace dials { namespace algorithms {
 
@@ -1356,6 +1357,70 @@ namespace dials { namespace algorithms {
       return af::reflection_table();
     }
 
+    af::reflection_table all_reflections_for_asu(Goniometer goniometer, double phi) {
+      mat3<double> fixed_rotation = goniometer.get_fixed_rotation();
+      mat3<double> setting_rotation = goniometer.get_setting_rotation();
+      vec3<double> rotation_axis = goniometer.get_rotation_axis();
+      mat3<double> rotation =
+        scitbx::math::r3_rotation::axis_and_angle_as_matrix(rotation_axis, phi);
+      vec3<double> unit_s0 = beam_.get_unit_s0();
+      vec2<double> wavelength_range = beam_.get_wavelength_range();
+
+      cctbx::miller::index_generator indices =
+        cctbx::miller::index_generator(unit_cell_, space_group_type_, false, dmin_);
+
+      af::shared<miller_index> indices_arr = indices.to_array();
+
+      af::reflection_table table;
+      af::shared<double> wavelength_column;
+      table["wavelength_cal"] = wavelength_column;
+      af::shared<vec3<double> > s0_column;
+      table["s0_cal"] = s0_column;
+      tof_prediction_data predictions(table);
+
+      for (std::size_t i = 0; i < indices_arr.size(); ++i) {
+        miller_index h = indices_arr[i];
+
+        vec3<double> q = setting_rotation * rotation * fixed_rotation * ub_ * h;
+
+        // Calculate the wavelength required to meet the diffraction condition
+        double wavelength = -2 * ((unit_s0 * q) / (q * q));
+        if (wavelength < wavelength_range[0] || wavelength > wavelength_range[1]) {
+          continue;
+        }
+        vec3<double> s0 = unit_s0 / wavelength;
+        DIALS_ASSERT(s0.length() > 0);
+
+        // Calculate the Ray (default zero angle and 'entering' as false)
+        vec3<double> s1 = s0 + q;
+
+        int panel = detector_.get_panel_intersection(s1);
+        if (panel == -1) {
+          continue;
+        }
+
+        Detector::coord_type coord;
+        coord.first = panel;
+        coord.second = detector_[panel].get_ray_intersection(s1);
+        vec2<double> mm = coord.second;
+        vec2<double> px = detector_[panel].millimeter_to_pixel(mm);
+
+        // Add the reflections to the table
+        predictions.hkl.push_back(h);
+        predictions.enter.push_back(false);
+        predictions.s1.push_back(s1);
+        predictions.xyz_mm.push_back(vec3<double>(mm[0], mm[1], 0.0));
+        predictions.xyz_px.push_back(vec3<double>(px[0], px[1], 0.0));
+        predictions.panel.push_back(panel);
+        predictions.flags.push_back(af::Predicted);
+        predictions.wavelength_cal.push_back(wavelength);
+        predictions.s0_cal.push_back(s0);
+      }
+
+      // Return the reflection table
+      return table;
+    }
+
     /**
      * Predict reflections for UB. Also filters based on ewald sphere proximity.
      * @param ub The UB matrix
@@ -1514,14 +1579,6 @@ namespace dials { namespace algorithms {
       append_for_ray(p, h, ray, panel, wavelength, s0);
     }
 
-    /**
-     * Predict for the given Miller index, ray, panel number and delta psi
-     * @param p The reflection data
-     * @param h The miller index
-     * @param ray The ray data
-     * @param panel The panel number
-     * @param delpsi The calculated minimum rotation to Ewald sphere
-     */
     void append_for_ray(tof_prediction_data &p,
                         const miller_index &h,
                         const Ray &ray,
