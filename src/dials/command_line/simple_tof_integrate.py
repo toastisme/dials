@@ -17,6 +17,9 @@ from dxtbx.model import Goniometer
 
 import dials.util.log
 import dials_array_family_flex_ext
+from dials.algorithms.integration.fit.tof_line_profile import (
+    compute_line_profile_intensity,
+)
 from dials.algorithms.integration.report import IntegrationReport, ProfileModelReport
 from dials.algorithms.profile_model.gaussian_rs import GaussianRSProfileModeller
 from dials.algorithms.profile_model.gaussian_rs import Model as GaussianRSProfileModel
@@ -298,6 +301,11 @@ def output_reflections_as_hkl(reflections, filename):
         variance = reflections["intensity.sum.variance"][idx]
         return intensity, np.sqrt(variance)
 
+    def get_line_profile_intensity_and_sigma(reflections, idx):
+        intensity = reflections["line_profile_intensity"][idx]
+        variance = reflections["line_profile_variance"][idx]
+        return intensity, np.sqrt(variance)
+
     def valid_intensity(intensity):
         from math import isinf, isnan
 
@@ -310,6 +318,35 @@ def output_reflections_as_hkl(reflections, filename):
             h, k, l = reflections["miller_index"][i]
             batch_number = 1
             intensity, sigma = get_corrected_intensity_and_sigma(reflections, i)
+            if not valid_intensity(intensity):
+                continue
+            intensity = round(intensity, 2)
+            sigma = round(sigma, 2)
+            wavelength = round(reflections["wavelength_cal"][i], 4)
+            g.write(
+                ""
+                + "{:4d}{:4d}{:4d}{:8.1f}{:8.2f}{:4d}{:8.4f}\n".format(
+                    int(h),
+                    int(k),
+                    int(l),
+                    float(intensity),
+                    float(sigma),
+                    int(batch_number),
+                    float(wavelength),
+                )
+            )
+        g.write(
+            ""
+            + "{:4d}{:4d}{:4d}{:8.1f}{:9.2f}{:4d}{:8.4f}\n".format(
+                int(0), int(0), int(0), float(0.00), float(0.00), int(0), float(0.0000)
+            )
+        )
+
+    with open("lp_" + filename, "w") as g:
+        for i in range(len(reflections)):
+            h, k, l = reflections["miller_index"][i]
+            batch_number = 1
+            intensity, sigma = get_line_profile_intensity_and_sigma(reflections, i)
             if not valid_intensity(intensity):
                 continue
             intensity = round(intensity, 2)
@@ -605,6 +642,7 @@ def run_simple_integrate(params, experiments, reflections):
     centroid_algorithm.compute_centroid(predicted_reflections)
 
     predicted_reflections.compute_summed_intensity()
+    predicted_reflections = compute_line_profile_intensity(predicted_reflections)
 
     # Filter reflections with a high fraction of masked foreground
     valid_foreground_threshold = 1.0  # DIALS default
