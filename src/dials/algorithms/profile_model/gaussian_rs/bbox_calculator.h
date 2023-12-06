@@ -452,7 +452,7 @@ namespace dials {
       double z2 = sequence_.get_frame_from_tof(tof2);
       double2 z(z1, z2);
 
-      int6 bbox(x0, x1, y0, y1, frame - 5, frame + 7);
+      int6 bbox(x0, x1, y0, y1, frame - 30, frame + 30);
       DIALS_ASSERT(bbox[1] > bbox[0]);
       DIALS_ASSERT(bbox[3] > bbox[2]);
       DIALS_ASSERT(bbox[5] > bbox[4]);
