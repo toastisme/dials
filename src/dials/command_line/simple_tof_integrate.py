@@ -572,7 +572,7 @@ def run_simple_integrate(params, experiments, reflections):
         predicted_reflections["idx"] = reflections["idx"]
 
     """
-    Create profile model and add it to erperiment.
+    Create profile model and add it to experiment.
     This is used to predict reflection properties.
     """
 
