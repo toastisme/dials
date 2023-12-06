@@ -4,20 +4,24 @@ from __future__ import annotations
 import logging
 import multiprocessing
 from os.path import splitext
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 from scipy.signal import savgol_filter
 
+from dxtbx import flumpy
 from dxtbx.format import Format
-from dxtbx.model import Beam, Detector, Experiment, TOFSequence
+from dxtbx.model import Beam, Detector, Experiment
 from libtbx import Auto, phil
 
 import dials.util.log
-from dials.algorithms.scaling.tof_absorption_correction import SphericalAbsorption
 from dials.util.options import ArgumentParser
 from dials.util.phil import parse
 from dials.util.version import dials_version
+from dials_scaling_ext import (
+    tof_lorentz_correction,
+    tof_spherical_absorption_correction,
+)
 
 logger = logging.getLogger("dials.command_line.normalize_tof_images")
 
@@ -42,7 +46,7 @@ corrections{
         .type = bool
         .help = "Divide the target by the incident (e.g. Vanadium) run"q
                 "and subtract the empty run."
-    normalize_by_bin_width = True
+    normalize_by_bin_width = False
         .type = bool
         .help = "Multiply ToF bin widths by their ToF width."
     smoothing_window_length = 51
@@ -197,41 +201,6 @@ def expand_spectra(
     return spectra_arr
 
 
-def calculate_absorption_correction(
-    fmt_instance: Format,
-    detector: Detector,
-    beam: Beam,
-    radius: float,
-    sample_number_density: float,
-    scattering_x_section: float,
-    absorption_x_section: float,
-    spectra: Optional[np.array] = None,
-) -> np.array:
-
-    """
-    Calculates the spherical absorption correction for spectra (or spectra from
-    fmt_instance if spectra is None)
-    """
-
-    if spectra is None:
-        spectra = fmt_instance.get_raw_spectra(normalize_by_proton_charge=True)
-
-    spherical_absorption = SphericalAbsorption(
-        radius=radius,
-        sample_number_density=sample_number_density,
-        scattering_x_section=scattering_x_section,
-        absorption_x_section=absorption_x_section,
-    )
-
-    two_theta = np.array(fmt_instance.get_raw_spectra_two_theta(detector, beam))
-    # TODO correct wavelengths for each pixel location
-    wavelengths = np.array(fmt_instance.get_wavelength_channels_in_ang())
-
-    return spherical_absorption.get_absorption_correction_vec(
-        spectra_arr=spectra, wavelength_arr=wavelengths, two_theta_arr=two_theta
-    )
-
-
 def process_incident_and_empty_spectra(
     params: phil.scope_extract,
     experiment: Experiment,
@@ -286,10 +255,10 @@ def process_incident_and_empty_spectra(
 
     # Normalise with absorption correction
     if params.corrections.spherical_absorption:
-        absorption_correction = get_incident_absorption_correction(
+        logger.info("Calculating incident absorption correction")
+        incident_spectra = get_incident_absorption_correction(
             params, incident_instance, experiment.detector, experiment.beam
         )
-        incident_spectra = incident_spectra / absorption_correction
 
     return incident_spectra, empty_spectra
 
@@ -305,18 +274,33 @@ def get_incident_absorption_correction(
     radius = params.incident_spectrum.sample_radius
     scattering_x_section = params.incident_spectrum.scattering_x_section
     absorption_x_section = params.incident_spectrum.absorption_x_section
+    linear_absorption_c = absorption_x_section * sample_number_density
+    linear_scattering_c = scattering_x_section * sample_number_density
 
-    logger.info("Calculating incident spectrum absorption correction")
-    absorption_correction = calculate_absorption_correction(
-        fmt_instance=incident_spectrum_instance,
-        detector=detector,
-        beam=beam,
-        radius=radius,
-        sample_number_density=sample_number_density,
-        scattering_x_section=scattering_x_section,
-        absorption_x_section=absorption_x_section,
+    spectra = incident_spectrum_instance.get_raw_spectra(
+        normalize_by_proton_charge=True
     )
-    return absorption_correction
+    two_theta = np.array(
+        incident_spectrum_instance.get_raw_spectra_two_theta(detector, beam)
+    )
+    # TODO correct wavelengths for each pixel location
+    wavelengths = np.array(incident_spectrum_instance.get_wavelength_channels_in_ang())
+
+    muR_arr = (linear_scattering_c + (linear_absorption_c / 1.8) * wavelengths) * radius
+    two_theta_deg_arr = two_theta * 180 / np.pi
+    two_theta_idx_arr = (two_theta_deg_arr / 10.0).astype(int)
+
+    tof_spherical_absorption_correction(
+        flumpy.from_numpy(spectra[0]),
+        flumpy.from_numpy(muR_arr),
+        flumpy.from_numpy(two_theta),
+        flumpy.from_numpy(two_theta_idx_arr),
+    )
+
+    spectra[np.isinf(spectra)] = 0
+    spectra[np.isnan(spectra)] = 0
+
+    return spectra
 
 
 def update_image_path(expt: Experiment, new_image_path: str) -> Experiment:
@@ -346,29 +330,19 @@ def apply_lorentz_correction(
     (sin^2(theta)/lambda^4)
     """
 
-    def get_lorentz_correction(
-        sequence: TOFSequence,
-        L0: float,
-        L1: float,
-        tof: float,
-        sin_sq_two_theta: float,
-    ):
-        wl = sequence.get_tof_wavelength_in_ang(L0 + L1, tof)
-        correction = sin_sq_two_theta / wl**4
-        return correction
-
-    sequence = experiment.sequence
     L0 = experiment.beam.get_sample_to_moderator_distance() * 10**-3
-    L1_spectra = expt_instance.get_raw_spectra_L1(experiment.detector)
-    tof = expt_instance.get_tof_in_seconds()
+    L1_spectra = np.array(expt_instance.get_raw_spectra_L1(experiment.detector))
+    tof = np.array(expt_instance.get_tof_in_seconds())
     two_theta_spectra_sq = np.square(np.sin(two_theta_spectra * 0.5))
 
-    for i in range(spectra.shape[1]):
-        for j in range(spectra.shape[2]):
-            correction = get_lorentz_correction(
-                sequence, L0, L1_spectra[i], tof[j], two_theta_spectra_sq[i]
-            )
-            spectra[0, i, j] = spectra[0, i, j] * correction
+    tof_lorentz_correction(
+        flumpy.from_numpy(spectra[0]),
+        float(L0),
+        flumpy.from_numpy(L1_spectra),
+        flumpy.from_numpy(tof),
+        flumpy.from_numpy(two_theta_spectra_sq),
+    )
+
     return spectra
 
 
@@ -510,18 +484,29 @@ def run() -> None:
         radius = params.target_spectrum.sample_radius
         scattering_x_section = params.target_spectrum.scattering_x_section
         absorption_x_section = params.target_spectrum.absorption_x_section
+        linear_absorption_c = absorption_x_section * sample_number_density
+        linear_scattering_c = scattering_x_section * sample_number_density
 
-        absorption_correction = calculate_absorption_correction(
-            fmt_instance=expt_instance,
-            detector=experiment.detector,
-            beam=experiment.beam,
-            radius=radius,
-            sample_number_density=sample_number_density,
-            scattering_x_section=scattering_x_section,
-            absorption_x_section=absorption_x_section,
+        two_theta = np.array(
+            expt_instance.get_raw_spectra_two_theta(
+                experiment.detector, experiment.beam
+            )
+        )
+        # TODO correct wavelengths for each pixel location
+        wavelengths = np.array(expt_instance.get_wavelength_channels_in_ang())
+        muR_arr = (
+            linear_scattering_c + (linear_absorption_c / 1.8) * wavelengths
+        ) * radius
+        two_theta_deg_arr = two_theta * 180 / np.pi
+        two_theta_idx_arr = (two_theta_deg_arr / 10.0).astype(int)
+
+        tof_spherical_absorption_correction(
+            flumpy.from_numpy(spectra[0]),
+            flumpy.from_numpy(muR_arr),
+            flumpy.from_numpy(two_theta),
+            flumpy.from_numpy(two_theta_idx_arr),
         )
 
-        spectra = spectra / absorption_correction
         spectra[np.isinf(spectra)] = 0
         spectra[np.isnan(spectra)] = 0
 
