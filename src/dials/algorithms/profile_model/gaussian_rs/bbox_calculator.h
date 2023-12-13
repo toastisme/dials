@@ -442,6 +442,7 @@ namespace dials {
 
       /// Calculate the rotation angles at the following XDS
       // e3 coordinates: -delta_m, +delta_m
+      /*
       double wavelength1 = xcs.to_wavelength(-delta_m, s1);
       double wavelength2 = xcs.to_wavelength(+delta_m, s1);
       double tof1 = beam_.get_tof_from_wavelength(wavelength1, L1);
@@ -451,8 +452,18 @@ namespace dials {
       double z1 = sequence_.get_frame_from_tof(tof1);
       double z2 = sequence_.get_frame_from_tof(tof2);
       double2 z(z1, z2);
+      */
+      double z0 = frame - delta_m;
+      if (z0 < 0) {
+        z0 = 0;
+      }
+      double max_z = sequence_.get_array_range()[1];
+      double z1 = frame + delta_m;
+      if (z1 > max_z) {
+        z1 = max_z;
+      }
 
-      int6 bbox(x0, x1, y0, y1, frame - 30, frame + 30);
+      int6 bbox(x0, x1, y0, y1, z0, z1);
       DIALS_ASSERT(bbox[1] > bbox[0]);
       DIALS_ASSERT(bbox[3] > bbox[2]);
       DIALS_ASSERT(bbox[5] > bbox[4]);

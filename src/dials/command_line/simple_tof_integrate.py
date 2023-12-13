@@ -581,7 +581,7 @@ def run_simple_integrate(params, experiments, reflections):
     model_reflections = reflections.select(used_in_ref)
 
     # sigma_m in 3.1 of Kabsch 2010
-    sigma_m = 0.01
+    sigma_m = 3
     sigma_b = 0.01
     # The Gaussian model given in 2.3 of Kabsch 2010
     experiment.profile = GaussianRSProfileModel(
