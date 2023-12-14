@@ -235,7 +235,7 @@ class ExperimentsPredictorFactory:
     @staticmethod
     def from_experiments(experiments, force_stills=False, spherical_relp=False):
 
-        if experiments.is_single_tof_experiment():
+        if experiments.all_tof_experiments():
             return TOFExperimentsPredictor(experiments)
 
         # Determine whether or not to use a stills predictor

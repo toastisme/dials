@@ -373,7 +373,7 @@ class RefinerFactory:
         obs["x_resid"] = x_calc - x_obs
         obs["y_resid"] = y_calc - y_obs
 
-        if experiments.is_single_tof_experiment():
+        if experiments.all_tof_experiments():
 
             obs["wavelength_resid"] = obs["wavelength_cal"] - obs["wavelength"]
             obs["wavelength_resid2"] = (obs["wavelength_cal"] - obs["wavelength"]) ** 2

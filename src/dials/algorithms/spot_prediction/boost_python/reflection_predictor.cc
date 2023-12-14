@@ -174,6 +174,7 @@ namespace dials { namespace algorithms { namespace boost_python {
     class_<Predictor>("TOFReflectionPredictor", no_init)
       .def(init<const PolyBeam&,
                 const Detector&,
+                const Goniometer&,
                 mat3<double>,
                 const cctbx::uctbx::unit_cell&,
                 const cctbx::sgtbx::space_group_type&,

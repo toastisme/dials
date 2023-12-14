@@ -395,7 +395,7 @@ def _set_n_intervals(smoother_params, analysis, scan, exp_ids):
 def _parameterise_beams(options, experiments, analysis):
     beam_params = []
 
-    if experiments.is_single_tof_experiment():
+    if experiments.all_tof_experiments():
         return beam_params
 
     sv_beam = options.scan_varying and not options.beam.force_static
@@ -810,7 +810,7 @@ def build_prediction_parameterisation(
 
     # Build the prediction equation parameterisation
     if do_stills:  # doing stills
-        if experiments.is_single_tof_experiment():
+        if experiments.all_tof_experiments():
             PredParam = TOFPredictionParameterisation
         elif options.sparse:
             if options.spherical_relp_model:
