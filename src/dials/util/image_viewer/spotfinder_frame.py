@@ -2421,7 +2421,9 @@ class PixelLinePlot(wx.Frame):
         all_bboxes = []
         all_centroids = []
         for rt in self.reflection_table_list:
-            bboxes, centroids = rt.get_pixel_bbox_centroid_positions(panel, coords)
+            bboxes, centroids = rt.get_pixel_bbox_centroid_positions(
+                panel, coords, False
+            )
             all_bboxes += list(bboxes)
             all_centroids += list(centroids)
         return all_bboxes, all_centroids

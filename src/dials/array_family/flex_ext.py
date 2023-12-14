@@ -1064,7 +1064,7 @@ class _:
         return "tof" in self
 
     def get_pixel_bbox_centroid_positions(
-        self, panel: int, pixel_pos: Tuple[int, int]
+        self, panel: int, pixel_pos: Tuple[int, int], return_miller_indices: bool = True
     ) -> Tuple[list, list, list, list]:
         """
         Finds any bounding boxes within px and py on panel
@@ -1074,7 +1074,9 @@ class _:
 
         sel = self["panel"] == panel
         x0, x1, y0, y1, z0, z1 = self["bbox"].select(sel).parts()
-        idxs = self["idx"].select(sel)
+        idxs = None
+        if "idx" in self:
+            idxs = self["idx"].select(sel)
         if "xyzobs.px.value" in self:
             centroids = self["xyzobs.px.value"].select(sel)
         else:
@@ -1093,7 +1095,8 @@ class _:
             if px >= x0[i] and px <= x1[i]:
                 if py >= y0[i] and py <= y1[i]:
                     bbox_pos.append([z0[i], z1[i]])
-                    refl_ids.append(idxs[i])
+                    if idxs:
+                        refl_ids.append(idxs[i])
                     if centroids:
                         centroid_pos.append(centroids[i][2])
                         ci = centroids[i][2]
@@ -1104,7 +1107,11 @@ class _:
                     else:
                         selected_miller_indices.append((0, 0, 0))
 
-        return bbox_pos, centroid_pos, refl_ids, selected_miller_indices
+        if idxs:
+            return bbox_pos, centroid_pos, refl_ids, selected_miller_indices
+        elif return_miller_indices:
+            return bbox_pos, centroid_pos, selected_miller_indices
+        return bbox_pos, centroid_pos
 
     def find_overlaps(self, experiments=None, border=0):
         """
