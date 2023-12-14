@@ -229,7 +229,7 @@ class ReflectionManagerFactory:
             flex.set_random_seed(params.random_seed)
             logger.debug("Random seed set to %d", params.random_seed)
 
-        if experiments.is_single_tof_experiment():
+        if experiments.all_tof_experiments():
             refman = TOFReflectionManager
 
         # check whether we deal with stills or scans
@@ -269,7 +269,7 @@ class ReflectionManagerFactory:
         if params.outlier.algorithm in ("null", None):
             outlier_detector = None
         else:
-            if experiments.is_single_tof_experiment():
+            if experiments.all_tof_experiments():
                 colnames = ["x_resid", "y_resid", "wavelength_resid"]
             elif do_stills:
                 colnames = ["x_resid", "y_resid"]
@@ -362,7 +362,7 @@ class ReflectionManager:
         self._axes = [
             matrix.col(g.get_rotation_axis()) if g else None for g in goniometers
         ]
-        if experiments.is_single_tof_experiment():
+        if experiments.all_tof_experiments():
             self._s0vecs = [None]
         else:
             self._s0vecs = [matrix.col(e.beam.get_s0()) for e in self._experiments]

@@ -115,6 +115,7 @@ class TOFReflectionPredictorPy:
         self.predictor = TOFReflectionPredictor(
             experiment.beam,
             experiment.detector,
+            experiment.goniometer,
             experiment.crystal.get_A(),
             experiment.crystal.get_unit_cell(),
             experiment.crystal.get_space_group().type(),

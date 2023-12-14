@@ -80,7 +80,7 @@ class TargetFactory:
 
         # Determine whether the target is in X, Y, Phi space or just X, Y to choose
         # the right Target to instantiate
-        if experiments.is_single_tof_experiment():
+        if experiments.all_tof_experiments():
             targ = TOFLeastSquaresPositionalResidualWithRmsdCutoff
         elif do_stills:
             if do_sparse:

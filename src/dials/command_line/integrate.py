@@ -486,7 +486,7 @@ def run_integration(params, experiments, reference=None):
     logger.info("\n".join(("", "=" * 80, "")))
     logger.info(heading("Predicting reflections"))
 
-    if experiments.is_single_tof_experiment() and not params.prediction.d_min:
+    if experiments.all_tof_experiments() and not params.prediction.d_min:
 
         min_s0_idx = min(
             range(len(reference["wavelength"])), key=reference["wavelength"].__getitem__

@@ -269,7 +269,7 @@ def eliminate_sys_absent(experiments, reflections):
 def get_subset_for_symmetry(experiments, reflection_tables, exclude_images=None):
     """Select an image range for symmetry analysis, or just select
     the first 360 degrees of data."""
-    if experiments.is_single_tof_experiment():
+    if experiments.all_tof_experiments():
         return reflection_tables
     refls_for_sym = []
     if exclude_images:

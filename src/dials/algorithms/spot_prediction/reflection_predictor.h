@@ -1336,17 +1336,21 @@ namespace dials { namespace algorithms {
      */
     TOFReflectionPredictor(const PolyBeam &beam,
                            const Detector &detector,
+                           const Goniometer &goniometer,
                            mat3<double> ub,
                            const cctbx::uctbx::unit_cell &unit_cell,
                            const cctbx::sgtbx::space_group_type &space_group_type,
                            const double &dmin)
         : beam_(beam),
           detector_(detector),
+          goniometer_(goniometer),
           ub_(ub),
           unit_cell_(unit_cell),
           space_group_type_(space_group_type),
           dmin_(dmin),
-          predict_ray_(beam.get_unit_s0()) {}
+          predict_ray_(beam.get_unit_s0(),
+                       goniometer.get_fixed_rotation(),
+                       goniometer.get_setting_rotation()) {}
 
     /**
      * Predict all reflection.
@@ -1626,6 +1630,7 @@ namespace dials { namespace algorithms {
   protected:
     PolyBeam beam_;
     Detector detector_;
+    Goniometer goniometer_;
     mat3<double> ub_;
     cctbx::uctbx::unit_cell unit_cell_;
     cctbx::sgtbx::space_group_type space_group_type_;
