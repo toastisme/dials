@@ -296,32 +296,34 @@ def print_data(reflections, panel):
 
 
 def output_reflections_as_hkl(reflections, filename):
-    def get_corrected_intensity_and_sigma(reflections, idx):
+    def get_corrected_intensity_and_variance(reflections, idx):
         intensity = reflections["intensity.sum.value"][idx]
         variance = reflections["intensity.sum.variance"][idx]
-        return intensity, np.sqrt(variance)
+        return intensity, variance
 
-    def get_line_profile_intensity_and_sigma(reflections, idx):
-        intensity = reflections["line_profile_intensity"][idx]
-        variance = reflections["line_profile_variance"][idx]
-        return intensity, np.sqrt(variance)
+    def get_line_profile_intensity_and_variance(reflections, idx):
+        intensity = reflections["intensity.prf.value"][idx]
+        variance = reflections["intensity.prf.variance"][idx]
+        return intensity, variance
 
-    def valid_intensity(intensity):
+    def valid_intensity(intensity, variance):
         from math import isinf, isnan
 
         if isnan(intensity) or isinf(intensity):
             return False
-        return intensity > 0
+        if isnan(variance) or isinf(variance):
+            return False
+        return intensity > 0 and variance > 0
 
     with open(filename, "w") as g:
         for i in range(len(reflections)):
             h, k, l = reflections["miller_index"][i]
             batch_number = 1
-            intensity, sigma = get_corrected_intensity_and_sigma(reflections, i)
-            if not valid_intensity(intensity):
+            intensity, variance = get_corrected_intensity_and_variance(reflections, i)
+            if not valid_intensity(intensity, variance):
                 continue
             intensity = round(intensity, 2)
-            sigma = round(sigma, 2)
+            sigma = round(np.sqrt(variance), 2)
             wavelength = round(reflections["wavelength_cal"][i], 4)
             g.write(
                 ""
@@ -342,15 +344,17 @@ def output_reflections_as_hkl(reflections, filename):
             )
         )
 
-    with open("lp_" + filename, "w") as g:
+    with open("prf_" + filename, "w") as g:
         for i in range(len(reflections)):
             h, k, l = reflections["miller_index"][i]
             batch_number = 1
-            intensity, sigma = get_line_profile_intensity_and_sigma(reflections, i)
-            if not valid_intensity(intensity):
+            intensity, variance = get_line_profile_intensity_and_variance(
+                reflections, i
+            )
+            if not valid_intensity(intensity, variance):
                 continue
             intensity = round(intensity, 2)
-            sigma = round(sigma, 2)
+            sigma = round(np.sqrt(variance), 2)
             wavelength = round(reflections["wavelength_cal"][i], 4)
             g.write(
                 ""
@@ -526,9 +530,6 @@ def run():
     )
     reflections = reflections[0]
 
-    reflections["id"] = cctbx.array_family.flex.int(len(reflections), 0)
-    reflections["imageset_id"] = cctbx.array_family.flex.int(len(reflections), 0)
-
     integrated_reflections = run_simple_integrate(params, experiments, reflections)
     integrated_reflections.as_msgpack_file(params.output.reflections)
     experiments.as_file(params.output.experiments)
@@ -540,8 +541,6 @@ def run_simple_integrate(params, experiments, reflections):
     nproc = 11
     pool = multiprocessing.Pool(nproc)
 
-    experiment = experiments[0]
-
     reflections, _ = process_reference(reflections)
 
     """
@@ -552,16 +551,34 @@ def run_simple_integrate(params, experiments, reflections):
         range(len(reflections["wavelength"])), key=reflections["wavelength"].__getitem__
     )
     min_s0 = reflections["s0"][min_s0_idx]
-    dmin = experiment.detector.get_max_resolution(min_s0)
-    predicted_reflections = flex.reflection_table.from_predictions(
-        experiment, padding=1.0, dmin=dmin
-    )
-    predicted_reflections["id"] = cctbx.array_family.flex.int(
-        len(predicted_reflections), 0
-    )
-    predicted_reflections["imageset_id"] = cctbx.array_family.flex.int(
-        len(predicted_reflections), 0
-    )
+    dmin = None
+    for experiment in experiments:
+        expt_dmin = experiment.detector.get_max_resolution(min_s0)
+        if dmin is None or expt_dmin < dmin:
+            dmin = expt_dmin
+
+    predicted_reflections = None
+    for idx, experiment in enumerate(experiments):
+
+        if predicted_reflections is None:
+            predicted_reflections = flex.reflection_table.from_predictions(
+                experiment, padding=1.0, dmin=dmin
+            )
+            predicted_reflections["id"] = cctbx.array_family.flex.int(
+                len(predicted_reflections), idx
+            )
+            predicted_reflections["imageset_id"] = cctbx.array_family.flex.int(
+                len(predicted_reflections), idx
+            )
+        else:
+            r = flex.reflection_table.from_predictions(
+                experiment, padding=1.0, dmin=dmin
+            )
+            r["id"] = cctbx.array_family.flex.int(len(r), idx)
+            r["imageset_id"] = cctbx.array_family.flex.int(len(r), idx)
+            predicted_reflections.extend(r)
+    predicted_reflections.calculate_entering_flags(experiments)
+
     # Updates flags to set which reflections to use in generating reference profiles
     matched, reflections, unmatched = predicted_reflections.match_with_reference(
         reflections
@@ -584,9 +601,10 @@ def run_simple_integrate(params, experiments, reflections):
     sigma_m = 3
     sigma_b = 0.01
     # The Gaussian model given in 2.3 of Kabsch 2010
-    experiment.profile = GaussianRSProfileModel(
-        params=params, n_sigma=3, sigma_b=sigma_b, sigma_m=sigma_m
-    )
+    for idx, experiment in enumerate(experiments):
+        experiments[idx].profile = GaussianRSProfileModel(
+            params=params, n_sigma=3, sigma_b=sigma_b, sigma_m=sigma_m
+        )
 
     """
     Compute properties for predicted reflections using profile model,
@@ -599,7 +617,7 @@ def run_simple_integrate(params, experiments, reflections):
     predicted_reflections.compute_bbox(experiments)
     x1, x2, y1, y2, t1, t2 = predicted_reflections["bbox"].parts()
     predicted_reflections = predicted_reflections.select(
-        t2 < experiment.sequence.get_image_range()[1]
+        t2 < experiments[0].sequence.get_image_range()[1]
     )
     predicted_reflections.compute_d(experiments)
     predicted_reflections.compute_partiality(experiments)
@@ -615,16 +633,17 @@ def run_simple_integrate(params, experiments, reflections):
     # Get actual shoebox values and the reflections for each image
     shoebox_processor = ShoeboxProcessor(
         predicted_reflections,
-        len(experiment.detector),
+        len(experiments[0].detector),
         0,
-        len(experiment.imageset),
+        sum([len(experiment.imageset) for experiment in experiments]),
         False,
     )
 
-    for i in range(len(experiment.imageset)):
-        image = experiment.imageset.get_corrected_data(i)
-        mask = experiment.imageset.get_mask(i)
-        shoebox_processor.next_data_only(make_image(image, mask))
+    for experiment in experiments:
+        for i in range(len(experiment.imageset)):
+            image = experiment.imageset.get_corrected_data(i)
+            mask = experiment.imageset.get_mask(i)
+            shoebox_processor.next_data_only(make_image(image, mask))
 
     predicted_reflections.is_overloaded(experiments)
     predicted_reflections.compute_mask(experiments)

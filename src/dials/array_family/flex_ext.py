@@ -689,6 +689,7 @@ class _:
             x *= scale[0]
             y *= scale[1]
             z *= scale[2]
+
             xyz = cctbx.array_family.flex.vec3_double(x, y, z)
 
             x, y, z = ref.parts()

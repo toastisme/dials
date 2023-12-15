@@ -219,10 +219,14 @@ def compute_line_profile_intensity(reflections):
         fit_variance = abs(fit_intensity) + abs(background_sum) * (1.0 + m_n)
         fit_variances[i] = fit_variance
 
-    reflections["line_profile_intensity"] = fit_intensities
-    reflections["line_profile_variance"] = fit_variances
+    reflections["intensity.prf.value"] = fit_intensities
+    reflections["intensity.prf.variance"] = fit_variances
     reflections.set_flags(
-        reflections["line_profile_intensity"] < 0,
+        reflections["intensity.prf.value"] < 0,
         reflections.flags.failed_during_profile_fitting,
+    )
+    reflections.set_flags(
+        reflections["intensity.prf.value"] > 0,
+        reflections.flags.integrated_prf,
     )
     return reflections

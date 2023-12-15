@@ -42,6 +42,7 @@ namespace dials { namespace algorithms {
   using dxtbx::model::plane_ray_intersection;
   using dxtbx::model::PolyBeam;
   using dxtbx::model::Scan;
+  using dxtbx::model::TOFSequence;
   using scitbx::constants::pi;
   using scitbx::constants::pi_180;
   using scitbx::constants::two_pi;
@@ -1337,6 +1338,7 @@ namespace dials { namespace algorithms {
     TOFReflectionPredictor(const PolyBeam &beam,
                            const Detector &detector,
                            const Goniometer &goniometer,
+                           const TOFSequence &sequence,
                            mat3<double> ub,
                            const cctbx::uctbx::unit_cell &unit_cell,
                            const cctbx::sgtbx::space_group_type &space_group_type,
@@ -1344,6 +1346,7 @@ namespace dials { namespace algorithms {
         : beam_(beam),
           detector_(detector),
           goniometer_(goniometer),
+          sequence_(sequence),
           ub_(ub),
           unit_cell_(unit_cell),
           space_group_type_(space_group_type),
@@ -1595,13 +1598,16 @@ namespace dials { namespace algorithms {
         std::size_t panel = impact.first;
         vec2<double> mm = impact.second;
         vec2<double> px = detector_[panel].millimeter_to_pixel(mm);
+        double L1 = ray.s1.length() * std::pow(10, -3);
+        double tof = beam_.get_tof_from_wavelength(wavelength, L1);
+        double frame = sequence_.get_frame_from_tof(tof);
 
         // Add the reflections to the table
         p.hkl.push_back(h);
         p.enter.push_back(ray.entering);
         p.s1.push_back(ray.s1);
         p.xyz_mm.push_back(vec3<double>(mm[0], mm[1], 0.0));
-        p.xyz_px.push_back(vec3<double>(px[0], px[1], 0.0));
+        p.xyz_px.push_back(vec3<double>(px[0], px[1], frame));
         p.panel.push_back(panel);
         p.flags.push_back(af::Predicted);
         p.wavelength_cal.push_back(wavelength);
@@ -1631,6 +1637,7 @@ namespace dials { namespace algorithms {
     PolyBeam beam_;
     Detector detector_;
     Goniometer goniometer_;
+    TOFSequence sequence_;
     mat3<double> ub_;
     cctbx::uctbx::unit_cell unit_cell_;
     cctbx::sgtbx::space_group_type space_group_type_;
