@@ -116,6 +116,7 @@ class TOFReflectionPredictorPy:
             experiment.beam,
             experiment.detector,
             experiment.goniometer,
+            experiment.sequence,
             experiment.crystal.get_A(),
             experiment.crystal.get_unit_cell(),
             experiment.crystal.get_space_group().type(),
@@ -147,9 +148,8 @@ class TOFReflectionPredictorPy:
 
             for idx in range(len(expt_reflections)):
                 wavelength = expt_reflections[idx]["wavelength_cal"]
-                expt_tof_cal[idx] = expt.beam.get_tof_from_wavelength(
-                    wavelength, expt_L1[idx]
-                )
+                tof = expt.beam.get_tof_from_wavelength(wavelength, expt_L1[idx])
+                expt_tof_cal[idx] = tof
             tof_cal.set_selected(sel, expt_tof_cal)
             L1.set_selected(sel, expt_L1)
 

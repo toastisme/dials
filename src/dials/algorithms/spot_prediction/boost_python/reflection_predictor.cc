@@ -175,6 +175,7 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def(init<const PolyBeam&,
                 const Detector&,
                 const Goniometer&,
+                const TOFSequence&,
                 mat3<double>,
                 const cctbx::uctbx::unit_cell&,
                 const cctbx::sgtbx::space_group_type&,
