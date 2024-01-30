@@ -52,7 +52,7 @@ class BackToBackExponential:
             p0=self.params,
             bounds=(
                 (1, 0, 0, 1, min(self.tof)),
-                (100000000, 1, 100000, 10000000, max(self.tof)),
+                (100000000000, 1, 100000000, 10000000000, max(self.tof)),
             ),
             max_nfev=10000000,
         )
@@ -67,13 +67,11 @@ class BackToBackExponential:
         return integrate.simpson(predicted, self.tof)
 
 
-def compute_line_profile_data_for_reflection(reflection_table):
+def compute_line_profile_data_for_reflection(
+    reflection_table, A=200.0, alpha=0.4, beta=0.4, sigma=8.0
+):
 
     assert len(reflection_table) == 1
-    A = 200.0
-    alpha = 0.4
-    beta = 0.4
-    sigma = 8.0
 
     bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
 
