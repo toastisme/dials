@@ -59,9 +59,10 @@ log = 'simple_tof_integrate.log'
     .help = "The log filename"
 }
 method{
-profile_fitting = False
+line_profile_fitting = False
     .type = bool
-    .help = "Use integration by profile fitting"
+    .help = "Use integration by profile fitting using a Gaussian"
+    "convoluted with back-to-back exponential functions"
 }
 """
 )
@@ -639,6 +640,7 @@ def run_simple_integrate(params, experiments, reflections):
         False,
     )
 
+    print("Getting shoebox data")
     for experiment in experiments:
         for i in range(len(experiment.imageset)):
             image = experiment.imageset.get_corrected_data(i)
@@ -660,8 +662,11 @@ def run_simple_integrate(params, experiments, reflections):
     centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
     centroid_algorithm.compute_centroid(predicted_reflections)
 
+    print("Calculating summed intensities")
     predicted_reflections.compute_summed_intensity()
-    predicted_reflections = compute_line_profile_intensity(predicted_reflections)
+    if params.method.line_profile_fitting:
+        print("Calculating line profile fitted intensities")
+        predicted_reflections = compute_line_profile_intensity(predicted_reflections)
 
     # Filter reflections with a high fraction of masked foreground
     valid_foreground_threshold = 1.0  # DIALS default
@@ -685,6 +690,11 @@ def run_simple_integrate(params, experiments, reflections):
 
     predicted_reflections.experiment_identifiers()[0] = experiment.identifier
 
+    integration_report = IntegrationReport(experiments, predicted_reflections)
+    logger.info("")
+    logger.info(integration_report.as_str(prefix=" "))
+    return predicted_reflections
+
     """
     Load modeller that will calculate reference profiles and
     do the actual profile fitting integration.
@@ -692,12 +702,6 @@ def run_simple_integrate(params, experiments, reflections):
 
     sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
     reference_reflections = predicted_reflections.select(sel)
-
-    if params.method.profile_fitting is False:
-        integration_report = IntegrationReport(experiments, predicted_reflections)
-        logger.info("")
-        logger.info(integration_report.as_str(prefix=" "))
-        return predicted_reflections
 
     fit_method = 1  # reciprocal space fitter (called explicitly below)
     grid_method = 2  # regular grid
