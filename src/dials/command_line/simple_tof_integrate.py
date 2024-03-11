@@ -64,6 +64,9 @@ line_profile_fitting = False
     .help = "Use integration by profile fitting using a Gaussian"
     "convoluted with back-to-back exponential functions"
 }
+keep_shoeboxes = False
+    .type = bool
+    .help = "Retain shoeboxes in output reflection table"
 """
 )
 
@@ -582,6 +585,9 @@ def run_simple_integrate(params, experiments, reflections):
             predicted_reflections.extend(r)
     predicted_reflections.calculate_entering_flags(experiments)
 
+    for i in range(len(experiments)):
+        predicted_reflections.experiment_identifiers()[i] = experiments[i].identifier
+
     # Updates flags to set which reflections to use in generating reference profiles
     matched, reflections, unmatched = predicted_reflections.match_with_reference(
         reflections
@@ -666,6 +672,7 @@ def run_simple_integrate(params, experiments, reflections):
 
     print("Calculating summed intensities")
     predicted_reflections.compute_summed_intensity()
+
     if params.method.line_profile_fitting:
         print("Calculating line profile fitted intensities")
         predicted_reflections = compute_line_profile_intensity(predicted_reflections)
@@ -690,11 +697,12 @@ def run_simple_integrate(params, experiments, reflections):
     )
     predicted_reflections["num_pixels.foreground"] = nvalfg
 
-    predicted_reflections.experiment_identifiers()[0] = experiment.identifier
-
     integration_report = IntegrationReport(experiments, predicted_reflections)
     logger.info("")
     logger.info(integration_report.as_str(prefix=" "))
+
+    if not params.keep_shoeboxes:
+        del predicted_reflections["shoebox"]
     return predicted_reflections
 
     """
@@ -787,8 +795,8 @@ def run_simple_integrate(params, experiments, reflections):
     Remove shoeboxes
     """
 
-    del predicted_reflections["shoebox"]
-    predicted_reflections.experiment_identifiers()[0] = experiment.identifier
+    if not params.keep_shoeboxes:
+        del predicted_reflections["shoebox"]
     return predicted_reflections
 
 
