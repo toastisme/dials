@@ -345,6 +345,8 @@ def output_reflections_as_hkl(reflections, filename):
             )
         )
 
+    if "intensity.prf.value" not in reflections:
+        return
     with open("prf_" + filename, "w") as g:
         for i in range(len(reflections)):
             h, k, l = reflections["miller_index"][i]
