@@ -291,6 +291,9 @@ def run_dials_refine(experiments, reflections, params):
     # Similarly, keep track of sparse to reset that for scan-varying macrocycle
     sparse = params.refinement.parameterisation.sparse
 
+    if experiments.all_tof_experiments():
+        print(params.refinement.reflections.outlier)
+        params.refinement.reflections.outlier.algorithm = "mcd"
     if params.n_static_macrocycles == 1:
         refiner, reflections, history = run_macrocycle(params, reflections, experiments)
         experiments = refiner.get_experiments()
