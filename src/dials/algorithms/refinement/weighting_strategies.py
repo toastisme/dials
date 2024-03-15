@@ -99,26 +99,15 @@ class ConstantWeightingStrategy:
 
 
 class TOFWeightingStrategy(StatisticalWeightingStrategy):
-    """Defines a single method that provides a ReflectionManager with a strategy
-    for calculating weights for refinement. This version uses statistical weights
-    for X and Y and a fixed constant for the delta Psi part, defaulting to 1000000"""
-
     def __init__(self):
         pass
 
     def calculate_weights(self, reflections):
-        """Include weights for DeltaPsi"""
 
-        # call parent class method to set X and Y weights
         reflections = super().calculate_weights(reflections)
 
         wx, wy, _ = reflections["xyzobs.mm.weights"].parts()
-        wavelength_var = (
-            reflections["wavelength"]
-            - sum(reflections["wavelength"]) / len(reflections)
-        ) ** 2
-        wz = 1 / wavelength_var
-        wz = wy * 1260000
+        wz = flex.sqrt(wx * wx + wy * wy) * 1e7
         reflections["xyzobs.mm.weights"] = flex.vec3_double(wx, wy, wz)
 
         return reflections
