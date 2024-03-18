@@ -7,6 +7,7 @@ import numpy as np
 
 import iotbx.phil
 from cctbx import uctbx
+from dxtbx.model import PolyBeam
 from dxtbx.model.experiment_list import ExperimentListFactory
 from scitbx.math import five_number_summary
 
@@ -91,6 +92,8 @@ def show_beam(detector, beam):
 
     # standard static beam model string
     s = str(beam)
+    if isinstance(beam, PolyBeam):
+        return s
 
     # report whether the beam is scan-varying
     if beam.num_scan_points > 0:
@@ -263,14 +266,17 @@ def show_experiments(experiments, show_scan_varying=False):
         except AttributeError:
             pass
         text.append(str(expt.detector))
-        text.append(
-            "Max resolution (at corners): %f"
-            % (expt.detector.get_max_resolution(expt.beam.get_s0()))
-        )
-        text.append(
-            "Max resolution (inscribed):  %f"
-            % (expt.detector.get_max_inscribed_resolution(expt.beam.get_s0()))
-        )
+        try:
+            text.append(
+                "Max resolution (at corners): %f"
+                % (expt.detector.get_max_resolution(expt.beam.get_s0()))
+            )
+            text.append(
+                "Max resolution (inscribed):  %f"
+                % (expt.detector.get_max_inscribed_resolution(expt.beam.get_s0()))
+            )
+        except AttributeError:
+            pass
         text.append("")
         text.append(show_beam(expt.detector, expt.beam))
         if expt.sequence is not None:
