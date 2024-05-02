@@ -124,16 +124,4 @@ namespace dials_scaling { namespace boost_python {
       .def("indices", &split_unmerged::indices);
   }
 
-  void export_tof_spherical_absorption_correction() {
-    def("tof_spherical_absorption_correction",
-        &dials::algorithms::tof_spherical_absorption_correction,
-        (arg("spectra"), arg("muR"), arg("two_thetas"), arg("two_theta_idxs")));
-  }
-  void export_tof_lorentz_correction() {
-    def(
-      "tof_lorentz_correction",
-      &dials::algorithms::tof_lorentz_correction,
-      (arg("spectra"), arg("L0"), arg("L1"), arg("tof"), arg("two_theta_spectra_sq")));
-  }
-
 }}  // namespace dials_scaling::boost_python

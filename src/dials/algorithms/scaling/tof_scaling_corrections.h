@@ -3,13 +3,31 @@
 #define DIALS_ALGORITHMS_SCALING_TOF_SCALING_CORRECTIONS_H
 
 #include <dials/array_family/scitbx_shared_and_versa.h>
+#include <dxtbx/format/image.h>
 #include <scitbx/constants.h>
+#include <scitbx/vec2.h>
+#include <scitbx/vec3.h>
+#include <dxtbx/imageset.h>
+#include <dxtbx/model/detector.h>
+#include <dxtbx/model/beam.h>
+#include <dxtbx/model/scan.h>
+#include <dials/algorithms/integration/processor.h>
+
 #include <cmath>
 
 namespace dials { namespace algorithms {
 
+  using dxtbx::ImageSequence;
+  using dxtbx::model::Beam;
+  using dxtbx::model::Detector;
+  using dxtbx::model::Scan;
+  using format::Image;
+  using format::ImageTile;
   using scitbx::deg_as_rad;
+  using scitbx::vec2;
+  using scitbx::vec3;
   using scitbx::constants::m_n;
+  using scitbx::constants::pi;
   using scitbx::constants::Planck;
 
   // Taken from
@@ -167,54 +185,122 @@ namespace dials { namespace algorithms {
                              0.0000e+00,
                              0.0000e+00}};
 
-  void tof_lorentz_correction(scitbx::af::versa<double, af::flex_grid<> > spectra,
-                              double L0,
-                              scitbx::af::shared<double> L1,
-                              scitbx::af::shared<double> tof,
-                              scitbx::af::shared<double> two_theta_spectra_sq) {
-    DIALS_ASSERT(spectra.accessor().all()[0] == L1.size());
-    DIALS_ASSERT(spectra.accessor().all()[0] == two_theta_spectra_sq.size());
-    DIALS_ASSERT(spectra.accessor().all()[1] == tof.size());
-
-    for (std::size_t i = 0; i < spectra.accessor().all()[0]; ++i) {
-      for (std::size_t j = 0; j < spectra.accessor().all()[1]; ++j) {
-        double wl = ((Planck * tof[j]) / (m_n * (L0 + L1[i]))) * std::pow(10, 10);
-        spectra(i, j) *= two_theta_spectra_sq[i] / std::pow(wl, 4);
-      }
+  double tof_pixel_spherical_absorption_correction(double pixel_data,
+                                                   double muR,
+                                                   double two_theta,
+                                                   int two_theta_idx) {
+    double ln_t1 = 0;
+    double ln_t2 = 0;
+    for (std::size_t k = 0; k < pc_size; ++k) {
+      ln_t1 = ln_t1 * muR + pc[k][two_theta_idx];
+      ln_t2 = ln_t2 * muR + pc[k][two_theta_idx + 1];
     }
+    const double t1 = exp(ln_t1);
+    const double t2 = exp(ln_t2);
+    const double sin_theta_1 = pow(sin(deg_as_rad(two_theta_idx * 5.0)), 2);
+    const double sin_theta_2 = pow(sin(deg_as_rad((two_theta_idx + 1) * 5.0)), 2);
+    const double l1 = (t1 - t2) / (sin_theta_1 - sin_theta_2);
+    const double l0 = t1 - l1 * sin_theta_1;
+    const double correction = 1 / (l0 + l1 * pow(sin(two_theta * .5), 2));
+    return correction;
   }
 
-  void tof_spherical_absorption_correction(
-    scitbx::af::versa<double, af::flex_grid<> > spectra,
-    scitbx::af::shared<double> muR_arr,
-    scitbx::af::shared<double> two_thetas,
-    scitbx::af::shared<long> two_theta_idxs) {
-    DIALS_ASSERT(spectra.accessor().all()[0] == two_thetas.size());
-    DIALS_ASSERT(spectra.accessor().all()[0] == two_theta_idxs.size());
-    DIALS_ASSERT(spectra.accessor().all()[1] == muR_arr.size());
+  void tof_extract_shoeboxes_to_reflection_table(af::reflection_table &reflection_table,
+                                                 Experiment &experiment,
+                                                 ImageSequence &vandium_data,
+                                                 ImageSequence &empty_data,
+                                                 double sample_radius,
+                                                 double scattering_x_section,
+                                                 double absorption_x_section,
+                                                 double linear_absorption_c,
+                                                 double linear_scattering_c) {
+    Detector detector = experiment.get_detector();
+    Scan scan = experiment.get_scan();
 
-    const double pc_size = sizeof(pc) / sizeof(pc[0]);
+    PolychromaticBeam beam = experiment.get_beam();
+    vec3<double> unit_s0 = beam.get_unit_s0();
+    double sample_to_source_distance = beam.get_sample_to_source_distance();
 
-    for (std::size_t i = 0; i < two_thetas.size(); ++i) {
-      const int theta_idx = two_theta_idxs[i];
-      const double theta = two_thetas[i] * .5;
-      for (std::size_t j = 0; j < muR_arr.size(); ++j) {
-        const double muR = muR_arr[j];
-        double ln_t1 = 0;
-        double ln_t2 = 0;
-        for (std::size_t k = 0; k < pc_size; ++k) {
-          ln_t1 = ln_t1 * muR + pc[k][theta_idx];
-          ln_t2 = ln_t2 * muR + pc[k][theta_idx + 1];
+    scitbx::af::shared<double> img_tof = scan.get_property("time_of_flight");
+    img_tof *= std::pow(10, -6);  //(s)
+
+    ImageSequence data = experiment.get_imageset();
+    int n_panels = detector.size();
+    int num_images = data.size();
+    DIALS_ASSERT(num_images == img_tof.size());
+
+    ShoeboxProcessor shoebox_processor(
+      reflection_table, n_panels, 0, num_images, false);
+
+    for (std::size_t img_num = 0; img_num < num_images; ++img_num) {
+      // Image for each panel
+      Image<int> imgs = data.get_corrected_data(img_num);
+      Image<int> v_imgs = vanadium_data.get_corrected_data(img_num);
+      Image<int> e_imgs = empty_data.get_corrected_data(img_num);
+
+      DIALS_ASSERT(imgs.size() == v_imgs.size() == e_imgs.size());
+
+      Image<double> corrected_imgs;
+      double tof = img_tof[j];
+
+      for (std::size_t panel_num = 0; panel_num < imgs.size(); ++panel_num) {
+        scitbx::vec2<int> img_size = imgs[panel_num].accessor().all();
+        DIALS_ASSERT(img_size == v_imgs[panel_num].accessor().all());
+        DIALS_ASSERT(img_size == e_imgs[panel_num].accessor().all());
+
+        scitbx::af::vera<double, scitbx::af::c_grid<2>(img_size[0], img_size[1])>
+          corrected_img_data;
+
+        for (std::size_t i = 0; i < img_size[0]; ++i) {
+          for (std::size_t j = 0; j < img_size[1]; ++j) {
+            // Get data for pixel
+            int pixel_data = imgs[panel_num](i, j);
+            int vanadium_pixel_data = v_imgs[panel_num](i, j);
+            int empty_pixel_data = e_imgs[panel_num](i, j);
+
+            // Subtract empty and normalise by vanadium
+            // If vanadium pixel is less than 0, set pixel data to 0
+            pixel_data -= empty_pixel_data;
+            vanadium_pixel_data -= empty_pixel_data;
+            if (vanadium_pixel_data <= 0) {
+              corrected_img_data(i, j) = 0.0;
+              continue;
+            }
+            pixel_data /= vanadium_pixel_data;
+
+            // Spherical absorption correction
+            double two_theta = detector[panel_num].get_two_theta_at_pixel(
+              unit_s0, scitbx::vec2<double>(i, j));
+            double two_theta_deg = two_theta * (180 / pi);
+            int two_theta_idx = static_cast<int>(two_theta_deg / 10);
+
+            scitbx::vec3<double> s1 =
+              detector[panel_num].get_pixel_lab_coord(scitbx::vec2<double>(i, j));
+            double distance = s1.length() + sample_to_source_distance;
+            distance *= std::pow(10, -3);  // (m)
+
+            double wl = ((Planck * tof) / (m_n * (distance))) * std::pow(10, 10);
+            double muR =
+              (linear_scattering_c + (linear_absorption_c / 1.8) * wl) * sample_radius;
+            double absorption_correction = tof_pixel_spherical_absorption_correction(
+              pixel_data, muR, two_theta, two_theta_idx);
+            if (absorption_correction <= 0) {
+              corrected_img_data(i, j) = 0.0;
+              continue;
+            }
+
+            pixel_data /= absorption_correction;
+
+            // Lorentz correction
+            double sin_two_theta_sq = std::pow(sin(two_theta * .5), 2);
+            double lorentz_correction = sin_two_theta_sq / std::pow(wl, 4);
+            pixel_data *= lorentz_correction;
+            corrected_img_data(i, j) = pixel_data;
+          }
         }
-        const double t1 = exp(ln_t1);
-        const double t2 = exp(ln_t2);
-        const double sin_theta_1 = pow(sin(deg_as_rad(theta_idx * 5.0)), 2);
-        const double sin_theta_2 = pow(sin(deg_as_rad((theta_idx + 1) * 5.0)), 2);
-        const double l1 = (t1 - t2) / (sin_theta_1 - sin_theta_2);
-        const double l0 = t1 - l1 * sin_theta_1;
-        const double correction = 1 / (l0 + l1 * pow(sin(theta), 2));
-        spectra(i, j) /= correction;
+        corrected_img.push_back(ImageTile<double>(corrected_img_data));
       }
+      shoebox_processor.next_data_only(corrected_img);
     }
   }
 }}  // namespace dials::algorithms
