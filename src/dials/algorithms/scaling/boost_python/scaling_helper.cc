@@ -3,6 +3,7 @@
 #include <dials/algorithms/scaling/scaling_helper.h>
 #include <cctbx/miller.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
+#include <dials/algorithms/scaling/tof_scaling_corrections.h>
 
 namespace dials_scaling { namespace boost_python {
 
@@ -121,6 +122,18 @@ namespace dials_scaling { namespace boost_python {
       .def("n1", &split_unmerged::n1)
       .def("n2", &split_unmerged::n2)
       .def("indices", &split_unmerged::indices);
+  }
+
+  void export_tof_spherical_absorption_correction() {
+    def("tof_spherical_absorption_correction",
+        &dials::algorithms::tof_spherical_absorption_correction,
+        (arg("spectra"), arg("muR"), arg("two_thetas"), arg("two_theta_idxs")));
+  }
+  void export_tof_lorentz_correction() {
+    def(
+      "tof_lorentz_correction",
+      &dials::algorithms::tof_lorentz_correction,
+      (arg("spectra"), arg("L0"), arg("L1"), arg("tof"), arg("two_theta_spectra_sq")));
   }
 
 }}  // namespace dials_scaling::boost_python
