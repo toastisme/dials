@@ -14,6 +14,7 @@
 #include <dials/algorithms/integration/integrator.h>
 #include <dials/algorithms/integration/manager.h>
 #include <dxtbx/array_family/flex_table_suite.h>
+#include <dials/algorithms/scaling/tof_scaling_corrections.h>
 
 using namespace boost::python;
 

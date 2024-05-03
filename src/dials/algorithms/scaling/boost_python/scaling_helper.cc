@@ -3,7 +3,6 @@
 #include <dials/algorithms/scaling/scaling_helper.h>
 #include <cctbx/miller.h>
 #include <dials/array_family/scitbx_shared_and_versa.h>
-#include <dials/algorithms/scaling/tof_scaling_corrections.h>
 
 namespace dials_scaling { namespace boost_python {
 
