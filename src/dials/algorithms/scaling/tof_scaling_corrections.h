@@ -209,13 +209,25 @@ namespace dials { namespace algorithms {
 
   void tof_extract_shoeboxes_to_reflection_table(af::reflection_table &reflection_table,
                                                  Experiment &experiment,
-                                                 ImageSequence &vanadium_data,
+                                                 ImageSequence &incident_data,
                                                  ImageSequence &empty_data,
                                                  double sample_radius,
-                                                 double scattering_x_section,
-                                                 double absorption_x_section,
-                                                 double linear_absorption_c,
-                                                 double linear_scattering_c) {
+                                                 double sample_scattering_x_section,
+                                                 double sample_absorption_x_section,
+                                                 double sample_number_density,
+                                                 double incident_radius,
+                                                 double incident_scattering_x_section,
+                                                 double incident_absorption_x_section,
+                                                 double incident_number_density) {
+    double sample_linear_scattering_c =
+      sample_number_density * sample_scattering_x_section;
+    double incident_linear_scattering_c =
+      incident_number_density * incident_scattering_x_section;
+    double sample_linear_absorption_c =
+      sample_number_density * sample_absorption_x_section;
+    double incident_linear_absorption_c =
+      incident_number_density * incident_absorption_x_section;
+
     Detector detector = *experiment.get_detector();
     Scan scan = *experiment.get_scan();
 
@@ -242,22 +254,23 @@ namespace dials { namespace algorithms {
       // Image for each panel
       dxtbx::format::Image<double> imgs = data.get_corrected_data(img_num);
       dxtbx::format::Image<bool> masks = data.get_mask(img_num);
-      dxtbx::format::Image<double> v_imgs = vanadium_data.get_corrected_data(img_num);
+      dxtbx::format::Image<double> i_imgs = incident_data.get_corrected_data(img_num);
       dxtbx::format::Image<double> e_imgs = empty_data.get_corrected_data(img_num);
 
-      DIALS_ASSERT(imgs.n_tiles() == v_imgs.n_tiles() == e_imgs.n_tiles());
+      DIALS_ASSERT(imgs.n_tiles() == i_imgs.n_tiles() == e_imgs.n_tiles());
 
       dxtbx::format::Image<double> corrected_imgs;
       double tof = img_tof[img_num] * std::pow(10, -6);  // (s)
 
       for (std::size_t panel_num = 0; panel_num < imgs.n_tiles(); ++panel_num) {
+        // Get panel data
         scitbx::af::versa<double, scitbx::af::c_grid<2> > panel_data =
           imgs.tile(panel_num).data();
-        scitbx::af::versa<double, scitbx::af::c_grid<2> > v_panel_data =
-          v_imgs.tile(panel_num).data();
+        scitbx::af::versa<double, scitbx::af::c_grid<2> > i_panel_data =
+          i_imgs.tile(panel_num).data();
         scitbx::af::versa<double, scitbx::af::c_grid<2> > e_panel_data =
           e_imgs.tile(panel_num).data();
-        DIALS_ASSERT(panel_data.accessor().all_eq(v_panel_data.accessor()));
+        DIALS_ASSERT(panel_data.accessor().all_eq(i_panel_data.accessor()));
         DIALS_ASSERT(panel_data.accessor().all_eq(e_panel_data.accessor()));
 
         scitbx::af::versa<double, scitbx::af::c_grid<2> > corrected_img_data(
@@ -267,18 +280,12 @@ namespace dials { namespace algorithms {
           for (std::size_t j = 0; j < panel_data.accessor()[1]; ++j) {
             // Get data for pixel
             double pixel_data = panel_data(i, j);
-            double vanadium_pixel_data = v_panel_data(i, j);
+            double incident_pixel_data = i_panel_data(i, j);
             double empty_pixel_data = e_panel_data(i, j);
 
-            // Subtract empty and normalise by vanadium
-            // If vanadium pixel is less than 0, set pixel data to 0
+            // Subtract empty from incident and sample
             pixel_data -= empty_pixel_data;
-            vanadium_pixel_data -= empty_pixel_data;
-            if (vanadium_pixel_data <= 0) {
-              corrected_img_data(i, j) = 0.0;
-              continue;
-            }
-            pixel_data /= vanadium_pixel_data;
+            incident_pixel_data -= empty_pixel_data;
 
             // Spherical absorption correction
             double two_theta = detector[panel_num].get_two_theta_at_pixel(
@@ -292,16 +299,37 @@ namespace dials { namespace algorithms {
             distance *= std::pow(10, -3);  // (m)
 
             double wl = ((Planck * tof) / (m_n * (distance))) * std::pow(10, 10);
-            double muR =
-              (linear_scattering_c + (linear_absorption_c / 1.8) * wl) * sample_radius;
-            double absorption_correction = tof_pixel_spherical_absorption_correction(
-              pixel_data, muR, two_theta, two_theta_idx);
-            if (absorption_correction <= 0) {
+
+            double sample_muR =
+              (sample_linear_scattering_c + (sample_linear_absorption_c / 1.8) * wl)
+              * sample_radius;
+            double sample_absorption_correction =
+              tof_pixel_spherical_absorption_correction(
+                pixel_data, sample_muR, two_theta, two_theta_idx);
+            if (sample_absorption_correction < 1e-5) {
+              corrected_img_data(i, j) = 0.0;
+              continue;
+            }
+            double incident_muR =
+              (incident_linear_scattering_c + (incident_linear_absorption_c / 1.8) * wl)
+              * incident_radius;
+            double incident_absorption_correction =
+              tof_pixel_spherical_absorption_correction(
+                pixel_data, incident_muR, two_theta, two_theta_idx);
+
+            if (incident_absorption_correction < 1e-5) {
               corrected_img_data(i, j) = 0.0;
               continue;
             }
 
-            pixel_data /= absorption_correction;
+            incident_pixel_data /= incident_absorption_correction;
+            if (incident_pixel_data < 1e-5) {
+              corrected_img_data(i, j) = 0.0;
+              continue;
+            }
+
+            pixel_data /= incident_pixel_data;
+            pixel_data /= sample_absorption_correction;
 
             // Lorentz correction
             double sin_two_theta_sq = std::pow(sin(two_theta * .5), 2);

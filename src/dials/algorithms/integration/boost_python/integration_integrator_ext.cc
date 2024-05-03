@@ -350,6 +350,18 @@ namespace dials { namespace algorithms { namespace boost_python {
     def("max_memory_needed",
         &max_memory_needed,
         (arg("reflection table"), arg("frame0"), arg("frame1"), arg("flatten")));
+
+    def("tof_extract_shoeboxes_to_reflection_table",
+        &tof_extract_shoeboxes_to_reflection_table,
+        (arg("reflection_table"),
+         arg("experiment"),
+         arg("vanadium_data"),
+         arg("empty_data"),
+         arg("sample_radius"),
+         arg("scattering_x_section"),
+         arg("absorption_x_section"),
+         arg("linear_absorption_c"),
+         arg("linear_scattering_c")));
   }
 
 }}}  // namespace dials::algorithms::boost_python
