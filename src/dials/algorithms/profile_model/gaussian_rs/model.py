@@ -515,9 +515,20 @@ class Model(ProfileModelExt):
         )
 
         # Calculate the bounding boxes of all the reflections
-        bbox = calculate(
-            reflections["s1"], reflections["xyzcal.px"].parts()[2], reflections["panel"]
-        )
+        if scan.has_property("time_of_flight"):
+            bbox = calculate(
+                reflections["s0_cal"],
+                reflections["s1"],
+                reflections["xyzcal.px"].parts()[2],
+                reflections["L1"],
+                reflections["panel"],
+            )
+        else:
+            bbox = calculate(
+                reflections["s1"],
+                reflections["xyzcal.px"].parts()[2],
+                reflections["panel"],
+            )
 
         # Return the bounding boxes
         return bbox

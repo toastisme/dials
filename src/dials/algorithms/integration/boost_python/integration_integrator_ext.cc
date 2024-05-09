@@ -14,6 +14,7 @@
 #include <dials/algorithms/integration/integrator.h>
 #include <dials/algorithms/integration/manager.h>
 #include <dxtbx/array_family/flex_table_suite.h>
+#include <dials/algorithms/scaling/tof_scaling_corrections.h>
 
 using namespace boost::python;
 
@@ -349,6 +350,36 @@ namespace dials { namespace algorithms { namespace boost_python {
     def("max_memory_needed",
         &max_memory_needed,
         (arg("reflection table"), arg("frame0"), arg("frame1"), arg("flatten")));
+
+    def("tof_extract_shoeboxes_to_reflection_table",
+        &tof_extract_shoeboxes_to_reflection_table,
+        (arg("reflection_table"),
+         arg("experiment"),
+         arg("incident_data"),
+         arg("empty_data"),
+         arg("sample_radius"),
+         arg("sample_scattering_x_section"),
+         arg("sample_absorption_x_section"),
+         arg("sample_number_density"),
+         arg("incident_radius"),
+         arg("incident_scattering_x_section"),
+         arg("incident_absorption_x_section"),
+         arg("incident_number_density")));
+
+    def("tof_extract_shoeboxes_to_reflection_table2",
+        &tof_extract_shoeboxes_to_reflection_table2,
+        (arg("reflection_table"),
+         arg("experiment"),
+         arg("incident_data"),
+         arg("empty_data"),
+         arg("sample_radius"),
+         arg("sample_scattering_x_section"),
+         arg("sample_absorption_x_section"),
+         arg("sample_number_density"),
+         arg("incident_radius"),
+         arg("incident_scattering_x_section"),
+         arg("incident_absorption_x_section"),
+         arg("incident_number_density")));
   }
 
 }}}  // namespace dials::algorithms::boost_python

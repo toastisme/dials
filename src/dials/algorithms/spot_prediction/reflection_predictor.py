@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from dxtbx.model import ExperimentType
 from libtbx.phil import parse
 
 from dials.util import Sorry
@@ -62,6 +63,7 @@ class ReflectionPredictor:
             ScanStaticReflectionPredictor,
             ScanVaryingReflectionPredictor,
             StillsReflectionPredictor,
+            TOFReflectionPredictor,
         )
         from dials.array_family import flex
 
@@ -78,6 +80,15 @@ class ReflectionPredictor:
                     mask = result["d"] > dmax
                     result.del_selected(mask)
                 return result
+
+        if experiment.get_type() == ExperimentType.TOF:
+            predictor = TOFReflectionPredictor(experiment=experiment, dmin=dmin)
+            predict = Predictor(
+                "ToF prediction",
+                lambda: predictor.for_ub(experiment.crystal.get_A()),
+            )
+            self._predict = predict
+            return
 
         # Check prediction to maximum resolution is possible
         wl = experiment.beam.get_wavelength()
