@@ -462,6 +462,10 @@ namespace dials {
       if (z1 > max_z) {
         z1 = max_z;
       }
+      if (z0 > z1) {
+        z0 = -1;
+        z1 = 0;
+      }
 
       int6 bbox(x0, x1, y0, y1, z0, z1);
       DIALS_ASSERT(bbox[1] > bbox[0]);

@@ -23,6 +23,9 @@ from dials.algorithms.integration.fit.tof_line_profile import (
 from dials.algorithms.integration.report import IntegrationReport, ProfileModelReport
 from dials.algorithms.profile_model.gaussian_rs import GaussianRSProfileModeller
 from dials.algorithms.profile_model.gaussian_rs import Model as GaussianRSProfileModel
+from dials.algorithms.profile_model.gaussian_rs.calculator import (
+    ComputeEsdBeamDivergence,
+)
 from dials.algorithms.shoebox import MaskCode
 from dials.array_family import flex
 from dials.command_line.integrate import process_reference
@@ -64,6 +67,12 @@ line_profile_fitting = False
     .help = "Use integration by profile fitting using a Gaussian"
     "convoluted with back-to-back exponential functions"
 }
+sigma_b = 0.01
+    .type = float
+    .help = "Used to calculate xy bounding box of predicted reflections"
+sigma_m = 3
+    .type = float
+    .help = "Used to calculate z bounding box of predicted reflections"
 keep_shoeboxes = False
     .type = bool
     .help = "Retain shoeboxes in output reflection table"
@@ -592,10 +601,9 @@ def run_simple_integrate(params, experiments, reflections):
     matched, reflections, unmatched = predicted_reflections.match_with_reference(
         reflections
     )
-    sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
-    predicted_reflections = predicted_reflections.select(sel)
-    if "idx" in reflections:
-        predicted_reflections["idx"] = reflections["idx"]
+    # if "idx" in reflections:
+    #    predicted_reflections["idx"] = reflections["idx"]
+    # sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
 
     """
     Create profile model and add it to experiment.
@@ -606,9 +614,13 @@ def run_simple_integrate(params, experiments, reflections):
     used_in_ref = reflections.get_flags(reflections.flags.used_in_refinement)
     model_reflections = reflections.select(used_in_ref)
 
+    sigma_b = ComputeEsdBeamDivergence(
+        experiment.detector, model_reflections, centroid_definition="s1"
+    ).sigma()
+
     # sigma_m in 3.1 of Kabsch 2010
-    sigma_m = 3
-    sigma_b = 0.01
+    sigma_m = params.sigma_m
+    sigma_b = 0.001
     # The Gaussian model given in 2.3 of Kabsch 2010
     for idx, experiment in enumerate(experiments):
         experiments[idx].profile = GaussianRSProfileModel(
@@ -625,9 +637,12 @@ def run_simple_integrate(params, experiments, reflections):
 
     predicted_reflections.compute_bbox(experiments)
     x1, x2, y1, y2, t1, t2 = predicted_reflections["bbox"].parts()
+    predicted_reflections = predicted_reflections.select(t1 > 0)
+    x1, x2, y1, y2, t1, t2 = predicted_reflections["bbox"].parts()
     predicted_reflections = predicted_reflections.select(
         t2 < experiments[0].sequence.get_image_range()[1]
     )
+
     predicted_reflections.compute_d(experiments)
     predicted_reflections.compute_partiality(experiments)
 
