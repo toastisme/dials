@@ -14,6 +14,7 @@ from wx.lib.intctrl import IntCtrl
 from cctbx import crystal, uctbx
 from cctbx.miller import index_generator
 from dxtbx.imageset import ImageSet
+from dxtbx.model import Scan
 from dxtbx.model.detector_helpers import get_detector_projection_2d_axes
 from dxtbx.model.experiment_list import ExperimentList, ExperimentListFactory
 from libtbx.utils import flat_list
@@ -2005,7 +2006,7 @@ class SpotFrame(XrayFrame):
         beam = imageset.get_beam()
         gonio = imageset.get_goniometer()
         still = scan is None or gonio is None
-        if not still:
+        if not still and isinstance(scan, Scan):
             phi = scan.get_angle_from_array_index(
                 i_frame - imageset.get_array_range()[0], deg=True
             )
@@ -2029,7 +2030,7 @@ class SpotFrame(XrayFrame):
         for i, h in enumerate(((1, 0, 0), (0, 1, 0), (0, 0, 1))):
             r = A * matrix.col(h) * self.settings.basis_vector_scale
 
-            if still:
+            if still or not isinstance(scan, Scan):
                 s1 = matrix.col(beam.get_unit_s0()) + r
             else:
                 r_phi = r.rotate_around_origin(axis, phi, deg=True)
