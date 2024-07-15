@@ -1400,7 +1400,7 @@ Found %s"""
                 for i in range(len(s0)):
                     vec[i] = matrix.col(s0[i]).cross(axis)
             else:
-                s0 = matrix.col(experiment.beam.get_s0())
+                s0 = matrix.col(experiment.beam.get_unit_s0())
                 vec = s0.cross(axis)
             sel = self["id"] == iexp
             enterings.set_selected(sel, self["s1"].dot(vec) < 0.0)
