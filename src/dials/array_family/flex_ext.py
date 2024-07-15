@@ -629,7 +629,7 @@ class _:
         distance = cctbx.array_family.flex.sqrt(
             cctbx.array_family.flex.pow2(x1 - x2)
             + cctbx.array_family.flex.pow2(y1 - y2)
-            + cctbx.array_family.flex.pow2(z1 - z2)
+            + cctbx.array_family.flex.pow2(z1 - z1)
         )
         mask = distance < 2
         logger.info(" %d reflections matched", len(o2))

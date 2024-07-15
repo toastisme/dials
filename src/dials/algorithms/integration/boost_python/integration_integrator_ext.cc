@@ -368,6 +368,10 @@ namespace dials { namespace algorithms { namespace boost_python {
          arg("incident_number_density"),
          arg("apply_lorentz_correction"),
          arg("apply_spherical_absorption_correction")));
+
+    def("tof_calculate_shoebox_foreground",
+        &tof_calculate_shoebox_foreground,
+        (arg("reflection_table"), arg("experiment"), arg("foreground_radius")));
   }
 
 }}}  // namespace dials::algorithms::boost_python
