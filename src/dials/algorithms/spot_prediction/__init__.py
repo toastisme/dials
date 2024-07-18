@@ -271,3 +271,6 @@ class TOFReflectionPredictor:
 
     def for_reflection_table(self, reflections, UB):
         return self.predictor.for_reflection_table(reflections, UB)
+
+    def all_reflections_for_asu(self, phi):
+        return self.predictor.all_reflections_for_asu(float(phi))
