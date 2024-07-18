@@ -351,21 +351,27 @@ namespace dials { namespace algorithms { namespace boost_python {
         &max_memory_needed,
         (arg("reflection table"), arg("frame0"), arg("frame1"), arg("flatten")));
 
+    class_<TOFCorrectionsData>("TOFCorrectionsData", no_init)
+      .def(init<double,
+                double,
+                double,
+                double,
+                double,
+                double,
+                double,
+                double,
+                double,
+                double,
+                double>());
+
     def("tof_extract_shoeboxes_to_reflection_table",
         &tof_extract_shoeboxes_to_reflection_table,
         (arg("reflection_table"),
          arg("experiment"),
+         arg("data"),
          arg("incident_data"),
          arg("empty_data"),
-         arg("proton_charges"),
-         arg("sample_radius"),
-         arg("sample_scattering_x_section"),
-         arg("sample_absorption_x_section"),
-         arg("sample_number_density"),
-         arg("incident_radius"),
-         arg("incident_scattering_x_section"),
-         arg("incident_absorption_x_section"),
-         arg("incident_number_density"),
+         arg("corrections_data"),
          arg("apply_lorentz_correction"),
          arg("apply_spherical_absorption_correction")));
 
