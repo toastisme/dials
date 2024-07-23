@@ -29,6 +29,7 @@
 #include <dials/algorithms/spot_prediction/stills_ray_predictor.h>
 #include <dials/algorithms/spot_prediction/ray_intersection.h>
 #include <cctbx/miller/index_generator.h>
+#include <iostream>
 
 namespace dials { namespace algorithms {
 

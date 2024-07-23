@@ -25,9 +25,9 @@ from dials.extensions.simple_background_ext import SimpleBackgroundExt
 from dials.util.options import ArgumentParser, reflections_and_experiments_from_files
 from dials.util.phil import parse
 from dials.util.version import dials_version
-from dials_algorithms_integration_integrator_ext import (
+from dials_algorithms_integration_integrator_ext import tof_calculate_shoebox_foreground
+from dials_tof_scaling_ext import (
     TOFCorrectionsData,
-    tof_calculate_shoebox_foreground,
     tof_extract_shoeboxes_to_reflection_table,
 )
 
@@ -73,9 +73,6 @@ corrections{
     lorentz = True
         .type = bool
         .help = "Apply the Lorentz correction to target spectrum."
-    spherical_absorption = True
-        .type = bool
-        .help = "Apply a spherical absorption correction."
 }
 incident_spectrum{
     sample_number_density = 0.0722
@@ -241,7 +238,6 @@ def join_reflections(list_of_reflections):
 
 
 def run():
-
     """
     Input setup
     """
@@ -276,6 +272,37 @@ def run():
     experiments.as_file(params.output.experiments)
     if params.output.output_hkl:
         output_reflections_as_hkl(integrated_reflections, params.output.hkl)
+
+
+def applying_spherical_absorption_correction(params):
+    all_params_present = True
+    some_params_present = False
+    for i in dir(params.target_spectrum):
+        if i.startswith("__"):
+            continue
+        if getattr(params.target_spectrum, i) is not None:
+            some_params_present = True
+        else:
+            all_params_present = False
+    if some_params_present and not all_params_present:
+        raise ValueError(
+            "Trying to apply spherical absorption correction but some corrections are None."
+        )
+    return all_params_present
+
+
+def applying_incident_and_empty_runs(params):
+    if params.input.incident_run is not None:
+        assert (
+            params.input.empty_run is not None
+        ), "Incident run given without empty run."
+        return True
+    elif params.input.empty_run is not None:
+        assert (
+            params.input.incident_run is not None
+        ), "Empty run given without incident run."
+        return True
+    return False
 
 
 def run_integrate(params, experiments, reflections):
@@ -385,54 +412,76 @@ def run_integrate(params, experiments, reflections):
     )
 
     experiment_cls = experiments[0].imageset.get_format_class()
-    incident_fmt_class = experiment_cls.get_instance(params.input.incident_run)
-    empty_fmt_class = experiment_cls.get_instance(params.input.empty_run)
-
-    incident_data = experiment_cls(params.input.incident_run).get_imageset(
-        params.input.incident_run
-    )
-    empty_data = experiment_cls(params.input.empty_run).get_imageset(
-        params.input.empty_run
-    )
-    incident_proton_charge = incident_fmt_class.get_proton_charge()
-    empty_proton_charge = empty_fmt_class.get_proton_charge()
-
     predicted_reflections.map_centroids_to_reciprocal_space(
         experiments, calculated=True
     )
 
-    for expt in experiments:
+    if applying_incident_and_empty_runs(params):
+        incident_fmt_class = experiment_cls.get_instance(params.input.incident_run)
+        empty_fmt_class = experiment_cls.get_instance(params.input.empty_run)
 
-        expt_proton_charge = experiment_cls.get_instance(
-            expt.imageset.paths()[0], **expt.imageset.data().get_params()
-        ).get_proton_charge()
-        expt_data = expt.imageset
-        corrections_data = TOFCorrectionsData(
-            expt_proton_charge,
-            incident_proton_charge,
-            empty_proton_charge,
-            params.target_spectrum.sample_radius,
-            params.target_spectrum.scattering_x_section,
-            params.target_spectrum.absorption_x_section,
-            params.target_spectrum.sample_number_density,
-            params.incident_spectrum.sample_radius,
-            params.incident_spectrum.scattering_x_section,
-            params.incident_spectrum.absorption_x_section,
-            params.incident_spectrum.sample_number_density,
+        incident_data = experiment_cls(params.input.incident_run).get_imageset(
+            params.input.incident_run
         )
-
-        tof_extract_shoeboxes_to_reflection_table(
-            predicted_reflections,
-            expt,
-            expt_data,
-            incident_data,
-            empty_data,
-            corrections_data,
-            params.corrections.lorentz,
-            params.corrections.spherical_absorption,
+        empty_data = experiment_cls(params.input.empty_run).get_imageset(
+            params.input.empty_run
         )
+        incident_proton_charge = incident_fmt_class.get_proton_charge()
+        empty_proton_charge = empty_fmt_class.get_proton_charge()
 
-        tof_calculate_shoebox_foreground(predicted_reflections, expt, 0.5)
+        for expt in experiments:
+            expt_data = expt.imageset
+            expt_proton_charge = experiment_cls.get_instance(
+                expt.imageset.paths()[0], **expt.imageset.data().get_params()
+            ).get_proton_charge()
+
+            if applying_spherical_absorption_correction(params):
+                corrections_data = TOFCorrectionsData(
+                    expt_proton_charge,
+                    incident_proton_charge,
+                    empty_proton_charge,
+                    params.target_spectrum.sample_radius,
+                    params.target_spectrum.scattering_x_section,
+                    params.target_spectrum.absorption_x_section,
+                    params.target_spectrum.sample_number_density,
+                    params.incident_spectrum.sample_radius,
+                    params.incident_spectrum.scattering_x_section,
+                    params.incident_spectrum.absorption_x_section,
+                    params.incident_spectrum.sample_number_density,
+                )
+
+                tof_extract_shoeboxes_to_reflection_table(
+                    predicted_reflections,
+                    expt,
+                    expt_data,
+                    incident_data,
+                    empty_data,
+                    corrections_data,
+                    params.corrections.lorentz,
+                )
+            else:
+                tof_extract_shoeboxes_to_reflection_table(
+                    predicted_reflections,
+                    expt,
+                    expt_data,
+                    incident_data,
+                    empty_data,
+                    expt_proton_charge,
+                    incident_proton_charge,
+                    empty_proton_charge,
+                    params.corrections.lorentz,
+                )
+    else:
+        for expt in experiments:
+            expt_data = expt.imageset
+            tof_extract_shoeboxes_to_reflection_table(
+                predicted_reflections,
+                expt,
+                expt_data,
+                params.corrections.lorentz,
+            )
+
+    tof_calculate_shoebox_foreground(predicted_reflections, expt, 0.5)
     predicted_reflections.is_overloaded(experiments)
     predicted_reflections.contains_invalid_pixels()
     predicted_reflections["partiality"] = flex.double(len(predicted_reflections), 1.0)

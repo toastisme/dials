@@ -280,6 +280,9 @@ namespace dials { namespace algorithms { namespace boost_python {
     }
   };
 
+  void (*test_func_a)(double) = &test_func;
+  void (*test_func_b)(double, int) = &test_func;
+
   BOOST_PYTHON_MODULE(dials_algorithms_integration_integrator_ext) {
     class_<GroupList::Group>("Group", no_init)
       .def("index", &GroupList::Group::index)
@@ -375,9 +378,16 @@ namespace dials { namespace algorithms { namespace boost_python {
          arg("apply_lorentz_correction"),
          arg("apply_spherical_absorption_correction")));
 
+    def("tof_extract_shoeboxes_to_reflection_table_no_corrections",
+        &tof_extract_shoeboxes_to_reflection_table_no_corrections,
+        (arg("reflection_table"), arg("experiment"), arg("data")));
+
     def("tof_calculate_shoebox_foreground",
         &tof_calculate_shoebox_foreground,
         (arg("reflection_table"), arg("experiment"), arg("foreground_radius")));
+
+    def("test_func", test_func_a);
+    def("test_func", test_func_b);
   }
 
 }}}  // namespace dials::algorithms::boost_python

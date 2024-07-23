@@ -250,6 +250,48 @@ namespace dials { namespace algorithms {
           incident_absorption_x_section(incident_absorption_x_section),
           incident_number_density(incident_number_density) {}
   };
+  void tof_extract_shoeboxes_to_reflection_table_no_corrections(
+    af::reflection_table &reflection_table,
+    Experiment &experiment,
+    ImageSequence &data) {
+    Detector detector = *experiment.get_detector();
+    Scan scan = *experiment.get_scan();
+
+    std::shared_ptr<dxtbx::model::BeamBase> beam_ptr = experiment.get_beam();
+    std::shared_ptr<PolychromaticBeam> beam =
+      std::dynamic_pointer_cast<PolychromaticBeam>(beam_ptr);
+    DIALS_ASSERT(beam != nullptr);
+
+    vec3<double> unit_s0 = beam->get_unit_s0();
+    double sample_to_source_distance = beam->get_sample_to_source_distance();
+
+    scitbx::af::shared<double> img_tof = scan.get_property<double>("time_of_flight");
+
+    int n_panels = detector.size();
+    int num_images = data.size();
+    vec2<std::size_t> image_size = detector[0].get_image_size();
+    DIALS_ASSERT(num_images == img_tof.size());
+
+    ShoeboxProcessor shoebox_processor(
+      reflection_table, n_panels, 0, num_images, false);
+
+    for (std::size_t img_num = 0; img_num < num_images; ++img_num) {
+      dxtbx::format::Image<double> img = data.get_corrected_data(img_num);
+      dxtbx::format::Image<bool> mask = data.get_mask(img_num);
+
+      af::shared<scitbx::af::versa<double, scitbx::af::c_grid<2> > > output_data(
+        n_panels);
+      af::shared<scitbx::af::versa<bool, scitbx::af::c_grid<2> > > output_mask(
+        n_panels);
+
+      for (std::size_t i = 0; i < output_data.size(); ++i) {
+        output_data[i] = img.tile(i).data();
+        output_mask[i] = mask.tile(i).data();
+      }
+      shoebox_processor.next_data_only(
+        model::Image<double>(output_data.const_ref(), output_mask.const_ref()));
+    }
+  }
 
   void tof_extract_shoeboxes_to_reflection_table(
     af::reflection_table &reflection_table,
@@ -576,6 +618,14 @@ namespace dials { namespace algorithms {
         }
       }
     }
+  }
+
+  void test_func(double test_double) {
+    std::cout << "test func " << test_double << "\n";
+  }
+
+  void test_func(double test_double, int test_int) {
+    std::cout << "test_func " << test_double << " test_int " << test_int << "\n";
   }
 
 }}  // namespace dials::algorithms
