@@ -204,6 +204,36 @@ namespace dials {
                                                  arg("scan"),
                                                  arg("delta_divergence"),
                                                  arg("delta_mosaicity"))));
+      class_<BBoxCalculatorTOF>("BBoxCalculatorTOF", no_init)
+        .def(
+          init<const PolychromaticBeam&, const Detector&, const Scan&, double, double>(
+            (arg("beam"),
+             arg("detector"),
+             arg("scan"),
+             arg("delta_divergence"),
+             arg("delta_mosaicity"))))
+        .def("__call__",
+             &BBoxCalculatorTOF::single,
+             (arg("s0"), arg("s1"), arg("frame"), arg("L1"), arg("panel")))
+        .def("__call__",
+             &BBoxCalculatorTOF::array,
+             (arg("s0"), arg("s1"), arg("frame"), arg("L1"), arg("panel")));
+
+      class_<BBoxMultiCalculator>("BBoxMultiCalculator")
+        .def("append", &BBoxMultiCalculator::push_back)
+        .def("__len__", &BBoxMultiCalculator::size)
+        .def("__call__", &BBoxMultiCalculator::operator());
+
+      class_<MaskCalculatorIface, boost::noncopyable>("MaskCalculatorIface", no_init)
+        .def("__call__",
+             &MaskCalculatorIface::single,
+             (arg("shoebox"), arg("s1"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &MaskCalculatorIface::array,
+             (arg("shoebox"), arg("s1"), arg("frame"), arg("panel")))
+        .def("__call__",
+             &MaskCalculatorIface::volume,
+             (arg("volume"), arg("bbox"), arg("s1"), arg("frame"), arg("panel")));
 
       class_<BBoxCalculator2D, bases<BBoxCalculatorIface> >("BBoxCalculator2D", no_init)
         .def(init<const BeamBase&, const Detector&, double, double>(
