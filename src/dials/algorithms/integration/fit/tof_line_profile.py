@@ -121,7 +121,7 @@ def compute_line_profile_data_for_reflection(
         )
         l.fit()
         line_profile = l.result()
-        fit_intensity = integrate.simpson(line_profile, tof)
+        fit_intensity = integrate.simpson(line_profile, x=tof)
     except ValueError:
         return [], [], [], [], -1, -1, -1, -1
 
