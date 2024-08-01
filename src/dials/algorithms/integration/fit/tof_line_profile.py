@@ -113,7 +113,7 @@ def compute_line_profile_data_for_reflection(
         l = BackToBackExponential(
             tof=tof,
             intensities=projected_intensity,
-            A=A,
+            A=max(projected_intensity),
             alpha=alpha,
             beta=beta,
             sigma=sigma,
@@ -148,7 +148,7 @@ def compute_line_profile_data_for_reflection(
 
 def compute_line_profile_intensity(reflections):
 
-    A = 200.0
+    # A = 200.0
     alpha = 0.4
     beta = 0.4
     sigma = 8.0
@@ -195,7 +195,7 @@ def compute_line_profile_intensity(reflections):
             l = BackToBackExponential(
                 tof=tof,
                 intensities=projected_intensity,
-                A=A,
+                A=max(projected_intensity),
                 alpha=alpha,
                 beta=beta,
                 sigma=sigma,

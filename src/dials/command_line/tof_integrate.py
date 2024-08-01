@@ -434,11 +434,14 @@ def run_integrate(params, experiments, reflections):
         incident_proton_charge = incident_fmt_class.get_proton_charge()
         empty_proton_charge = empty_fmt_class.get_proton_charge()
 
-        for expt in experiments:
+        for idx, expt in enumerate(experiments):
             expt_data = expt.imageset
             expt_proton_charge = experiment_cls.get_instance(
                 expt.imageset.paths()[0], **expt.imageset.data().get_params()
             ).get_proton_charge()
+
+            sel = predicted_reflections["id"] == idx
+            expt_reflections = predicted_reflections.select(sel)
 
             if applying_spherical_absorption_correction(params):
                 logger.info(
@@ -462,7 +465,7 @@ def run_integrate(params, experiments, reflections):
                 )
 
                 tof_extract_shoeboxes_to_reflection_table(
-                    predicted_reflections,
+                    expt_reflections,
                     expt,
                     expt_data,
                     incident_data,
@@ -470,12 +473,39 @@ def run_integrate(params, experiments, reflections):
                     corrections_data,
                     params.corrections.lorentz,
                 )
+                # tof_calculate_shoebox_mask(predicted_reflections, expt)
+                tof_calculate_shoebox_foreground(
+                    expt_reflections, expt, params.foreground_radius
+                )
+                expt_reflections.is_overloaded(experiments)
+                expt_reflections.contains_invalid_pixels()
+                expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
+
+                # Background calculated explicitly to expose underlying algorithm
+                background_algorithm = SimpleBackgroundExt(
+                    params=None, experiments=experiments
+                )
+                success = background_algorithm.compute_background(expt_reflections)
+                expt_reflections.set_flags(
+                    ~success, expt_reflections.flags.failed_during_background_modelling
+                )
+
+                # Centroids calculated explicitly to expose underlying algorithm
+                # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
+                # centroid_algorithm.compute_centroid(expt_reflections)
+
+                expt_reflections.compute_summed_intensity()
+
+                if params.method.line_profile_fitting:
+                    print("Calculating line profile fitted intensities")
+                    expt_reflections = compute_line_profile_intensity(expt_reflections)
+                predicted_reflections.set_selected(sel, expt_reflections)
             else:
                 logger.info("Normalising target run with Vanadium run")
                 if params.corrections.lorentz:
                     logger.info("Applying Lorentz correction to target run")
                 tof_extract_shoeboxes_to_reflection_table(
-                    predicted_reflections,
+                    expt_reflections,
                     expt,
                     expt_data,
                     incident_data,
@@ -485,43 +515,75 @@ def run_integrate(params, experiments, reflections):
                     empty_proton_charge,
                     params.corrections.lorentz,
                 )
+                # tof_calculate_shoebox_mask(predicted_reflections, expt)
+                tof_calculate_shoebox_foreground(
+                    expt_reflections, expt, params.foreground_radius
+                )
+                expt_reflections.is_overloaded(experiments)
+                expt_reflections.contains_invalid_pixels()
+                expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
+
+                # Background calculated explicitly to expose underlying algorithm
+                background_algorithm = SimpleBackgroundExt(
+                    params=None, experiments=experiments
+                )
+                success = background_algorithm.compute_background(expt_reflections)
+                expt_reflections.set_flags(
+                    ~success, expt_reflections.flags.failed_during_background_modelling
+                )
+
+                # Centroids calculated explicitly to expose underlying algorithm
+                # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
+                # centroid_algorithm.compute_centroid(expt_reflections)
+
+                expt_reflections.compute_summed_intensity()
+
+                if params.method.line_profile_fitting:
+                    print("Calculating line profile fitted intensities")
+                    expt_reflections = compute_line_profile_intensity(expt_reflections)
+                predicted_reflections.set_selected(sel, expt_reflections)
     else:
         if params.corrections.lorentz:
             logger.info("Applying Lorentz correction to target run")
-        for expt in experiments:
+        print("Calculating summed intensities")
+        for idx, expt in enumerate(experiments):
+            sel = predicted_reflections["id"] == idx
+            expt_reflections = predicted_reflections.select(sel)
             expt_data = expt.imageset
             tof_extract_shoeboxes_to_reflection_table(
-                predicted_reflections,
+                expt_reflections,
                 expt,
                 expt_data,
                 params.corrections.lorentz,
             )
 
-    # tof_calculate_shoebox_mask(predicted_reflections, expt)
-    tof_calculate_shoebox_foreground(
-        predicted_reflections, expt, params.foreground_radius
-    )
-    predicted_reflections.is_overloaded(experiments)
-    predicted_reflections.contains_invalid_pixels()
-    predicted_reflections["partiality"] = flex.double(len(predicted_reflections), 1.0)
+            # tof_calculate_shoebox_mask(predicted_reflections, expt)
+            tof_calculate_shoebox_foreground(
+                expt_reflections, expt, params.foreground_radius
+            )
+            expt_reflections.is_overloaded(experiments)
+            expt_reflections.contains_invalid_pixels()
+            expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
 
-    # Background calculated explicitly to expose underlying algorithm
-    background_algorithm = SimpleBackgroundExt(params=None, experiments=experiments)
-    success = background_algorithm.compute_background(predicted_reflections)
-    predicted_reflections.set_flags(
-        ~success, predicted_reflections.flags.failed_during_background_modelling
-    )
+            # Background calculated explicitly to expose underlying algorithm
+            background_algorithm = SimpleBackgroundExt(
+                params=None, experiments=experiments
+            )
+            success = background_algorithm.compute_background(expt_reflections)
+            expt_reflections.set_flags(
+                ~success, expt_reflections.flags.failed_during_background_modelling
+            )
 
-    # Centroids calculated explicitly to expose underlying algorithm
-    # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
-    # centroid_algorithm.compute_centroid(predicted_reflections)
+            # Centroids calculated explicitly to expose underlying algorithm
+            # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
+            # centroid_algorithm.compute_centroid(expt_reflections)
 
-    print("Calculating summed intensities")
-    predicted_reflections.compute_summed_intensity()
+            expt_reflections.compute_summed_intensity()
 
-    if params.method.line_profile_fitting:
-        print("Calculating line profile fitted intensities")
-        predicted_reflections = compute_line_profile_intensity(predicted_reflections)
+            if params.method.line_profile_fitting:
+                print("Calculating line profile fitted intensities")
+                expt_reflections = compute_line_profile_intensity(expt_reflections)
+            predicted_reflections.set_selected(sel, expt_reflections)
 
     # Filter reflections with a high fraction of masked foreground
     valid_foreground_threshold = 1.0  # DIALS default
