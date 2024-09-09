@@ -45,9 +45,9 @@ namespace dials { namespace algorithms {
   using scitbx::constants::Planck;
 
   void get_asu_reflections(af::shared<cctbx::miller::index<int> > indices,
-                           af::shared<cctbx::miller::index<int> > predicted_indices,
+                           af::shared<cctbx::miller::index<int> > asu_predicted_indices,
                            af::shared<double> wavelengths,
-                           af::shared<double> predicted_wavelengths,
+                           af::shared<double> asu_predicted_wavelengths,
                            af::shared<bool> asu_reflection,
                            cctbx::sgtbx::space_group space_group
 
@@ -58,7 +58,8 @@ namespace dials { namespace algorithms {
 
     DIALS_ASSERT(indices.size() == asu_reflection.size());
     DIALS_ASSERT(indices.size() == wavelengths.size());
-    DIALS_ASSERT(predicted_indices.size() == predicted_wavelengths.size());
+    DIALS_ASSERT(asu_predicted_indices.size() == asu_predicted_wavelengths.size());
+
     const char* hall_symbol = space_group.type().hall_symbol().c_str();
     const gemmi::SpaceGroup* gemmi_sg_ptr =
       gemmi::find_spacegroup_by_ops(gemmi::symops_from_hall(hall_symbol));
@@ -75,29 +76,14 @@ namespace dials { namespace algorithms {
       int isym = hkl_mover.move_to_asu(hkl);
       merged_hkls[i_refl] = cctbx::miller::index<>(hkl[0], hkl[1], hkl[3]);
     }
-    int matched = 0;
-    int unmatched = 0;
-    for (std::size_t i = 0; i < indices.size(); ++i) {
-      bool match = false;
-      for (std::size_t j = 0; j < predicted_indices.size(); ++j) {
-        if (indices[i] == predicted_indices[j]) {
-          match = true;
-          matched++;
-          break;
-        }
-      }
-      if (!match) {
-        unmatched++;
-      }
-    }
 
-    for (std::size_t i = 0; i < predicted_indices.size(); ++i) {
-      cctbx::miller::index<> p_hkl = predicted_indices[i];
+    for (std::size_t i = 0; i < asu_predicted_indices.size(); ++i) {
+      cctbx::miller::index<> p_hkl = asu_predicted_indices[i];
       int closest_match = -1;
       double min_wl_diff = -1;
-      for (std::size_t j = 0; j < indices.size(); ++j) {
-        if (p_hkl == indices[j]) {
-          double wl_diff = std::abs(wavelengths[j] - predicted_wavelengths[j]);
+      for (std::size_t j = 0; j < merged_hkls.size(); ++j) {
+        if (p_hkl == merged_hkls[j]) {
+          double wl_diff = std::abs(wavelengths[j] - asu_predicted_wavelengths[i]);
           if (min_wl_diff < 0 || wl_diff < min_wl_diff) {
             closest_match = j;
           }

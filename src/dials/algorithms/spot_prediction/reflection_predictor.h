@@ -1372,8 +1372,6 @@ namespace dials { namespace algorithms {
       cctbx::miller::index_generator indices =
         cctbx::miller::index_generator(unit_cell_, space_group_type_, false, dmin_);
 
-      af::shared<miller_index> indices_arr = indices.to_array();
-
       af::reflection_table table;
       af::shared<double> wavelength_column;
       table["wavelength_cal"] = wavelength_column;
@@ -1381,9 +1379,11 @@ namespace dials { namespace algorithms {
       table["s0_cal"] = s0_column;
       laue_prediction_data predictions(table);
 
-      for (std::size_t i = 0; i < indices_arr.size(); ++i) {
-        miller_index h = indices_arr[i];
-
+      for (;;) {
+        miller_index h = indices.next();
+        if (h.is_zero()) {
+          break;
+        }
         vec3<double> q = setting_rotation * rotation * fixed_rotation * ub_ * h;
 
         // Calculate the wavelength required to meet the diffraction condition

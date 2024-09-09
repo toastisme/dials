@@ -122,7 +122,8 @@ def compute_line_profile_data_for_reflection(
         l.fit()
         line_profile = l.result()
         fit_intensity = integrate.simpson(line_profile, x=tof)
-    except ValueError:
+    except ValueError as e:
+        print("fit error", e)
         return [], [], [], [], -1, -1, -1, -1
 
     if n_background > 0:
