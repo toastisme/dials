@@ -19,6 +19,7 @@ from dials.algorithms.profile_model.gaussian_rs.calculator import (
     ComputeEsdBeamDivergence,
 )
 from dials.algorithms.shoebox import MaskCode
+from dials.algorithms.spot_prediction import TOFReflectionPredictor
 from dials.array_family import flex
 from dials.command_line.integrate import process_reference
 from dials.extensions.simple_background_ext import SimpleBackgroundExt
@@ -330,12 +331,12 @@ def run_integrate(params, experiments, reflections):
             dmin = expt_dmin
 
     predicted_reflections = None
+    miller_indices = reflections["miller_index"]
     for idx, experiment in enumerate(experiments):
 
+        predictor = TOFReflectionPredictor(experiment, dmin)
         if predicted_reflections is None:
-            predicted_reflections = flex.reflection_table.from_predictions(
-                experiment, padding=1.0, dmin=dmin
-            )
+            predicted_reflections = predictor.indices_for_ub(miller_indices)
             predicted_reflections["id"] = cctbx.array_family.flex.int(
                 len(predicted_reflections), idx
             )
@@ -343,9 +344,7 @@ def run_integrate(params, experiments, reflections):
                 len(predicted_reflections), idx
             )
         else:
-            r = flex.reflection_table.from_predictions(
-                experiment, padding=1.0, dmin=dmin
-            )
+            r = predictor.indices_for_ub(miller_indices)
             r["id"] = cctbx.array_family.flex.int(len(r), idx)
             r["imageset_id"] = cctbx.array_family.flex.int(len(r), idx)
             predicted_reflections.extend(r)
@@ -497,7 +496,7 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.compute_summed_intensity()
 
                 if params.method.line_profile_fitting:
-                    print("Calculating line profile fitted intensities")
+                    print(f"Calculating line profile fitted intensities for expt {idx}")
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
             else:
@@ -539,7 +538,7 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.compute_summed_intensity()
 
                 if params.method.line_profile_fitting:
-                    print("Calculating line profile fitted intensities")
+                    print(f"Calculating line profile fitted intensities for expt {idx}")
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
     else:
@@ -581,7 +580,7 @@ def run_integrate(params, experiments, reflections):
             expt_reflections.compute_summed_intensity()
 
             if params.method.line_profile_fitting:
-                print("Calculating line profile fitted intensities")
+                print(f"Calculating line profile fitted intensities for expt {idx}")
                 expt_reflections = compute_line_profile_intensity(expt_reflections)
             predicted_reflections.set_selected(sel, expt_reflections)
 

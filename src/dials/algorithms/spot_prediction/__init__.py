@@ -234,6 +234,40 @@ class TOFReflectionPredictor:
 
         return reflections
 
+    def indices_for_ub(self, indices):
+        reflection_table = self.predictor(indices)
+        reflection_table = self.post_prediction(reflection_table)
+
+        interpolation_tof = self.experiment.scan.get_property("time_of_flight")
+        interpolation_frames = list(range(len(interpolation_tof)))
+        tof_to_frame = tof_helpers.tof_to_frame_interpolator(
+            interpolation_tof, interpolation_frames
+        )
+        L0 = self.experiment.beam.get_sample_to_source_distance() * 10**-3  # (m)
+
+        reflection_tof = (
+            tof_helpers.tof_from_wavelength(
+                reflection_table["wavelength_cal"],
+                L0 + reflection_table["L1"] * 10**-3,
+            )
+            * 10**6
+        )
+
+        reflection_table = reflection_table.select(
+            (reflection_tof > min(interpolation_tof))
+            & (reflection_tof < max(interpolation_tof))
+        )
+
+        reflection_tof = reflection_tof.select(
+            (reflection_tof > min(interpolation_tof))
+            & (reflection_tof < max(interpolation_tof))
+        )
+        reflection_frames = flumpy.from_numpy(tof_to_frame(reflection_tof))
+        x, y, _ = reflection_table["xyzcal.px"].parts()
+        reflection_table["xyzcal.px"] = flex.vec3_double(x, y, reflection_frames)
+
+        return reflection_table
+
     def for_ub(self, ub):
 
         reflection_table = self.predictor.for_ub(ub)
