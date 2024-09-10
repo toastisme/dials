@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy import integrate
-from scipy.optimize import curve_fit
+from scipy.optimize import least_squares
 from scipy.special import erfc
 
 import cctbx.array_family.flex
@@ -17,8 +17,9 @@ class BackToBackExponential:
     """
 
     def __init__(self, tof, intensities, A, alpha, beta, sigma, T):
-        self.intensities = intensities
-        self.tof = tof
+        # Clean the input data
+        self.tof = np.nan_to_num(tof, nan=0, posinf=None, neginf=None)
+        self.intensities = np.nan_to_num(intensities, nan=0, posinf=None, neginf=None)
         self.params = (A, alpha, beta, sigma, T)
         self.cov = None
 
@@ -33,30 +34,42 @@ class BackToBackExponential:
         z = (beta * sigma2 - dT) / sigma_sqrt
 
         N = (alpha * beta) / (2 * (alpha + beta))
-        exp_u = np.exp(u)
-        exp_v = np.exp(v)
-        erfc_y = erfc(y)
-        erfc_z = erfc(z)
 
-        result = A
-        result *= N
-        result *= exp_u * erfc_y + exp_v * erfc_z
-        return result
+        # Handle numerical stability for exponentials
+        exp_u = np.exp(np.clip(u, -700, 700))
+        exp_v = np.exp(np.clip(v, -700, 700))
+
+        # Handle erfc to avoid domain errors
+        erfc_y = erfc(np.clip(y, -10, 10))
+        erfc_z = erfc(np.clip(z, -10, 10))
+
+        result = A * N * (exp_u * erfc_y + exp_v * erfc_z)
+
+        regularization = 1e-10
+        return np.where(np.isfinite(result), result, regularization)
 
     def fit(self):
-        params, cov = curve_fit(
-            f=self.func,
-            xdata=self.tof,
-            ydata=self.intensities,
-            p0=self.params,
-            bounds=(
-                (1, 0, 0, 1, min(self.tof)),
-                (100000000000, 1, 100000000, 10000000000, max(self.tof)),
-            ),
-            max_nfev=10000000,
-        )
-        self.params = params
-        self.cov = cov
+        try:
+            # Use least_squares for robustness
+            def residuals(params):
+                A, alpha, beta, sigma, T = params
+                return self.intensities - self.func(self.tof, A, alpha, beta, sigma, T)
+
+            res = least_squares(
+                residuals,
+                x0=self.params,
+                bounds=(
+                    (1, 0, 0, 1, min(self.tof)),
+                    (1000000, 1, 100000, 10000000, max(self.tof)),
+                ),
+            )
+            self.params = res.x
+            # Covariance might not be available in least_squares
+            self.cov = None
+        except Exception as e:
+            print(f"An error occurred during fitting: {e}")
+            self.params = None
+            self.cov = None
 
     def result(self):
         return self.func(self.tof, *(self.params))
