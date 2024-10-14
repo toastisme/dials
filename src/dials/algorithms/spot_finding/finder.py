@@ -922,7 +922,78 @@ class TOFSpotFinder(SpotFinder):
 
         return reflections
 
+    def _merge_nearby_reflections(self, reflections, threshold_xy, threshold_z):
+        x0, x1, y0, y1, z0, z1 = reflections["bbox"].parts()
+        px, py, pz = reflections["xyzobs.px.value"].parts()
+        panel = reflections["panel"]
+
+        # Find close pairs
+        close_pairs = []
+        num_reflections = len(reflections)
+
+        for i in range(num_reflections):
+            for j in range(i + 1, num_reflections):
+                if panel[i] != panel[j]:
+                    continue
+                if abs(px[i] - px[j]) > threshold_xy:
+                    continue
+                if abs(py[i] - py[j]) > threshold_xy:
+                    continue
+                if abs(pz[i] - pz[j]) <= threshold_z:
+                    close_pairs.append((i, j))
+
+        # Group pairs
+        graph = {i: [] for i in range(num_reflections)}
+
+        for i, j in close_pairs:
+            graph[i].append(j)
+            graph[j].append(i)
+
+        # Perform DFS to find all connected components
+        visited = [False] * num_reflections
+        connected_idxs = []
+
+        def dfs(node, component):
+            visited[node] = True
+            component.append(node)
+            for neighbor in graph[node]:
+                if not visited[neighbor]:
+                    dfs(neighbor, component)
+
+        # Traverse all nodes and apply DFS to unvisited nodes
+        for i in range(num_reflections):
+            if not visited[i]:
+                component = []
+                dfs(i, component)
+                connected_idxs.append(component)
+
+        connected_idxs = [i for i in connected_idxs if len(i) > 1]
+
+        # Create new reflections from merged data
+        new_bboxes = flex.int6(len(connected_idxs))
+        new_panel = flex.int(len(connected_idxs))
+        for i in connected_idxs:
+            new_bboxes[i] = (
+                min([reflections[j]["bbox"][0] for j in i]),
+                max([reflections[j]["bbox"][1] for j in i]),
+                min([reflections[j]["bbox"][2] for j in i]),
+                max([reflections[j]["bbox"][3] for j in i]),
+                min([reflections[j]["bbox"][4] for j in i]),
+                max([reflections[j]["bbox"][5] for j in i]),
+            )
+            new_panel[i] = panel[i[j]]
+
+        _ = flex.shoebox(new_panel, new_bboxes, allocate=False, flatten=False)
+        # r = shoeboxes_to_reflection_table
+        # remove old reflections
+        # reflection_table.extend(r)
+
+        return reflections
+
     def _post_process(self, reflections):
+        reflections = self._merge_nearby_reflections(
+            reflections, threshold_xy=2, threshold_z=5
+        )
         reflections = self._correct_centroid_tof(reflections)
 
         # Filter any reflections outside of the tof range

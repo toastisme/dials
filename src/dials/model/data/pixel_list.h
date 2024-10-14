@@ -262,6 +262,68 @@ namespace dials { namespace model {
     }
 
     /**
+     * @param xyz_threshold Pixels found within these thresholds of each other
+     * will have the the intervening pixels added
+     */
+    void fill_gaps_between_pixels_3d(vec3<int> xyz_threshold,
+                                     dxtbx::ImageSet imagetset) {
+      typedef boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS>
+        AdjacencyList;
+
+      if (coords_.size() == 0) {
+        return af::shared<int>();
+      }
+
+      // Ensure coords are ordered
+      for (std::size_t i = 0; i < coords_.size(); ++i) {
+        if (i > 0) {
+          DIALS_ASSERT(detail::lessthan(coords_[i - 1], coords_[i]));
+        }
+      }
+
+      // Create a graph of coordinates
+      AdjacencyList graph(coords_.size());
+      std::size_t i1 = 0, i2 = 0, i3 = 0;
+      for (; i1 < coords_.size() - 1; ++i1) {
+        vec3<int> a0 = coords_[i1];
+
+        // Threshold comparison with neighboring coordinates
+        for (std::size_t j = i1 + 1; j < coords_.size(); ++j) {
+          vec3<int> a1 = coords_[j];
+
+          int dx = std::abs(a1[0] - a0[0]);
+          int dy = std::abs(a1[1] - a0[1]);
+          int dz = std::abs(a1[2] - a0[2]);
+
+          if (dx == 0 && dy == 0 && dz == 0) {
+            continue;
+          }
+
+          if (dz <= threshold_xyz[2] && dz > 0) {
+          }
+
+          for (int z = std::min(a0[2], a1[2]); z <= std::max(a0[2], a1[2]); ++z) {
+            for (int y = std::min(a0[1], a1[1]); y <= std::max(a0[1], a1[1]); ++y) {
+              for (int x = std::min(a0[0], a1[0]); x <= std::max(a0[0], a1[0]); ++x) {
+                // If this point doesn't already exist, add it
+                vec3<int> new_point(x, y, z);
+                if (std::find(coords_.begin(), coords_.end(), new_point)
+                    == coords_.end()) {
+                  coords_.push_back(new_point);  // Add the new missing coordinate
+                }
+              }
+            }
+          }
+
+          // If within thresholds, connect these points in the graph
+          if (dx <= threshold_x && dy <= threshold_y && dz <= threshold_z) {
+            boost::add_edge(i1, j, graph);
+          }
+        }
+      }
+    }
+
+    /**
      * Label the pixels in 3D
      */
     af::shared<int> labels_3d() const {
