@@ -943,9 +943,9 @@ class TOFSpotFinder(SpotFinder):
                 sel_expt = reflections["id"] == expt_idx
 
             expt_reflections = reflections.select(sel_expt)
+            px, py, pz = expt_reflections["xyzobs.px.value"].parts()
             panel = expt_reflections["panel"]
             bboxes = expt_reflections["bbox"]
-            x0, x1, y0, y1, z0, z1 = expt_reflections["bbox"].parts()
 
             # Find close pairs
             close_pairs = []
@@ -955,20 +955,11 @@ class TOFSpotFinder(SpotFinder):
                 for j in range(i + 1, num_reflections):
                     if panel[i] != panel[j]:
                         continue
-                    if (
-                        abs(x1[i] - x0[j]) > threshold_xy
-                        and abs(x1[j] > x0[i]) > threshold_xy
-                    ):
+                    if abs(px[i] - px[j]) > threshold_xy:
                         continue
-                    if (
-                        abs(y1[i] - y0[j]) > threshold_xy
-                        and abs(y1[j] - y0[i]) > threshold_xy
-                    ):
+                    if abs(py[i] - py[j]) > threshold_xy:
                         continue
-                    if (
-                        abs(z1[i] - z0[j]) <= threshold_z
-                        or abs(z1[j] - z0[i]) <= threshold_z
-                    ):
+                    if abs(pz[i] - pz[j]) <= threshold_z:
                         close_pairs.append((i, j))
 
             # Group pairs
