@@ -89,6 +89,16 @@ def generate_phil_scope():
                 "greater than this value, throw an exception"
         .type = float(value_min=0, value_max=1)
 
+    merge_threshold_xy = 2
+        .help = "Spots within merge_threshold_xy pixels and merge_threshold_z"
+                "frames are merged for time-of-flight experiments"
+        .type = int(value_min=0, allow_none=False)
+    merge_threshold_z = 5
+        .help = "Spots within merge_threshold_z frames and merge_threshold_xy"
+                "pixels are merged for time-of-flight experiments"
+        .type = int(value_min=0, allow_none=False)
+
+
       background_gradient
         .expert_level=2
       {
@@ -488,6 +498,8 @@ class SpotFinderFactory:
                 min_spot_size=params.spotfinder.filter.min_spot_size,
                 max_spot_size=params.spotfinder.filter.max_spot_size,
                 min_chunksize=params.spotfinder.mp.min_chunksize,
+                merge_threshold_xy=params.spotfinder.filter.merge_threshold_xy,
+                merge_threshold_z=params.spotfinder.filter.merge_threshold_z,
             )
 
         filter_spots = SpotFinderFactory.configure_filter(params)

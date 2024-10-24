@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import math
 import pickle
+from itertools import chain
 from typing import Iterable, Tuple
 
 import libtbx
@@ -16,11 +17,12 @@ from dxtbx.model import ExperimentList
 from dxtbx.model.tof_helpers import wavelength_from_tof
 
 from dials.array_family import flex
-from dials.model.data import PixelList, PixelListLabeller
+from dials.model.data import PixelList, PixelListLabeller, make_image
 from dials.util import Sorry, log
 from dials.util.log import rehandle_cached_records
 from dials.util.mp import batch_multi_node_parallel_map
 from dials.util.system import CPU_COUNT
+from dials_algorithms_integration_integrator_ext import ShoeboxProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -886,6 +888,8 @@ class TOFSpotFinder(SpotFinder):
         min_spot_size=1,
         max_spot_size=20,
         min_chunksize=50,
+        merge_threshold_xy=2,
+        merge_threshold_z=5,
     ):
 
         super().__init__(
@@ -911,6 +915,8 @@ class TOFSpotFinder(SpotFinder):
         )
 
         self.experiments = experiments
+        self.merge_threshold_xy = merge_threshold_xy
+        self.merge_threshold_z = merge_threshold_z
 
     def _correct_centroid_tof(self, reflections):
 
@@ -926,7 +932,138 @@ class TOFSpotFinder(SpotFinder):
 
         return reflections
 
+    def _merge_nearby_reflections(self, reflections, threshold_xy, threshold_z):
+        """
+        Spots within threshold_xy and threshold_z are combined
+        """
+
+        num_old_reflections = len(reflections)
+        merged_reflections = flex.reflection_table()
+
+        for expt_idx, expt in enumerate(self.experiments):
+            if "imageset_id" in reflections:
+                sel_expt = reflections["imageset_id"] == expt_idx
+            else:
+                sel_expt = reflections["id"] == expt_idx
+
+            expt_reflections = reflections.select(sel_expt)
+            px, py, pz = expt_reflections["xyzobs.px.value"].parts()
+            panel = expt_reflections["panel"]
+            bboxes = expt_reflections["bbox"]
+
+            # Find close pairs
+            close_pairs = []
+            num_reflections = len(expt_reflections)
+
+            for i in range(num_reflections):
+                for j in range(i + 1, num_reflections):
+                    if panel[i] != panel[j]:
+                        continue
+                    if abs(px[i] - px[j]) > threshold_xy:
+                        continue
+                    if abs(py[i] - py[j]) > threshold_xy:
+                        continue
+                    if abs(pz[i] - pz[j]) <= threshold_z:
+                        close_pairs.append((i, j))
+
+            # Group pairs
+            graph = {i: [] for i in range(num_reflections)}
+
+            for i, j in close_pairs:
+                graph[i].append(j)
+                graph[j].append(i)
+
+            # Perform DFS to find all connected components
+            visited = [False] * num_reflections
+            connected_idxs = []
+
+            def dfs(node, component):
+                visited[node] = True
+                component.append(node)
+                for neighbor in graph[node]:
+                    if not visited[neighbor]:
+                        dfs(neighbor, component)
+
+            # Traverse all nodes and apply DFS to unvisited nodes
+            for i in range(num_reflections):
+                if not visited[i]:
+                    component = []
+                    dfs(i, component)
+                    connected_idxs.append(component)
+
+            connected_idxs = [i for i in connected_idxs if len(i) > 1]
+
+            if len(connected_idxs) == 0:
+                merged_reflections.extend(expt_reflections)
+                continue
+
+            # Create new shoeboxes from merged data
+            new_bboxes = flex.int6(len(connected_idxs))
+            new_panel = flex.size_t(len(connected_idxs))
+            for count, i in enumerate(connected_idxs):
+                new_bboxes[count] = (
+                    min([bboxes[j][0] for j in i]),
+                    max([bboxes[j][1] for j in i]),
+                    min([bboxes[j][2] for j in i]),
+                    max([bboxes[j][3] for j in i]),
+                    min([bboxes[j][4] for j in i]),
+                    max([bboxes[j][5] for j in i]),
+                )
+                new_panel[count] = panel[i[0]]
+
+            new_shoeboxes = flex.shoebox(
+                new_panel, new_bboxes, allocate=False, flatten=False
+            )
+
+            # Slight hack here where a reflection table is created for the purposes of
+            # satisfying the ShoeboxProcessor interface
+            tmp_reflections = flex.reflection_table(len(new_shoeboxes))
+            tmp_reflections["shoebox"] = new_shoeboxes
+            tmp_reflections["bbox"] = new_bboxes
+
+            # Get image data for shoeboxes
+
+            imageset = expt.imageset
+            shoebox_processor = ShoeboxProcessor(
+                tmp_reflections,
+                len(expt.detector),
+                0,
+                len(imageset),
+                False,
+            )
+
+            for i in range(len(imageset)):
+                image = imageset.get_corrected_data(i)
+                mask = imageset.get_mask(i)
+                shoebox_processor.next_data_only(make_image(image, mask))
+
+            # Now create actual new reflections
+            # generated in the same way as current reflections
+            new_reflections = shoeboxes_to_reflection_table(
+                imageset, tmp_reflections["shoebox"], filter_spots=self.filter_spots
+            )
+
+            # Remove old reflections
+            indices = flex.size_t(list(set(chain.from_iterable(connected_idxs))))
+            mask = flex.bool(len(expt_reflections), True)
+            mask.set_selected(indices, False)
+            expt_reflections = expt_reflections.select(mask)
+
+            merged_reflections.extend(expt_reflections)
+            merged_reflections.extend(new_reflections)
+
+        logger.info(
+            f"Removed {num_old_reflections - len(merged_reflections)} spots by centroid-centroid distance"
+        )
+        return merged_reflections
+
     def _post_process(self, reflections):
+
+        reflections = self._merge_nearby_reflections(
+            reflections,
+            threshold_xy=self.merge_threshold_xy,
+            threshold_z=self.merge_threshold_z,
+        )
 
         reflections = self._correct_centroid_tof(reflections)
 
