@@ -349,7 +349,7 @@ def export_mtz(params, experiments, reflections):
 
     _check_input(experiments, reflections)
 
-    from dials.util.export_mtz import export_mtz
+    from dials.util.export_mtz import export_mtz, export_mtz_tof
 
     # Handle case where user has passed data before integration
     if (
@@ -375,22 +375,39 @@ def export_mtz(params, experiments, reflections):
                 "Data appears to be unscaled, setting mtz.hklout = 'integrated.mtz'"
             )
 
-    export_mtz(
-        reflection_table,
-        experiments,
-        intensity_choice=params.intensity,
-        filename=filename,
-        best_unit_cell=params.mtz.best_unit_cell,
-        partiality_threshold=params.mtz.partiality_threshold,
-        combine_partials=params.mtz.combine_partials,
-        min_isigi=params.mtz.min_isigi,
-        filter_ice_rings=params.mtz.filter_ice_rings,
-        d_min=params.mtz.d_min,
-        force_static_model=params.mtz.force_static_model,
-        crystal_name=params.mtz.crystal_name,
-        project_name=params.mtz.project_name,
-        wavelength_tolerance=params.mtz.wavelength_tolerance,
-    )
+    if experiments.all_tof():
+        export_mtz_tof(
+            reflection_table,
+            experiments,
+            intensity_choice=params.intensity,
+            filename=filename,
+            best_unit_cell=params.mtz.best_unit_cell,
+            partiality_threshold=params.mtz.partiality_threshold,
+            combine_partials=params.mtz.combine_partials,
+            min_isigi=params.mtz.min_isigi,
+            filter_ice_rings=params.mtz.filter_ice_rings,
+            d_min=params.mtz.d_min,
+            crystal_name=params.mtz.crystal_name,
+            project_name=params.mtz.project_name,
+        )
+
+    else:
+        export_mtz(
+            reflection_table,
+            experiments,
+            intensity_choice=params.intensity,
+            filename=filename,
+            best_unit_cell=params.mtz.best_unit_cell,
+            partiality_threshold=params.mtz.partiality_threshold,
+            combine_partials=params.mtz.combine_partials,
+            min_isigi=params.mtz.min_isigi,
+            filter_ice_rings=params.mtz.filter_ice_rings,
+            d_min=params.mtz.d_min,
+            force_static_model=params.mtz.force_static_model,
+            crystal_name=params.mtz.crystal_name,
+            project_name=params.mtz.project_name,
+            wavelength_tolerance=params.mtz.wavelength_tolerance,
+        )
 
 
 def export_sadabs(params, experiments, reflections):

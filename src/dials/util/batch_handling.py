@@ -118,12 +118,22 @@ def get_image_ranges(experiments):
     """Get image ranges for a list of experiments (including scanless exp.)"""
     # Note, if set to 1,1,for scanless experiments then first batch offset in
     # _calculate_batch_offsets is zero below, bad!
-    return [
-        e.scan.get_image_range()
-        if (e.scan and e.scan.get_oscillation()[1] != 0.0)
-        else (0, 0)
-        for e in experiments
-    ]
+    image_ranges = []
+    for e in experiments:
+        if e.scan:
+            if (
+                e.scan.has_property("oscillation")
+                and e.scan.get_oscillation()[1] != 0.0
+            ):
+                image_ranges.append(e.scan.get_image_range())
+            elif not e.scan.has_property("oscillation"):
+                image_ranges.append(e.scan.get_image_range())
+            else:
+                image_ranges.append((0, 0))
+        else:
+            image_ranges.append((0, 0))
+
+    return image_ranges
 
 
 def calculate_batch_offsets(experiment_list):

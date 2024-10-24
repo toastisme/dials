@@ -221,7 +221,11 @@ def add_batch_list(
 
     i0 = image_range[0]
     for i in range(n_batches):
-        if experiment.scan and experiment.scan.get_oscillation()[1] != 0.0:
+        if (
+            experiment.scan
+            and experiment.scan.has_property("oscillation")
+            and experiment.scan.get_oscillation()[1] != 0.0
+        ):
             phi_start[i], phi_range[i] = experiment.scan.get_image_oscillation(i + i0)
 
         # Unit cell and UB matrix for the centre of the image for scan-varying model
@@ -539,6 +543,168 @@ def write_columns(mtz, reflection_table):
     mtz.set_data(mtz_data)
 
 
+def write_columns_tof(mtz, reflection_table):
+
+    """Write the column definitions AND data to the current dataset."""
+
+    nref = len(reflection_table["miller_index"])
+    assert nref
+    xdet, ydet, _ = [
+        flex.double(x) for x in reflection_table["xyzobs.px.value"].parts()
+    ]
+
+    type_table = {
+        "H": "H",
+        "K": "H",
+        "L": "H",
+        "I": "J",
+        "SIGI": "Q",
+        "IPR": "J",
+        "SIGIPR": "Q",
+        "BG": "R",
+        "SIGBG": "R",
+        "XDET": "R",
+        "YDET": "R",
+        "BATCH": "B",
+        "BGPKRATIOS": "R",
+        "WIDTH": "R",
+        "MPART": "I",
+        "M_ISYM": "Y",
+        "FLAG": "I",
+        "LP": "R",
+        "FRACTIONCALC": "R",
+        "ROT": "R",
+        "QE": "R",
+        "LAMBDA": "R",
+    }
+
+    mtz_data = pd.DataFrame(
+        flumpy.to_numpy(reflection_table["miller_index"]).astype("float32"),
+        columns=["H", "K", "L"],
+    )
+    mtz_data.insert(3, "M/ISYM", np.zeros(nref, dtype="float32"))
+
+    # H, K, L are in the base dataset, but we have to add M/ISYM
+    mtz.add_column("M/ISYM", type_table["M_ISYM"])
+    mtz.add_column("BATCH", type_table["BATCH"])
+    mtz_data.insert(
+        4, "BATCH", flumpy.to_numpy(reflection_table["batch"]).astype("float32")
+    )
+
+    if "intensity.prf.value" in reflection_table:
+        if "intensity.sum.value" in reflection_table:
+            col_names = ("IPR", "SIGIPR")
+        else:
+            col_names = ("I", "SIGI")
+        I_profile = reflection_table["intensity.prf.value"]
+        V_profile = reflection_table["intensity.prf.variance"]
+        assert V_profile.all_gt(0)  # Trap negative variances
+        mtz.add_column(col_names[0], type_table["I"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            col_names[0],
+            flumpy.to_numpy(I_profile.as_float()).astype("float32"),
+        )
+        mtz.add_column(col_names[1], type_table["SIGI"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            col_names[1],
+            flumpy.to_numpy(flex.sqrt(V_profile)).astype("float32"),
+        )
+
+    if "intensity.sum.value" in reflection_table:
+        I_sum = reflection_table["intensity.sum.value"]
+        V_sum = reflection_table["intensity.sum.variance"]
+        assert V_sum.all_gt(0)  # Trap negative variances
+        mtz.add_column("I", type_table["I"])
+        mtz_data.insert(
+            len(mtz_data.columns), "I", flumpy.to_numpy(I_sum).astype("float32")
+        )
+        mtz.add_column("SIGI", type_table["SIGI"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "SIGI",
+            flumpy.to_numpy(flex.sqrt(V_sum)).astype("float32"),
+        )
+
+    if (
+        "background.sum.value" in reflection_table
+        and "background.sum.variance" in reflection_table
+    ):
+        bg = reflection_table["background.sum.value"]
+        varbg = reflection_table["background.sum.variance"]
+        assert (varbg >= 0).count(False) == 0
+        sigbg = flex.sqrt(varbg)
+        mtz.add_column("BG", type_table["BG"])
+        mtz_data.insert(
+            len(mtz_data.columns), "BG", flumpy.to_numpy(bg).astype("float32")
+        )
+        mtz.add_column("SIGBG", type_table["SIGBG"])
+        mtz_data.insert(
+            len(mtz_data.columns), "SIGBG", flumpy.to_numpy(sigbg).astype("float32")
+        )
+
+    if "fractioncalc" in reflection_table:
+        mtz.add_column("FRACTIONCALC", type_table["FRACTIONCALC"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "FRACTIONCALC",
+            flumpy.to_numpy(reflection_table["fractioncalc"]).astype("float32"),
+        )
+
+    mtz.add_column("LAMBDA", type_table["LAMBDA"])
+    mtz_data.insert(
+        len(mtz_data.columns),
+        "LAMBDA",
+        flumpy.to_numpy(reflection_table["wavelength_cal"]).astype("float32"),
+    )
+
+    mtz.add_column("XDET", type_table["XDET"])
+    mtz_data.insert(
+        len(mtz_data.columns), "XDET", flumpy.to_numpy(xdet).astype("float32")
+    )
+    mtz.add_column("YDET", type_table["YDET"])
+    mtz_data.insert(
+        len(mtz_data.columns), "YDET", flumpy.to_numpy(ydet).astype("float32")
+    )
+
+    if "ROT" in reflection_table:
+        mtz.add_column("ROT", type_table["ROT"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "ROT",
+            flumpy.to_numpy(reflection_table["ROT"]).astype("float32"),
+        )
+
+    if "lp" in reflection_table:
+        mtz.add_column("LP", type_table["LP"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "LP",
+            flumpy.to_numpy(reflection_table["lp"]).astype("float32"),
+        )
+    if "qe" in reflection_table:
+        mtz.add_column("QE", type_table["QE"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "QE",
+            flumpy.to_numpy(reflection_table["qe"]).astype("float32"),
+        )
+    elif "dqe" in reflection_table:
+        mtz.add_column("QE", type_table["QE"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "QE",
+            flumpy.to_numpy(reflection_table["dqe"]).astype("float32"),
+        )
+    else:
+        mtz.add_column("QE", type_table["QE"])
+        mtz_data.insert(len(mtz_data.columns), "QE", np.ones(nref).astype("float32"))
+
+    mtz.switch_to_original_hkl()
+    mtz.set_data(mtz_data)
+
+
 def export_mtz(
     reflection_table,
     experiment_list,
@@ -787,6 +953,174 @@ def export_mtz(
     mtz.write_to_file(filename)
     log_summary(mtz)
 
+    return mtz
+
+
+def export_mtz_tof(
+    reflection_table,
+    experiment_list,
+    intensity_choice,
+    filename,
+    best_unit_cell=None,
+    partiality_threshold=0.4,
+    combine_partials=True,
+    min_isigi=-5,
+    filter_ice_rings=False,
+    d_min=None,
+    crystal_name=None,
+    project_name=None,
+):
+    """Export data from reflection_table corresponding to experiment_list to an
+    MTZ file hklout."""
+    # First get the experiment identifier information out of the data
+    expids_in_table = reflection_table.experiment_identifiers()
+    if not list(expids_in_table.keys()):
+        reflection_tables = parse_multiple_datasets([reflection_table])
+        experiment_list, refl_list = assign_unique_identifiers(
+            experiment_list, reflection_tables
+        )
+        reflection_table = flex.reflection_table()
+        for reflections in refl_list:
+            reflection_table.extend(reflections)
+        expids_in_table = reflection_table.experiment_identifiers()
+    reflection_table.assert_experiment_identifiers_are_consistent(experiment_list)
+    expids_in_list = list(experiment_list.identifiers())
+    # Convert geometry to the Cambridge frame
+    experiment_list = convert_to_cambridge(experiment_list)
+    # Convert experiment_list to a real python list or else identity assumptions
+    # fail like:
+    #   assert experiment_list[0] is experiment_list[0]
+    # And assumptions about added attributes break
+    experiment_list = list(experiment_list)
+    # Validate multi-experiment assumptions
+    if len(experiment_list) > 1:
+        # All experiments should match crystals, or else we need multiple crystals/datasets
+        if not all(
+            x.crystal == experiment_list[0].crystal for x in experiment_list[1:]
+        ):
+            logger.warning(
+                "Experiment crystals differ. Using first experiment crystal for file-level data."
+            )
+        # At least, all experiments must have the same space group
+        if len({x.crystal.get_space_group().make_tidy() for x in experiment_list}) != 1:
+            raise ValueError("Experiments do not have a unique space group")
+    # also only work correctly with one panel (for the moment)
+    if any(len(experiment.detector) != 1 for experiment in experiment_list):
+        logger.warning("Ignoring multiple panels in output MTZ")
+    if best_unit_cell is None:
+        best_unit_cell = determine_best_unit_cell(experiment_list)
+    reflection_table["d"] = best_unit_cell.d(reflection_table["miller_index"])
+    # Clean up the data with the passed in options
+    reflection_table = filter_reflection_table(
+        reflection_table,
+        intensity_choice=intensity_choice,
+        partiality_threshold=partiality_threshold,
+        combine_partials=combine_partials,
+        min_isigi=min_isigi,
+        filter_ice_rings=filter_ice_rings,
+        d_min=d_min,
+    )
+    # get batch offsets and image ranges - even for scanless experiments
+    batch_offsets = [
+        expt.scan.get_batch_offset()
+        for expt in experiment_list
+        if expt.scan is not None
+    ]
+    unique_offsets = set(batch_offsets)
+    if len(set(unique_offsets)) <= 1:
+        logger.debug("Calculating new batches")
+        batch_offsets = calculate_batch_offsets(experiment_list)
+        batch_starts = [
+            e.scan.get_image_range()[0] if e.scan else 0 for e in experiment_list
+        ]
+        effective_offsets = [o + s for o, s in zip(batch_offsets, batch_starts)]
+        unique_offsets = set(effective_offsets)
+    else:
+        logger.debug("Keeping existing batches")
+    image_ranges = get_image_ranges(experiment_list)
+    if len(unique_offsets) != len(batch_offsets):
+        raise ValueError(
+            "Duplicate batch offsets detected: %s"
+            % ", ".join(
+                str(item) for item, count in Counter(batch_offsets).items() if count > 1
+            )
+        )
+    # Create the mtz file
+    if gemmi is None:
+        raise gemmi_import_error
+    mtz = gemmi.Mtz(with_base=True)
+    mtz.title = f"From {env.dispatcher_name}"
+    date_str = time.strftime("%Y-%m-%d at %H:%M:%S %Z")
+    if time.strftime("%Z") != "GMT":
+        date_str += time.strftime("  (%Y-%m-%d at %H:%M:%S %Z)", time.gmtime())
+    mtz.history += [
+        f"From {dials_version()}, run on {date_str}",
+    ]
+
+    # Create the right gemmi spacegroup from the crystal's cctbx space_group
+    # via a Hall symbol
+    hall = experiment_list[0].crystal.get_space_group().type().hall_symbol()
+    ops = gemmi.symops_from_hall(hall)
+    mtz.spacegroup = gemmi.find_spacegroup_by_ops(ops)
+    # FIXME TODO for more than one experiment into an MTZ file:
+    #
+    # - add an epoch (or recover an epoch) from the scan and add this as an extra
+    #   column to the MTZ file for scaling, so we know that the two lattices were
+    #   integrated at the same time
+    # ✓ decide a sensible BATCH increment to apply to the BATCH value between
+    #   experiments and add this
+    for id_ in expids_in_table.keys():
+        # Grab our subset of the data
+        loc = expids_in_list.index(
+            expids_in_table[id_]
+        )  # get strid and use to find loc in list
+        experiment = experiment_list[loc]
+        wavelength = -1
+        dataset_id = 1
+        reflections = reflection_table.select(reflection_table["id"] == id_)
+        batch_offset = batch_offsets[loc]
+        image_range = image_ranges[loc]
+        reflections = assign_batches_to_reflections([reflections], [batch_offset])[0]
+        experiment.data = dict(reflections)
+        add_batch_list(
+            mtz,
+            image_range,
+            experiment,
+            wavelength,
+            dataset_id,
+            batch_offset=batch_offset,
+            force_static_model=True,
+        )
+        # Create the batch offset array. This gives us an experiment (id)-dependent
+        # batch offset to calculate the correct batch from image number.
+        experiment.data["batch_offset"] = flex.int(
+            len(experiment.data["id"]), batch_offset
+        )
+        # Calculate whether we have a ROT value for this experiment, and set the column
+        _, _, z = experiment.data["xyzcal.px"].parts()
+        experiment.data["ROT"] = z
+    mtz.set_cell_for_all(gemmi.UnitCell(*best_unit_cell.parameters()))
+
+    # Combine all of the experiment data columns before writing
+    combined_data = {k: v.deep_copy() for k, v in experiment_list[0].data.items()}
+    for experiment in experiment_list[1:]:
+        for k, v in experiment.data.items():
+            combined_data[k].extend(v)
+    # ALL columns must be the same length
+    assert len({len(v) for v in combined_data.values()}) == 1, "Column length mismatch"
+    assert len(combined_data["id"]) == len(
+        reflection_table["id"]
+    ), "Lost rows in split/combine"
+
+    # Write all the data and columns to the mtz file
+    write_columns_tof(mtz, combined_data)
+    mtz.switch_to_asu_hkl()
+    mtz.sort(5)
+    logger.info(
+        "Saving %s integrated reflections to %s", len(combined_data["id"]), filename
+    )
+    mtz.write_to_file(filename)
+    log_summary(mtz)
     return mtz
 
 

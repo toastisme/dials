@@ -363,6 +363,7 @@ def run_integrate(params, experiments, reflections):
     if "idx" in reflections:
         predicted_reflections["idx"] = reflections["idx"]
 
+    predicted_reflections["xyzobs.px.value"] = reflections["xyzobs.px.value"]
     """
     Create profile model and add it to experiment.
     This is used to predict reflection properties.

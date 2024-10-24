@@ -514,7 +514,7 @@ class Model(ProfileModelExt):
             crystal, beam, detector, goniometer, scan, delta_b, delta_m
         )
 
-        if scan.has_property("time_of_flight"):
+        if scan is not None and scan.has_property("time_of_flight"):
             bbox = calculate(
                 reflections["s0_cal"],
                 reflections["s1"],
