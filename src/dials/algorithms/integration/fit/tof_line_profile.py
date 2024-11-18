@@ -50,7 +50,7 @@ class BackToBackExponential:
 
     def fit(self):
         try:
-            # Use least_squares for robustness
+
             def residuals(params):
                 A, alpha, beta, sigma, T = params
                 return self.intensities - self.func(self.tof, A, alpha, beta, sigma, T)
@@ -64,12 +64,12 @@ class BackToBackExponential:
                 ),
             )
             self.params = res.x
-            # Covariance might not be available in least_squares
             self.cov = None
         except Exception as e:
             print(f"An error occurred during fitting: {e}")
             self.params = None
             self.cov = None
+            raise ValueError
 
     def result(self):
         return self.func(self.tof, *(self.params))
@@ -79,15 +79,12 @@ class BackToBackExponential:
         return integrate.simpson(predicted, x=self.tof)
 
 
-def compute_line_profile_data_for_reflection(
-    reflection_table, A=200.0, alpha=0.4, beta=0.4, sigma=8.0
+def compute_line_profile_data_for_shoebox(
+    shoebox, A=200.0, alpha=0.4, beta=0.4, sigma=8.0
 ):
-
-    assert len(reflection_table) == 1
 
     bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
 
-    shoebox = reflection_table["shoebox"][0]
     data = flumpy.to_numpy(shoebox.data).ravel()
     background = flumpy.to_numpy(shoebox.background).ravel()
     mask = flumpy.to_numpy(shoebox.mask).ravel()
@@ -101,8 +98,10 @@ def compute_line_profile_data_for_reflection(
 
     n_signal = np.sum(m)
 
-    background = background[m]
-    intensity = data[m] - background
+    # Remove background and project onto ToF axis
+    background = background[bg_m]
+    avg_background = sum(background) / len(background)
+    intensity = data[m] - avg_background
     background_sum = np.sum(background)
     summation_intensity = float(np.sum(intensity))
     coords = coords[m]
@@ -114,12 +113,18 @@ def compute_line_profile_data_for_reflection(
     for j in np.unique(tof):
         indices = np.where(tof == j)
         summed_values[j] = np.sum(intensity[indices])
-        summed_background_values[j] = np.sum(background[indices])
+        summed_background_values[j] = avg_background * len(indices)
 
-    # Remove background and project onto ToF axis
     projected_intensity = np.array(list(summed_values.values()))
     projected_background = np.array(list(summed_background_values.values()))
     tof = np.array(list(summed_values.keys()))
+    if n_background > 0:
+        m_n = n_signal / n_background
+    else:
+        m_n = 0.0
+    summation_std = np.sqrt(
+        abs(summation_intensity) + abs(background_sum) * (1.0 + m_n)
+    )
 
     try:
         T = tof[np.argmax(projected_intensity)]
@@ -137,16 +142,18 @@ def compute_line_profile_data_for_reflection(
         fit_intensity = integrate.simpson(line_profile, x=tof)
     except ValueError as e:
         print("fit error", e)
-        return [], [], [], [], -1, -1, -1, -1
+        return (
+            tof,
+            projected_intensity,
+            projected_background,
+            [],
+            -1,
+            -1,
+            summation_intensity,
+            summation_std,
+        )
 
-    if n_background > 0:
-        m_n = n_signal / n_background
-    else:
-        m_n = 0.0
     fit_std = np.sqrt(abs(fit_intensity) + abs(background_sum) * (1.0 + m_n))
-    summation_std = np.sqrt(
-        abs(summation_intensity) + abs(background_sum) * (1.0 + m_n)
-    )
 
     return (
         tof,

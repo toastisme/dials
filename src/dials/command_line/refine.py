@@ -360,7 +360,9 @@ def run_dials_refine(experiments, reflections, params):
         crystal_has_scan = {}
         for j, e in enumerate(experiments):
             if e.crystal in crystal_has_scan:
-                if e.scan is not crystal_has_scan[e.crystal]:
+                if e.scan is not crystal_has_scan[e.crystal] and e.scan.has_property(
+                    "oscillation"
+                ):
                     logger.info(
                         "Duplicating crystal model for scan-varying refinement of experiment %d",
                         j,
