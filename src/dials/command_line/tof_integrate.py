@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+import os
 
 import numpy as np
 
@@ -190,7 +191,10 @@ def output_reflections_as_hkl(reflections, filename):
 
     if "intensity.prf.value" not in reflections:
         return
-    with open("prf_" + filename, "w") as g:
+
+    file_path, name = os.path.split(filename)
+    prf_filename = os.path.join(file_path, f"prf_{name}")
+    with open(prf_filename, "w") as g:
         for i in range(len(reflections)):
             h, k, l = reflections["miller_index"][i]
             batch_number = 1
@@ -473,10 +477,11 @@ def run_integrate(params, experiments, reflections):
                     corrections_data,
                     params.corrections.lorentz,
                 )
-                # tof_calculate_shoebox_mask(predicted_reflections, expt)
+                # tof_calculate_shoebox_mask(expt_reflections, expt)
                 tof_calculate_shoebox_foreground(
                     expt_reflections, expt, params.foreground_radius
                 )
+
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
                 expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
@@ -515,7 +520,7 @@ def run_integrate(params, experiments, reflections):
                     empty_proton_charge,
                     params.corrections.lorentz,
                 )
-                # tof_calculate_shoebox_mask(predicted_reflections, expt)
+                # tof_calculate_shoebox_mask(expt_reflections, expt)
                 tof_calculate_shoebox_foreground(
                     expt_reflections, expt, params.foreground_radius
                 )
@@ -557,7 +562,7 @@ def run_integrate(params, experiments, reflections):
                 params.corrections.lorentz,
             )
 
-            # tof_calculate_shoebox_mask(predicted_reflections, expt)
+            # tof_calculate_shoebox_mask(expt_reflections, expt)
             tof_calculate_shoebox_foreground(
                 expt_reflections, expt, params.foreground_radius
             )
