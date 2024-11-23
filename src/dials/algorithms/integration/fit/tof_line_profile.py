@@ -202,11 +202,11 @@ def compute_line_profile_intensity(reflections):
 
         summed_values = {}
 
+        # Remove background and project onto ToF axis
         for j in np.unique(tof):
             indices = np.where(tof == j)
-            summed_values[j] = np.sum(intensity[indices])
+            summed_values[j] = np.sum(intensity[indices]) - np.sum(background[indices])
 
-        # Remove background and project onto ToF axis
         projected_intensity = np.array(list(summed_values.values()))
         tof = np.array(list(summed_values.keys()))
 

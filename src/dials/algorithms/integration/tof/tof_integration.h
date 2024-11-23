@@ -179,6 +179,54 @@ namespace dials { namespace algorithms {
     axes_lengths = eigenvalues.cwiseSqrt();
   }
 
+  void compute_weighted_ellipsoid(std::vector<Eigen::Vector3d>& points,
+                                  std::vector<double>& values,
+                                  Eigen::Vector3d& mean,
+                                  Eigen::Matrix3d& eigenvectors,
+                                  Eigen::Vector3d& axes_lengths) {
+    if (points.size() != values.size() || points.empty()) {
+      throw std::invalid_argument(
+        "Points and values must have the same size and cannot be empty.");
+    }
+
+    // Normalize values to compute weights (ensure they sum to 1)
+    double totalWeight = std::accumulate(values.begin(), values.end(), 0.0);
+    if (totalWeight == 0) {
+      throw std::invalid_argument("Values must not all be zero.");
+    }
+
+    std::vector<double> weights(values.size());
+    for (size_t i = 0; i < values.size(); ++i) {
+      weights[i] = values[i] / totalWeight;
+    }
+
+    // Compute the weighted mean
+    Eigen::Vector3d weightedSum = Eigen::Vector3d::Zero();
+    for (size_t i = 0; i < points.size(); ++i) {
+      weightedSum += weights[i] * points[i];
+    }
+    mean = weightedSum;
+
+    // Compute the weighted covariance matrix
+    Eigen::Matrix3d covMatrix = Eigen::Matrix3d::Zero();
+    for (size_t i = 0; i < points.size(); ++i) {
+      Eigen::Vector3d centered = points[i] - mean;
+      covMatrix += weights[i] * (centered * centered.transpose());
+    }
+
+    // Perform eigen decomposition on the covariance matrix
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> eigensolver(covMatrix);
+    if (eigensolver.info() != Eigen::Success) {
+      throw std::runtime_error("Eigen decomposition failed.");
+    }
+
+    // Eigenvalues and eigenvectors
+    Eigen::VectorXd eigenvalues = eigensolver.eigenvalues();
+    eigenvectors = eigensolver.eigenvectors();
+    axes_lengths =
+      eigenvalues.cwiseSqrt();  // Semi-axis lengths are sqrt of eigenvalues
+  }
+
   bool point_inside_ellipsoid(const Eigen::Vector3d& point,
                               const Eigen::Vector3d& mean,
                               const Eigen::Matrix3d& eigenvectors,
@@ -190,15 +238,16 @@ namespace dials { namespace algorithms {
     return distance_squared <= 1.0;
   }
 
-  std::vector<Eigen::Vector3d> get_shoebox_rlps(const Shoebox<>& shoebox,
-                                                Detector& detector,
-                                                int& panel,
-                                                int6& bbox,
-                                                scitbx::af::shared<double>& img_tof,
-                                                vec3<double>& unit_s0,
-                                                double& sample_to_source_distance,
-                                                mat3<double>& setting_rotation) {
-    std::vector<Eigen::Vector3d> points;
+  void get_shoebox_rlps(const Shoebox<>& shoebox,
+                        std::vector<Eigen::Vector3d>& shoebox_rlps,
+                        std::vector<double>& shoebox_values,
+                        Detector& detector,
+                        int& panel,
+                        int6& bbox,
+                        scitbx::af::shared<double>& img_tof,
+                        vec3<double>& unit_s0,
+                        double& sample_to_source_distance,
+                        mat3<double>& setting_rotation) {
     for (std::size_t z = 0; z < shoebox.zsize(); ++z) {
       int frame_z = bbox[4] + z;
       double tof = img_tof[frame_z] * std::pow(10, -6);  // (s)
@@ -218,11 +267,11 @@ namespace dials { namespace algorithms {
           s1 = s1 / s1.length() * (1 / wl);
           vec3<double> S = s1 - s0;
           S = setting_rotation.inverse() * S;
-          points.emplace_back(Eigen::Vector3d(S[0], S[1], S[2]));
+          shoebox_rlps.emplace_back(Eigen::Vector3d(S[0], S[1], S[2]));
+          shoebox_values.push_back(shoebox.data(z, y, x));
         }
       }
     }
-    return points;
   }
 
   void tof_calculate_shoebox_mask(af::reflection_table& reflection_table,
@@ -250,19 +299,23 @@ namespace dials { namespace algorithms {
       int panel = shoebox.panel;
       int6 bbox = bboxes[i];
       vec3<double> rlp = rlps[i];
-      std::vector<Eigen::Vector3d> shoebox_rlps =
-        get_shoebox_rlps(shoebox,
-                         detector,
-                         panel,
-                         bbox,
-                         img_tof,
-                         unit_s0,
-                         sample_to_source_distance,
-                         setting_rotation);
+      std::vector<Eigen::Vector3d> shoebox_rlps;
+      std::vector<double> shoebox_values;
+      get_shoebox_rlps(shoebox,
+                       shoebox_rlps,
+                       shoebox_values,
+                       detector,
+                       panel,
+                       bbox,
+                       img_tof,
+                       unit_s0,
+                       sample_to_source_distance,
+                       setting_rotation);
       Eigen::Vector3d mean;
       Eigen::Matrix3d eigenvectors;
       Eigen::Vector3d axes_lengths;
-      compute_ellipsoid(shoebox_rlps, mean, eigenvectors, axes_lengths);
+      compute_weighted_ellipsoid(
+        shoebox_rlps, shoebox_values, mean, eigenvectors, axes_lengths);
       int count = 0;
       for (std::size_t z = 0; z < shoebox.zsize(); ++z) {
         for (std::size_t y = 0; y < shoebox.ysize(); ++y) {

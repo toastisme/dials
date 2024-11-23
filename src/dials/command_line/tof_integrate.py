@@ -15,10 +15,6 @@ from dials.algorithms.integration.fit.tof_line_profile import (
     compute_line_profile_intensity,
 )
 from dials.algorithms.integration.report import IntegrationReport
-from dials.algorithms.profile_model.gaussian_rs import Model as GaussianRSProfileModel
-from dials.algorithms.profile_model.gaussian_rs.calculator import (
-    ComputeEsdBeamDivergence,
-)
 from dials.algorithms.shoebox import MaskCode
 from dials.algorithms.spot_prediction import TOFReflectionPredictor
 from dials.array_family import flex
@@ -29,7 +25,7 @@ from dials.util.phil import parse
 from dials.util.version import dials_version
 from dials_tof_scaling_ext import (
     TOFCorrectionsData,
-    tof_calculate_shoebox_foreground,
+    tof_calculate_shoebox_mask,
     tof_extract_shoeboxes_to_reflection_table,
 )
 
@@ -114,15 +110,12 @@ mp{
         .help = "Number of processors to use during parallelized steps."
         "If set to Auto DIALS will choose automatically."
 }
-sigma_b = 0.01
-    .type = float
-    .help = "Used to calculate xy bounding box of predicted reflections"
-sigma_m = 10
-    .type = float
-    .help = "Used to calculate z bounding box of predicted reflections"
-foreground_radius=0.5
-    .type = float
-    .help = "Foreground mask radius in inverse angtroms"
+bbox_tof_padding = 30
+    .type = int
+    .help = "Additional ToF frames added to calculated bounding boxes"
+bbox_xy_padding = 5
+    .type = int
+    .help = "Additional pixels added to calculated bounding boxes"
 keep_shoeboxes = False
     .type = bool
     .help = "Retain shoeboxes in output reflection table"
@@ -136,6 +129,35 @@ post-refinment, Acta Crystallographica Section D, 2010, D66, 133-144
 Usage:
 $ dials.tof_integrate.py refined.expt refined.refl
 """
+
+
+def update_bounding_box(bbox, centroid, new_centroid, padding, image_size):
+    from copy import deepcopy
+    from math import ceil, floor
+
+    diff_centroid = (
+        new_centroid[0] - centroid[0],
+        new_centroid[1] - centroid[1],
+        new_centroid[2] - centroid[2],
+    )
+
+    updated_bbox = list(deepcopy(bbox))
+
+    updated_bbox[0] += diff_centroid[0] - padding[0]
+    updated_bbox[1] += diff_centroid[0] + padding[0]
+    updated_bbox[2] += diff_centroid[1] - padding[1]
+    updated_bbox[3] += diff_centroid[1] + padding[1]
+    updated_bbox[4] += diff_centroid[2] - padding[2]
+    updated_bbox[5] += diff_centroid[2] + padding[2]
+
+    updated_bbox[0] = max(floor(updated_bbox[0]), image_size[0])
+    updated_bbox[1] = min(ceil(updated_bbox[1]), image_size[1])
+    updated_bbox[2] = max(floor(updated_bbox[2]), image_size[2])
+    updated_bbox[3] = min(ceil(updated_bbox[3]), image_size[3])
+    updated_bbox[4] = max(floor(updated_bbox[4]), image_size[4])
+    updated_bbox[5] = min(ceil(updated_bbox[5]), image_size[5])
+
+    return tuple(updated_bbox)
 
 
 def output_reflections_as_hkl(reflections, filename):
@@ -368,44 +390,22 @@ def run_integrate(params, experiments, reflections):
         predicted_reflections["idx"] = reflections["idx"]
 
     predicted_reflections["xyzobs.px.value"] = reflections["xyzobs.px.value"]
-    """
-    Create profile model and add it to experiment.
-    This is used to predict reflection properties.
-    """
 
-    # Filter reflections to use to create the model
-    used_in_ref = reflections.get_flags(reflections.flags.used_in_refinement)
-    model_reflections = reflections.select(used_in_ref)
+    tof_padding = params.bbox_tof_padding
+    xy_padding = params.bbox_xy_padding
+    image_size = experiments[0].detector[0].get_image_size()
+    tof_size = len(experiments[0].scan.get_property("time_of_flight"))
+    bboxes = flex.int6(len(predicted_reflections))
+    for i in range(len(predicted_reflections)):
 
-    sigma_b = ComputeEsdBeamDivergence(
-        experiment.detector, model_reflections, centroid_definition="s1"
-    ).sigma()
-
-    # sigma_m in 3.1 of Kabsch 2010
-    sigma_m = params.sigma_m
-    # sigma_b = 0.001
-    # The Gaussian model given in 2.3 of Kabsch 2010
-    for idx, experiment in enumerate(experiments):
-        experiments[idx].profile = GaussianRSProfileModel(
-            params=params, n_sigma=2.5, sigma_b=sigma_b, sigma_m=sigma_m
+        bboxes[i] = update_bounding_box(
+            reflections["bbox"][i],
+            reflections["xyzobs.px.value"][i],
+            predicted_reflections["xyzcal.px"][i],
+            (int(xy_padding), int(xy_padding), int(tof_padding)),
+            (0, image_size[0], 0, image_size[1], 0, tof_size),
         )
-
-    """
-    Compute properties for predicted reflections using profile model,
-    accessed via experiment.profile_model. These reflection_table
-    methods are largely just wrappers for profile_model.compute_bbox etc.
-    Note: I do not think all these properties are needed for integration,
-    but are all present in the current dials.integrate output.
-    """
-
-    predicted_reflections.compute_bbox(experiments)
-    x1, x2, y1, y2, t1, t2 = predicted_reflections["bbox"].parts()
-    predicted_reflections = predicted_reflections.select(
-        (t1 > 0)
-        & (t2 < max([e.scan.get_image_range()[1] for e in experiments]))
-        & (x1 > 0)
-        & (y1 > 0)
-    )
+    predicted_reflections["bbox"] = bboxes
 
     predicted_reflections.compute_d(experiments)
     # predicted_reflections.compute_partiality(experiments)
@@ -477,10 +477,7 @@ def run_integrate(params, experiments, reflections):
                     corrections_data,
                     params.corrections.lorentz,
                 )
-                # tof_calculate_shoebox_mask(expt_reflections, expt)
-                tof_calculate_shoebox_foreground(
-                    expt_reflections, expt, params.foreground_radius
-                )
+                tof_calculate_shoebox_mask(expt_reflections, expt)
 
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
@@ -494,10 +491,6 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.set_flags(
                     ~success, expt_reflections.flags.failed_during_background_modelling
                 )
-
-                # Centroids calculated explicitly to expose underlying algorithm
-                # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
-                # centroid_algorithm.compute_centroid(expt_reflections)
 
                 expt_reflections.compute_summed_intensity()
 
@@ -520,10 +513,7 @@ def run_integrate(params, experiments, reflections):
                     empty_proton_charge,
                     params.corrections.lorentz,
                 )
-                # tof_calculate_shoebox_mask(expt_reflections, expt)
-                tof_calculate_shoebox_foreground(
-                    expt_reflections, expt, params.foreground_radius
-                )
+                tof_calculate_shoebox_mask(expt_reflections, expt)
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
                 expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
@@ -536,10 +526,6 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.set_flags(
                     ~success, expt_reflections.flags.failed_during_background_modelling
                 )
-
-                # Centroids calculated explicitly to expose underlying algorithm
-                # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
-                # centroid_algorithm.compute_centroid(expt_reflections)
 
                 expt_reflections.compute_summed_intensity()
 
@@ -562,10 +548,7 @@ def run_integrate(params, experiments, reflections):
                 params.corrections.lorentz,
             )
 
-            # tof_calculate_shoebox_mask(expt_reflections, expt)
-            tof_calculate_shoebox_foreground(
-                expt_reflections, expt, params.foreground_radius
-            )
+            tof_calculate_shoebox_mask(expt_reflections, expt)
             expt_reflections.is_overloaded(experiments)
             expt_reflections.contains_invalid_pixels()
             expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
@@ -578,10 +561,6 @@ def run_integrate(params, experiments, reflections):
             expt_reflections.set_flags(
                 ~success, expt_reflections.flags.failed_during_background_modelling
             )
-
-            # Centroids calculated explicitly to expose underlying algorithm
-            # centroid_algorithm = SimpleCentroidExt(params=None, experiments=experiments)
-            # centroid_algorithm.compute_centroid(expt_reflections)
 
             expt_reflections.compute_summed_intensity()
 
