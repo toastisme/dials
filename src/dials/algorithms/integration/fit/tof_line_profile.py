@@ -89,22 +89,23 @@ def compute_line_profile_data_for_shoebox(
     background = flumpy.to_numpy(shoebox.background).ravel()
     mask = flumpy.to_numpy(shoebox.mask).ravel()
     coords = flumpy.to_numpy(shoebox.coords())
-    m = mask & MaskCode.Foreground == MaskCode.Foreground
-    bg_m = mask & bg_code == bg_code
-    n_background = np.sum(np.bitwise_and(~m, bg_m))
 
-    m = np.bitwise_and(m, mask & MaskCode.Valid == MaskCode.Valid)
-    m = np.bitwise_and(m, mask & MaskCode.Overlapped == 0)
+    bg_mask = (mask & bg_code) == bg_code
 
-    n_signal = np.sum(m)
+    foreground_mask = (mask & MaskCode.Foreground) == MaskCode.Foreground
+    valid_mask = (mask & MaskCode.Valid) == MaskCode.Valid
+    not_overlapped_mask = (mask & MaskCode.Overlapped) == 0
+    intensity_mask = foreground_mask & valid_mask & not_overlapped_mask
+    n_background = np.sum(np.bitwise_and(~intensity_mask, bg_mask))
+    n_signal = np.sum(intensity_mask)
 
     # Remove background and project onto ToF axis
-    background = background[bg_m]
+    background = background[bg_mask]
     avg_background = sum(background) / len(background)
-    intensity = data[m] - avg_background
+    intensity = data[intensity_mask] - avg_background
     background_sum = np.sum(background)
     summation_intensity = float(np.sum(intensity))
-    coords = coords[m]
+    coords = coords[intensity_mask]
     tof = coords[:, 2]
 
     summed_values = {}
