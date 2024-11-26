@@ -131,6 +131,21 @@ $ dials.tof_integrate.py refined.expt refined.refl
 """
 
 
+def compute_partiality(bbox, image_size):
+    intersect_x0 = max(image_size[0], bbox[0])
+    intersect_y0 = max(image_size[2], bbox[2])
+    intersect_x1 = min(image_size[1], bbox[1])
+    intersect_y1 = min(image_size[3], bbox[3])
+
+    if intersect_x0 >= intersect_x1 or intersect_y0 >= intersect_y1:
+        return 0
+
+    intersection_area = (intersect_x1 - intersect_x0) * (intersect_y1 - intersect_y0)
+    square_area = (bbox[1] - bbox[0]) * (bbox[3] - bbox[2])
+
+    return intersection_area / square_area
+
+
 def update_bounding_box(bbox, centroid, new_centroid, padding, image_size):
     from copy import deepcopy
     from math import ceil, floor
@@ -150,6 +165,8 @@ def update_bounding_box(bbox, centroid, new_centroid, padding, image_size):
     updated_bbox[4] += diff_centroid[2] - padding[2]
     updated_bbox[5] += diff_centroid[2] + padding[2]
 
+    partiality = compute_partiality(updated_bbox, image_size)
+
     updated_bbox[0] = max(floor(updated_bbox[0]), image_size[0])
     updated_bbox[1] = min(ceil(updated_bbox[1]), image_size[1])
     updated_bbox[2] = max(floor(updated_bbox[2]), image_size[2])
@@ -157,10 +174,12 @@ def update_bounding_box(bbox, centroid, new_centroid, padding, image_size):
     updated_bbox[4] = max(floor(updated_bbox[4]), image_size[4])
     updated_bbox[5] = min(ceil(updated_bbox[5]), image_size[5])
 
-    return tuple(updated_bbox)
+    return tuple(updated_bbox), partiality
 
 
-def output_reflections_as_hkl(reflections, filename):
+def output_reflections_as_hkl(
+    reflections, filename, min_partiality=None, min_i_sigma=None
+):
     def get_corrected_intensity_and_variance(reflections, idx):
         intensity = reflections["intensity.sum.value"][idx]
         variance = reflections["intensity.sum.variance"][idx]
@@ -187,8 +206,15 @@ def output_reflections_as_hkl(reflections, filename):
             intensity, variance = get_corrected_intensity_and_variance(reflections, i)
             if not valid_intensity(intensity, variance):
                 continue
+            if "partiality" in reflections and min_partiality is not None:
+                if reflections["partiality"][i] < min_partiality:
+                    continue
+
             intensity = round(intensity, 2)
             sigma = round(np.sqrt(variance), 2)
+            if min_i_sigma is not None:
+                if (intensity / sigma) < min_i_sigma:
+                    continue
             wavelength = round(reflections["wavelength_cal"][i], 4)
             g.write(
                 ""
@@ -396,9 +422,10 @@ def run_integrate(params, experiments, reflections):
     image_size = experiments[0].detector[0].get_image_size()
     tof_size = len(experiments[0].scan.get_property("time_of_flight"))
     bboxes = flex.int6(len(predicted_reflections))
+    partiality = flex.double(len(predicted_reflections))
     for i in range(len(predicted_reflections)):
 
-        bboxes[i] = update_bounding_box(
+        bboxes[i], partiality[i] = update_bounding_box(
             reflections["bbox"][i],
             reflections["xyzobs.px.value"][i],
             predicted_reflections["xyzcal.px"][i],
@@ -406,6 +433,7 @@ def run_integrate(params, experiments, reflections):
             (0, image_size[0], 0, image_size[1], 0, tof_size),
         )
     predicted_reflections["bbox"] = bboxes
+    predicted_reflections["partiality"] = partiality
 
     predicted_reflections.compute_d(experiments)
     # predicted_reflections.compute_partiality(experiments)
@@ -481,7 +509,6 @@ def run_integrate(params, experiments, reflections):
 
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
-                expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
 
                 # Background calculated explicitly to expose underlying algorithm
                 background_algorithm = SimpleBackgroundExt(
