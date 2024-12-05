@@ -85,6 +85,8 @@ class ExperimentsPredictor:
             # select the reflections for this experiment only
             sel = reflections["id"] == iexp
             refs = reflections.select(sel)
+            if len(refs) == 0:
+                continue
 
             self._predict_one_experiment(e, refs)
             refs = self._post_predict_one_experiment(e, refs)
@@ -175,6 +177,8 @@ class StillsExperimentsPredictor(ExperimentsPredictor):
 
 class LaueExperimentsPredictor(ExperimentsPredictor):
     def _predict_one_experiment(self, experiment, reflections):
+        if len(reflections) == 0:
+            return
 
         min_s0_idx = min(
             range(len(reflections["wavelength"])),
@@ -196,6 +200,9 @@ class LaueExperimentsPredictor(ExperimentsPredictor):
 
 class TOFExperimentsPredictor(LaueExperimentsPredictor):
     def _post_predict_one_experiment(self, experiment, reflections):
+
+        if len(reflections) == 0:
+            return
 
         # Add ToF to xyzcal.mm
         wavelength_cal = reflections["wavelength_cal"]

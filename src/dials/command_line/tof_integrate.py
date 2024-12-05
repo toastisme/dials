@@ -9,6 +9,7 @@ import numpy as np
 
 import cctbx.array_family.flex
 import libtbx
+from dxtbx import flumpy
 
 import dials.util.log
 from dials.algorithms.integration.fit.tof_line_profile import (
@@ -60,6 +61,17 @@ phil = 'dials.simple_integrate.phil'
 log = 'tof_integrate.log'
     .type = str
     .help = "The log filename"
+}
+integration_type = *observed calculated
+    .type = choice
+    .help = "observed integrates only reflections observed during spot finding"
+            "calculated integrates all reflections out to calculated.dmin"
+
+calculated{
+    dmin = none
+    .type = float (value_min=0.5)
+    .help = "The resolution spots are integrated to when using integration_type.calculated"
+
 }
 method{
 line_profile_fitting = False
@@ -293,6 +305,182 @@ def join_reflections(list_of_reflections):
     return reflections
 
 
+def get_predicted_observed_reflections(params, experiments, reflections):
+    min_s0_idx = min(
+        range(len(reflections["wavelength"])), key=reflections["wavelength"].__getitem__
+    )
+    min_s0 = reflections["s0"][min_s0_idx]
+    dmin = None
+    for experiment in experiments:
+        expt_dmin = experiment.detector.get_max_resolution(min_s0)
+        if dmin is None or expt_dmin < dmin:
+            dmin = expt_dmin
+
+    predicted_reflections = None
+    miller_indices = reflections["miller_index"]
+    for idx, experiment in enumerate(experiments):
+
+        predictor = TOFReflectionPredictor(experiment, dmin)
+        if predicted_reflections is None:
+            predicted_reflections = predictor.indices_for_ub(miller_indices)
+            predicted_reflections["id"] = cctbx.array_family.flex.int(
+                len(predicted_reflections), idx
+            )
+            predicted_reflections["imageset_id"] = cctbx.array_family.flex.int(
+                len(predicted_reflections), idx
+            )
+        else:
+            r = predictor.indices_for_ub(miller_indices)
+            r["id"] = cctbx.array_family.flex.int(len(r), idx)
+            r["imageset_id"] = cctbx.array_family.flex.int(len(r), idx)
+            predicted_reflections.extend(r)
+    predicted_reflections["s0"] = predicted_reflections["s0_cal"]
+    predicted_reflections.calculate_entering_flags(experiments)
+
+    for i in range(len(experiments)):
+        predicted_reflections.experiment_identifiers()[i] = experiments[i].identifier
+
+    # Updates flags to set which reflections to use in generating reference profiles
+    matched, reflections, unmatched = predicted_reflections.match_with_reference(
+        reflections
+    )
+    # sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
+    predicted_reflections = predicted_reflections.select(matched)
+    if "idx" in reflections:
+        predicted_reflections["idx"] = reflections["idx"]
+
+    predicted_reflections["xyzobs.px.value"] = reflections["xyzobs.px.value"]
+
+    tof_padding = params.bbox_tof_padding
+    xy_padding = params.bbox_xy_padding
+    image_size = experiments[0].detector[0].get_image_size()
+    tof_size = len(experiments[0].scan.get_property("time_of_flight"))
+    bboxes = flex.int6(len(predicted_reflections))
+    partiality = flex.double(len(predicted_reflections))
+    for i in range(len(predicted_reflections)):
+
+        bboxes[i], partiality[i] = update_bounding_box(
+            reflections["bbox"][i],
+            reflections["xyzobs.px.value"][i],
+            predicted_reflections["xyzcal.px"][i],
+            (int(xy_padding), int(xy_padding), int(tof_padding)),
+            (0, image_size[0], 0, image_size[1], 0, tof_size),
+        )
+    predicted_reflections["bbox"] = bboxes
+    predicted_reflections["partiality"] = partiality
+
+    return predicted_reflections
+
+
+def get_predicted_calculated_reflections(params, experiments, reflections):
+
+    dmin = params.calculated.dmin
+
+    predicted_reflections = None
+    for idx, experiment in enumerate(experiments):
+
+        predictor = TOFReflectionPredictor(experiment, dmin)
+        if predicted_reflections is None:
+            predicted_reflections = predictor.for_ub(experiment.crystal.get_A())
+            predicted_reflections["id"] = cctbx.array_family.flex.int(
+                len(predicted_reflections), idx
+            )
+            predicted_reflections["imageset_id"] = cctbx.array_family.flex.int(
+                len(predicted_reflections), idx
+            )
+        else:
+            r = predictor.for_ub(experiment.crystal.get_A())
+            r["id"] = cctbx.array_family.flex.int(len(r), idx)
+            r["imageset_id"] = cctbx.array_family.flex.int(len(r), idx)
+            predicted_reflections.extend(r)
+    predicted_reflections["s0"] = predicted_reflections["s0_cal"]
+    predicted_reflections.calculate_entering_flags(experiments)
+
+    for i in range(len(experiments)):
+        predicted_reflections.experiment_identifiers()[i] = experiments[i].identifier
+
+    logger.info(f"Predicted {len(predicted_reflections)} using dmin {dmin}")
+
+    used_in_ref = reflections.get_flags(reflections.flags.used_in_refinement)
+    model_reflections = reflections.select(used_in_ref)
+    logger.info(
+        f"Using {len(model_reflections)} observed reflections to calculate bounding boxes"
+    )
+
+    # Get the closest observed reflection for each calculated reflection
+    # Use the observed bounding box as a basis for the calculated reflection
+
+    tof_padding = params.bbox_tof_padding
+    xy_padding = params.bbox_xy_padding
+    image_size = experiments[0].detector[0].get_image_size()
+    tof_size = len(experiments[0].scan.get_property("time_of_flight"))
+    predicted_reflections["bbox"] = flex.int6(len(predicted_reflections))
+    predicted_reflections["partiality"] = flex.double(len(predicted_reflections))
+
+    # If no observed reflections on a given panel, use the average bbox size
+    x0, x1, y0, y1, z0, z1 = reflections["bbox"].parts()
+    num_reflections = len(reflections)
+    avg_bbox_size = (
+        (sum(x1 - x0) / num_reflections) * 0.5,
+        (sum(y1 - y0) / num_reflections) * 0.5,
+        (sum(z1 - z0) / num_reflections) * 0.5,
+    )
+
+    for panel_idx in range(len(experiments[0].detector)):
+        for expt_idx in range(len(experiments)):
+
+            p_sel = (predicted_reflections["id"] == expt_idx) & (
+                predicted_reflections["panel"] == panel_idx
+            )
+            expt_p_reflections = predicted_reflections.select(p_sel)
+            bboxes = flex.int6(len(expt_p_reflections))
+            partiality = flex.double(len(expt_p_reflections))
+
+            m_sel = (model_reflections["id"] == expt_idx) & (
+                model_reflections["panel"] == panel_idx
+            )
+            expt_m_reflections = model_reflections.select(m_sel)
+
+            for i in range(len(expt_p_reflections)):
+                if len(expt_m_reflections) == 0:
+                    c = expt_p_reflections["xyzcal.px"][i]
+                    bbox = (
+                        c[0] - avg_bbox_size[0],
+                        c[0] + avg_bbox_size[0],
+                        c[1] - avg_bbox_size[1],
+                        c[1] + avg_bbox_size[1],
+                        c[2] - avg_bbox_size[2],
+                        c[2] + avg_bbox_size[2],
+                    )
+
+                    bboxes[i], partiality[i] = update_bounding_box(
+                        bbox,
+                        expt_p_reflections["xyzcal.px"][i],
+                        expt_p_reflections["xyzcal.px"][i],
+                        (int(xy_padding), int(xy_padding), int(tof_padding)),
+                        (0, image_size[0], 0, image_size[1], 0, tof_size),
+                    )
+
+                else:
+                    distances = (
+                        expt_m_reflections["xyzobs.px.value"]
+                        - expt_p_reflections["xyzcal.px"][i]
+                    ).norms()
+                    min_distance_idx = np.argmin(flumpy.to_numpy(distances))
+
+                    bboxes[i], partiality[i] = update_bounding_box(
+                        expt_m_reflections["bbox"][min_distance_idx],
+                        expt_m_reflections["xyzobs.px.value"][min_distance_idx],
+                        expt_p_reflections["xyzcal.px"][i],
+                        (int(xy_padding), int(xy_padding), int(tof_padding)),
+                        (0, image_size[0], 0, image_size[1], 0, tof_size),
+                    )
+            predicted_reflections["bbox"].set_selected(p_sel, bboxes)
+            predicted_reflections["partiality"].set_selected(p_sel, partiality)
+
+    return predicted_reflections
+
+
 def run():
     """
     Input setup
@@ -372,68 +560,14 @@ def run_integrate(params, experiments, reflections):
     Predict reflections using experiment crystal
     """
 
-    min_s0_idx = min(
-        range(len(reflections["wavelength"])), key=reflections["wavelength"].__getitem__
-    )
-    min_s0 = reflections["s0"][min_s0_idx]
-    dmin = None
-    for experiment in experiments:
-        expt_dmin = experiment.detector.get_max_resolution(min_s0)
-        if dmin is None or expt_dmin < dmin:
-            dmin = expt_dmin
-
-    predicted_reflections = None
-    miller_indices = reflections["miller_index"]
-    for idx, experiment in enumerate(experiments):
-
-        predictor = TOFReflectionPredictor(experiment, dmin)
-        if predicted_reflections is None:
-            predicted_reflections = predictor.indices_for_ub(miller_indices)
-            predicted_reflections["id"] = cctbx.array_family.flex.int(
-                len(predicted_reflections), idx
-            )
-            predicted_reflections["imageset_id"] = cctbx.array_family.flex.int(
-                len(predicted_reflections), idx
-            )
-        else:
-            r = predictor.indices_for_ub(miller_indices)
-            r["id"] = cctbx.array_family.flex.int(len(r), idx)
-            r["imageset_id"] = cctbx.array_family.flex.int(len(r), idx)
-            predicted_reflections.extend(r)
-    predicted_reflections["s0"] = predicted_reflections["s0_cal"]
-    predicted_reflections.calculate_entering_flags(experiments)
-
-    for i in range(len(experiments)):
-        predicted_reflections.experiment_identifiers()[i] = experiments[i].identifier
-
-    # Updates flags to set which reflections to use in generating reference profiles
-    matched, reflections, unmatched = predicted_reflections.match_with_reference(
-        reflections
-    )
-    # sel = predicted_reflections.get_flags(predicted_reflections.flags.reference_spot)
-    predicted_reflections = predicted_reflections.select(matched)
-    if "idx" in reflections:
-        predicted_reflections["idx"] = reflections["idx"]
-
-    predicted_reflections["xyzobs.px.value"] = reflections["xyzobs.px.value"]
-
-    tof_padding = params.bbox_tof_padding
-    xy_padding = params.bbox_xy_padding
-    image_size = experiments[0].detector[0].get_image_size()
-    tof_size = len(experiments[0].scan.get_property("time_of_flight"))
-    bboxes = flex.int6(len(predicted_reflections))
-    partiality = flex.double(len(predicted_reflections))
-    for i in range(len(predicted_reflections)):
-
-        bboxes[i], partiality[i] = update_bounding_box(
-            reflections["bbox"][i],
-            reflections["xyzobs.px.value"][i],
-            predicted_reflections["xyzcal.px"][i],
-            (int(xy_padding), int(xy_padding), int(tof_padding)),
-            (0, image_size[0], 0, image_size[1], 0, tof_size),
+    if params.integration_type == "observed":
+        predicted_reflections = get_predicted_observed_reflections(
+            params=params, experiments=experiments, reflections=reflections
         )
-    predicted_reflections["bbox"] = bboxes
-    predicted_reflections["partiality"] = partiality
+    elif params.integration_type == "calculated":
+        predicted_reflections = get_predicted_calculated_reflections(
+            params=params, experiments=experiments, reflections=reflections
+        )
 
     predicted_reflections.compute_d(experiments)
     # predicted_reflections.compute_partiality(experiments)
@@ -543,7 +677,6 @@ def run_integrate(params, experiments, reflections):
                 tof_calculate_shoebox_mask(expt_reflections, expt)
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
-                expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
 
                 # Background calculated explicitly to expose underlying algorithm
                 background_algorithm = SimpleBackgroundExt(
@@ -561,10 +694,8 @@ def run_integrate(params, experiments, reflections):
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
     else:
-        if params.corrections.lorentz:
-            logger.info("Applying Lorentz correction to target run")
-        print("Calculating summed intensities")
         for idx, expt in enumerate(experiments):
+            print(f"Computing for experiment {idx}")
             sel = predicted_reflections["id"] == idx
             expt_reflections = predicted_reflections.select(sel)
             expt_data = expt.imageset
@@ -578,7 +709,6 @@ def run_integrate(params, experiments, reflections):
             tof_calculate_shoebox_mask(expt_reflections, expt)
             expt_reflections.is_overloaded(experiments)
             expt_reflections.contains_invalid_pixels()
-            expt_reflections["partiality"] = flex.double(len(expt_reflections), 1.0)
 
             # Background calculated explicitly to expose underlying algorithm
             background_algorithm = SimpleBackgroundExt(
@@ -588,11 +718,14 @@ def run_integrate(params, experiments, reflections):
             expt_reflections.set_flags(
                 ~success, expt_reflections.flags.failed_during_background_modelling
             )
+            if params.corrections.lorentz:
+                logger.info("  Applying Lorentz correction to target run")
 
+            print("  Calculating summed intensities")
             expt_reflections.compute_summed_intensity()
 
             if params.method.line_profile_fitting:
-                print(f"Calculating line profile fitted intensities for expt {idx}")
+                print(f"  Calculating line profile fitted intensities for expt {idx}")
                 expt_reflections = compute_line_profile_intensity(expt_reflections)
             predicted_reflections.set_selected(sel, expt_reflections)
 

@@ -930,14 +930,24 @@ class Indexer:
             if unindexed_reflections:
                 sel = unindexed_reflections["imageset_id"] == i
                 unindexed_count += sel.count(True)
-            rows.append(
-                [
-                    str(i),
-                    str(indexed_count),
-                    str(unindexed_count),
-                    f"{indexed_count / (indexed_count + unindexed_count)*100:.1f}",
-                ]
-            )
+            if indexed_count + unindexed_count > 0:
+                rows.append(
+                    [
+                        str(i),
+                        str(indexed_count),
+                        str(unindexed_count),
+                        f"{indexed_count / (indexed_count + unindexed_count)*100:.1f}",
+                    ]
+                )
+            else:
+                rows.append(
+                    [
+                        str(i),
+                        str(indexed_count),
+                        str(unindexed_count),
+                        f"{0:.1f}",
+                    ]
+                )
         logger.info(dials.util.tabulate(rows, headers="firstrow"))
 
     def find_max_cell(self):

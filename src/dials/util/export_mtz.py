@@ -293,7 +293,7 @@ def add_batch_list(
             umat_array[i, j] = U_t_elements[j]
 
     # We ignore panels beyond the first one, at the moment
-    panel = experiment.detector[0]
+    panel = experiment.detector[6]
     panel_size = panel.get_image_size()
     panel_distance = panel.get_directed_distance()
 
@@ -549,16 +549,29 @@ def write_columns_tof(mtz, reflection_table):
 
     nref = len(reflection_table["miller_index"])
     assert nref
-    xdet, ydet, _ = [
-        flex.double(x) for x in reflection_table["xyzobs.px.value"].parts()
-    ]
+    if "xyzcal.px" in reflection_table:
+        xdet, ydet, _ = [flex.double(x) for x in reflection_table["xyzcal.px"].parts()]
+    else:
+        xdet, ydet, _ = [
+            flex.double(x) for x in reflection_table["xyzobs.px.value"].parts()
+        ]
 
     type_table = {
         "H": "H",
         "K": "H",
         "L": "H",
+        "PACK_ID": "B",
+        "PLATE": "I",
+        "XF": "R",
+        "YF": "R",
+        "LAMBDA": "R",
         "I": "J",
         "SIGI": "Q",
+        "MULT": "I",
+        "MINHARM": "I",
+        "MAXHARM": "I",
+        "NOVPIX": "R",
+        "FLAGS": "I",
         "IPR": "J",
         "SIGIPR": "Q",
         "BG": "R",
@@ -575,42 +588,35 @@ def write_columns_tof(mtz, reflection_table):
         "FRACTIONCALC": "R",
         "ROT": "R",
         "QE": "R",
-        "LAMBDA": "R",
     }
 
     mtz_data = pd.DataFrame(
         flumpy.to_numpy(reflection_table["miller_index"]).astype("float32"),
         columns=["H", "K", "L"],
     )
-    mtz_data.insert(3, "M/ISYM", np.zeros(nref, dtype="float32"))
-
-    # H, K, L are in the base dataset, but we have to add M/ISYM
-    mtz.add_column("M/ISYM", type_table["M_ISYM"])
-    mtz.add_column("BATCH", type_table["BATCH"])
+    mtz.add_column("PACK_ID", type_table["PACK_ID"])
     mtz_data.insert(
-        4, "BATCH", flumpy.to_numpy(reflection_table["batch"]).astype("float32")
+        len(mtz_data.columns), "PACK_ID", flumpy.to_numpy(reflection_table["panel"])
     )
 
-    if "intensity.prf.value" in reflection_table:
-        if "intensity.sum.value" in reflection_table:
-            col_names = ("IPR", "SIGIPR")
-        else:
-            col_names = ("I", "SIGI")
-        I_profile = reflection_table["intensity.prf.value"]
-        V_profile = reflection_table["intensity.prf.variance"]
-        assert V_profile.all_gt(0)  # Trap negative variances
-        mtz.add_column(col_names[0], type_table["I"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            col_names[0],
-            flumpy.to_numpy(I_profile.as_float()).astype("float32"),
-        )
-        mtz.add_column(col_names[1], type_table["SIGI"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            col_names[1],
-            flumpy.to_numpy(flex.sqrt(V_profile)).astype("float32"),
-        )
+    mtz.add_column("PLATE", type_table["PLATE"])
+    mtz_data.insert(len(mtz_data.columns), "PLATE", np.ones(nref).astype("int32"))
+
+    mtz.add_column("XF", type_table["XF"])
+    mtz_data.insert(
+        len(mtz_data.columns), "XF", flumpy.to_numpy(xdet).astype("float32")
+    )
+    mtz.add_column("YF", type_table["YF"])
+    mtz_data.insert(
+        len(mtz_data.columns), "YF", flumpy.to_numpy(ydet).astype("float32")
+    )
+
+    mtz.add_column("LAMBDA", type_table["LAMBDA"])
+    mtz_data.insert(
+        len(mtz_data.columns),
+        "LAMBDA",
+        flumpy.to_numpy(reflection_table["wavelength_cal"]).astype("float32"),
+    )
 
     if "intensity.sum.value" in reflection_table:
         I_sum = reflection_table["intensity.sum.value"]
@@ -624,6 +630,48 @@ def write_columns_tof(mtz, reflection_table):
         mtz_data.insert(
             len(mtz_data.columns),
             "SIGI",
+            flumpy.to_numpy(flex.sqrt(V_sum)).astype("float32"),
+        )
+
+    mtz.add_column("MULT", type_table["MULT"])
+    mult_dict = Counter(reflection_table["miller_index"])
+    mult = [mult_dict[reflection_table["miller_index"][i]] for i in range(nref)]
+    mtz_data.insert(len(mtz_data.columns), "MULT", np.array(mult).astype("int32"))
+
+    mtz.add_column("MINHARM", type_table["MINHARM"])
+    mtz_data.insert(len(mtz_data.columns), "MINHARM", np.ones(nref).astype("int32"))
+    mtz.add_column("MAXHARM", type_table["MAXHARM"])
+    mtz_data.insert(len(mtz_data.columns), "MAXHARM", np.ones(nref).astype("int32"))
+
+    mtz.add_column("NOVPIX", type_table["NOVPIX"])
+    x0, x1, y0, y1, z0, z1 = reflection_table["bbox"].parts()
+    novpix = (x1 - x0) * (y1 - y0) * (z1 - z0)
+    mtz_data.insert(
+        len(mtz_data.columns), "NOVPIX", flumpy.to_numpy(novpix).astype("int32")
+    )
+
+    mtz_data.insert(len(mtz_data.columns), "M/ISYM", np.zeros(nref, dtype="float32"))
+
+    # H, K, L are in the base dataset, but we have to add M/ISYM
+    mtz.add_column("M/ISYM", type_table["M_ISYM"])
+    mtz.add_column("BATCH", type_table["BATCH"])
+    mtz_data.insert(
+        len(mtz_data.columns),
+        "BATCH",
+        flumpy.to_numpy(reflection_table["batch"]).astype("float32"),
+    )
+
+    if "intensity.prf.value" in reflection_table:
+        I_prf = reflection_table["intensity.prf.value"]
+        assert V_sum.all_gt(0)  # Trap negative variances
+        mtz.add_column("IPR", type_table["IPR"])
+        mtz_data.insert(
+            len(mtz_data.columns), "IPR", flumpy.to_numpy(I_prf).astype("float32")
+        )
+        mtz.add_column("SIGIPR", type_table["SIGIPR"])
+        mtz_data.insert(
+            len(mtz_data.columns),
+            "SIGIPR",
             flumpy.to_numpy(flex.sqrt(V_sum)).astype("float32"),
         )
 
@@ -652,13 +700,6 @@ def write_columns_tof(mtz, reflection_table):
             flumpy.to_numpy(reflection_table["fractioncalc"]).astype("float32"),
         )
 
-    mtz.add_column("LAMBDA", type_table["LAMBDA"])
-    mtz_data.insert(
-        len(mtz_data.columns),
-        "LAMBDA",
-        flumpy.to_numpy(reflection_table["wavelength_cal"]).astype("float32"),
-    )
-
     mtz.add_column("XDET", type_table["XDET"])
     mtz_data.insert(
         len(mtz_data.columns), "XDET", flumpy.to_numpy(xdet).astype("float32")
@@ -667,39 +708,6 @@ def write_columns_tof(mtz, reflection_table):
     mtz_data.insert(
         len(mtz_data.columns), "YDET", flumpy.to_numpy(ydet).astype("float32")
     )
-
-    if "ROT" in reflection_table:
-        mtz.add_column("ROT", type_table["ROT"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            "ROT",
-            flumpy.to_numpy(reflection_table["ROT"]).astype("float32"),
-        )
-
-    if "lp" in reflection_table:
-        mtz.add_column("LP", type_table["LP"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            "LP",
-            flumpy.to_numpy(reflection_table["lp"]).astype("float32"),
-        )
-    if "qe" in reflection_table:
-        mtz.add_column("QE", type_table["QE"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            "QE",
-            flumpy.to_numpy(reflection_table["qe"]).astype("float32"),
-        )
-    elif "dqe" in reflection_table:
-        mtz.add_column("QE", type_table["QE"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            "QE",
-            flumpy.to_numpy(reflection_table["dqe"]).astype("float32"),
-        )
-    else:
-        mtz.add_column("QE", type_table["QE"])
-        mtz_data.insert(len(mtz_data.columns), "QE", np.ones(nref).astype("float32"))
 
     mtz.switch_to_original_hkl()
     mtz.set_data(mtz_data)
