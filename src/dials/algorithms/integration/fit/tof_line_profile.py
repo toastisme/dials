@@ -80,7 +80,7 @@ class BackToBackExponential:
 
 
 def compute_line_profile_data_for_shoebox(
-    shoebox, A=200.0, alpha=0.4, beta=0.4, sigma=8.0
+    shoebox, A=200.0, alpha=1.0, beta=0.2, sigma=1.0
 ):
 
     bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
@@ -138,8 +138,10 @@ def compute_line_profile_data_for_shoebox(
             sigma=sigma,
             T=T,
         )
+        print(f"TEST start params {l.params[:-1]}")
         l.fit()
         line_profile = l.result()
+        print(f"TEST fitted params {l.params[:-1]}")
         fit_intensity = integrate.simpson(line_profile, x=tof)
     except ValueError as e:
         print("fit error", e)
@@ -171,9 +173,9 @@ def compute_line_profile_data_for_shoebox(
 def compute_line_profile_intensity(reflections):
 
     # A = 200.0
-    alpha = 0.4
-    beta = 0.4
-    sigma = 8.0
+    alpha = 1.0
+    beta = 0.2
+    sigma = 1.0
 
     bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
 
@@ -217,7 +219,7 @@ def compute_line_profile_intensity(reflections):
             l = BackToBackExponential(
                 tof=tof,
                 intensities=projected_intensity,
-                A=max(projected_intensity),
+                A=max(5, max(projected_intensity)),
                 alpha=alpha,
                 beta=beta,
                 sigma=sigma,

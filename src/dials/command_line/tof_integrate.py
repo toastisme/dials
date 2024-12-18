@@ -27,6 +27,7 @@ from dials.util.version import dials_version
 from dials_tof_scaling_ext import (
     TOFCorrectionsData,
     tof_calculate_shoebox_mask,
+    tof_calculate_shoebox_seed_skewness_mask,
     tof_extract_shoeboxes_to_reflection_table,
 )
 
@@ -316,6 +317,7 @@ def get_predicted_observed_reflections(params, experiments, reflections):
         if dmin is None or expt_dmin < dmin:
             dmin = expt_dmin
 
+    print(f"dmin {dmin}")
     predicted_reflections = None
     miller_indices = reflections["miller_index"]
     for idx, experiment in enumerate(experiments):
@@ -375,6 +377,9 @@ def get_predicted_observed_reflections(params, experiments, reflections):
 def get_predicted_calculated_reflections(params, experiments, reflections):
 
     dmin = params.calculated.dmin
+    assert (
+        dmin is not None
+    ), "Integrating calculated reflections but calculated.dmin has not been set"
 
     predicted_reflections = None
     for idx, experiment in enumerate(experiments):
@@ -706,27 +711,37 @@ def run_integrate(params, experiments, reflections):
                 params.corrections.lorentz,
             )
 
-            tof_calculate_shoebox_mask(expt_reflections, expt)
-            expt_reflections.is_overloaded(experiments)
-            expt_reflections.contains_invalid_pixels()
+            # Filter any shoeboxes that contain no data
+            expt_sel = flex.bool(
+                [
+                    False if expt_reflections["shoebox"][i].data.all_lt(1e-7) else True
+                    for i in range(len(expt_reflections))
+                ]
+            )
+            r = expt_reflections.select(expt_sel)
+            expt_reflections.set_flags(~expt_sel, expt_reflections.flags.dont_integrate)
+
+            print("Computing seed skewness mask")
+            tof_calculate_shoebox_seed_skewness_mask(r, expt, 1e-7)
+            r.is_overloaded(experiments)
+            r.contains_invalid_pixels()
 
             # Background calculated explicitly to expose underlying algorithm
             background_algorithm = SimpleBackgroundExt(
                 params=None, experiments=experiments
             )
-            success = background_algorithm.compute_background(expt_reflections)
-            expt_reflections.set_flags(
-                ~success, expt_reflections.flags.failed_during_background_modelling
-            )
+            success = background_algorithm.compute_background(r)
+            r.set_flags(~success, r.flags.failed_during_background_modelling)
             if params.corrections.lorentz:
                 logger.info("  Applying Lorentz correction to target run")
 
             print("  Calculating summed intensities")
-            expt_reflections.compute_summed_intensity()
+            r.compute_summed_intensity()
 
             if params.method.line_profile_fitting:
                 print(f"  Calculating line profile fitted intensities for expt {idx}")
-                expt_reflections = compute_line_profile_intensity(expt_reflections)
+                r = compute_line_profile_intensity(r)
+            expt_reflections.set_selected(expt_sel, r)
             predicted_reflections.set_selected(sel, expt_reflections)
 
     # Filter reflections with a high fraction of masked foreground

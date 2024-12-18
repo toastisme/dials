@@ -47,6 +47,9 @@ namespace dials_scaling { namespace boost_python {
     def("tof_calculate_shoebox_mask",
         &dials::algorithms::tof_calculate_shoebox_mask,
         (arg("reflection_table"), arg("experiment")));
+    def("tof_calculate_shoebox_seed_skewness_mask",
+        &dials::algorithms::tof_calculate_shoebox_seed_skewness_mask,
+        (arg("reflection_table"), arg("experiment"), arg("d_skewness_threshold")));
     def("tof_calculate_shoebox_foreground",
         &dials::algorithms::tof_calculate_shoebox_foreground,
         (arg("reflection_table"), arg("experiment"), arg("foreground_radius")));

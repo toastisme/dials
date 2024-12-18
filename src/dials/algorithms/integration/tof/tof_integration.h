@@ -44,8 +44,8 @@ namespace dials { namespace algorithms {
   using scitbx::constants::pi;
   using scitbx::constants::Planck;
 
-  void get_asu_reflections(af::shared<cctbx::miller::index<int> > indices,
-                           af::shared<cctbx::miller::index<int> > asu_predicted_indices,
+  void get_asu_reflections(af::shared<cctbx::miller::index<int>> indices,
+                           af::shared<cctbx::miller::index<int>> asu_predicted_indices,
                            af::shared<double> wavelengths,
                            af::shared<double> asu_predicted_wavelengths,
                            af::shared<bool> asu_reflection,
@@ -68,7 +68,7 @@ namespace dials { namespace algorithms {
     }
 
     gemmi::UnmergedHklMover hkl_mover(gemmi_sg_ptr);
-    af::shared<cctbx::miller::index<> > merged_hkls(indices.size());
+    af::shared<cctbx::miller::index<>> merged_hkls(indices.size());
 
     for (int i_refl = 0; i_refl < indices.size(); ++i_refl) {
       cctbx::miller::index<> miller_index = indices[i_refl];
@@ -98,7 +98,7 @@ namespace dials { namespace algorithms {
   void tof_calculate_shoebox_foreground(af::reflection_table& reflection_table,
                                         Experiment& experiment,
                                         double foreground_radius) {
-    af::shared<Shoebox<> > shoeboxes = reflection_table["shoebox"];
+    af::shared<Shoebox<>> shoeboxes = reflection_table["shoebox"];
     Scan scan = *experiment.get_scan();
     Detector detector = *experiment.get_detector();
     Goniometer goniometer = *experiment.get_goniometer();
@@ -113,11 +113,11 @@ namespace dials { namespace algorithms {
 
     scitbx::af::shared<double> img_tof = scan.get_property<double>("time_of_flight");
     af::const_ref<int6> bboxes = reflection_table["bbox"];
-    scitbx::af::shared<vec3<double> > rlps = reflection_table["rlp"];
+    scitbx::af::shared<vec3<double>> rlps = reflection_table["rlp"];
 
     for (std::size_t i = 0; i < reflection_table.size(); ++i) {
       Shoebox<> shoebox = shoeboxes[i];
-      af::ref<int, af::c_grid<3> > mask = shoebox.mask.ref();
+      af::ref<int, af::c_grid<3>> mask = shoebox.mask.ref();
       int panel = shoebox.panel;
       int6 bbox = bboxes[i];
       vec3<double> rlp = rlps[i];
@@ -276,7 +276,7 @@ namespace dials { namespace algorithms {
 
   void tof_calculate_shoebox_mask(af::reflection_table& reflection_table,
                                   Experiment& experiment) {
-    af::shared<Shoebox<> > shoeboxes = reflection_table["shoebox"];
+    af::shared<Shoebox<>> shoeboxes = reflection_table["shoebox"];
     Scan scan = *experiment.get_scan();
     Detector detector = *experiment.get_detector();
     Goniometer goniometer = *experiment.get_goniometer();
@@ -291,11 +291,11 @@ namespace dials { namespace algorithms {
 
     scitbx::af::shared<double> img_tof = scan.get_property<double>("time_of_flight");
     af::const_ref<int6> bboxes = reflection_table["bbox"];
-    scitbx::af::shared<vec3<double> > rlps = reflection_table["rlp"];
+    scitbx::af::shared<vec3<double>> rlps = reflection_table["rlp"];
 
     for (std::size_t i = 0; i < reflection_table.size(); ++i) {
       Shoebox<> shoebox = shoeboxes[i];
-      af::ref<int, af::c_grid<3> > mask = shoebox.mask.ref();
+      af::ref<int, af::c_grid<3>> mask = shoebox.mask.ref();
       int panel = shoebox.panel;
       int6 bbox = bboxes[i];
       vec3<double> rlp = rlps[i];
@@ -324,6 +324,7 @@ namespace dials { namespace algorithms {
                                shoebox_rlps[count], mean, eigenvectors, axes_lengths)
                                ? Foreground
                                : Background;
+            mask(z, y, x) &= ~(Foreground | Background);
             mask(z, y, x) |= mask_value;
             count++;
           }
@@ -331,6 +332,260 @@ namespace dials { namespace algorithms {
       }
     }
   }
+
+  std::vector<size_t> get_shoebox_pixel_neighbors(size_t index,
+                                                  std::size_t zsize,
+                                                  std::size_t ysize,
+                                                  std::size_t xsize) {
+    std::vector<size_t> neighbors;
+
+    std::size_t z = index / (ysize * xsize);
+    std::size_t y = (index % (ysize * xsize)) / xsize;
+    std::size_t x = index % xsize;
+
+    for (int dz = -1; dz <= 1; ++dz) {
+      for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+          if (dz == 0 && dy == 0 && dx == 0) continue;  // Skip the center pixel
+          int nz = z + dz;
+          int ny = y + dy;
+          int nx = x + dx;
+          if (nz >= 0 && nz < zsize && ny >= 0 && ny < ysize && nx >= 0 && nx < xsize) {
+            neighbors.push_back(nz * (ysize * xsize) + ny * xsize + nx);
+          }
+        }
+      }
+    }
+    return neighbors;
+  }
+
+  double calculate_skewness(af::ref<float, af::c_grid<3>> data,
+                            std::set<size_t> selected_pixels) {
+    float avg_intensity = 0;
+    int count = 0;
+    for (std::size_t i = 0; i < data.size(); ++i) {
+      if (selected_pixels.find(i) == selected_pixels.end()) {
+        avg_intensity += data[i];
+        count++;
+      }
+    }
+    avg_intensity /= count;
+
+    float skewness = 0;
+    for (std::size_t i = 0; i < data.size(); ++i) {
+      if (selected_pixels.find(i) == selected_pixels.end()) {
+        skewness += std::pow(data[i] - avg_intensity, 3);
+      }
+    }
+    skewness /= count;
+    return skewness;
+  }
+
+  af::ref<int, af::c_grid<3>> fill_holes_in_mask(af::ref<int, af::c_grid<3>>& mask) {
+    /*
+     * Flood fill implementation to ensure no holes in mask
+     */
+
+    std::size_t zsize = mask.accessor()[0];
+    std::size_t ysize = mask.accessor()[1];
+    std::size_t xsize = mask.accessor()[2];
+
+    auto is_valid = [&](int z, int y, int x) {
+      return z >= 0 && z < zsize && y >= 0 && y < ysize && x >= 0 && x < xsize;
+    };
+
+    auto is_background = [&](int z, int y, int x) {
+      return (mask(z, y, x) & Background) == Background;
+    };
+
+    auto is_foreground = [&](int z, int y, int x) {
+      return (mask(z, y, x) & Foreground) == Foreground;
+    };
+
+    af::versa<bool, af::c_grid<3>> visited(mask.accessor(), false);
+
+    auto flood_fill = [&](
+                        int start_z, int start_y, int start_x, bool& touches_boundary) {
+      std::vector<std::tuple<int, int, int>> stack;   // Stack for flood-fill
+      std::vector<std::tuple<int, int, int>> region;  // To store pixels in the region
+      stack.emplace_back(start_z, start_y, start_x);
+
+      // Local visited map for the current flood-fill
+      af::versa<bool, af::c_grid<3>> fill_visited(visited.accessor(), false);
+      std::copy(visited.begin(), visited.end(), fill_visited.begin());
+
+      while (!stack.empty()) {
+        auto tuple = stack.back();
+        stack.pop_back();
+
+        int z = std::get<0>(tuple);
+        int y = std::get<1>(tuple);
+        int x = std::get<2>(tuple);
+
+        if (z == 0 || z == zsize - 1 || y == 0 || y == ysize - 1 || x == 0
+            || x == xsize - 1) {
+          touches_boundary = true;
+          break;
+        }
+
+        if (!is_valid(z, y, x) || fill_visited(z, y, x) || is_foreground(z, y, x)) {
+          continue;
+        }
+
+        fill_visited(z, y, x) = true;  // Temporarily mark as visited in this flood-fill
+        region.emplace_back(z, y, x);
+
+        // Add neighbors
+        for (int dz = -1; dz <= 1; ++dz) {
+          for (int dy = -1; dy <= 1; ++dy) {
+            for (int dx = -1; dx <= 1; ++dx) {
+              if ((std::abs(dz) + std::abs(dy) + std::abs(dx)) == 1) {
+                int nz = z + dz, ny = y + dy, nx = x + dx;
+                if (is_valid(nz, ny, nx) && !fill_visited(nz, ny, nx)) {
+                  stack.emplace_back(nz, ny, nx);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // If the region does not touch the boundary, update the global visited map
+      if (!touches_boundary) {
+        for (const auto& pixel : region) {
+          int rz = std::get<0>(pixel);
+          int ry = std::get<1>(pixel);
+          int rx = std::get<2>(pixel);
+          visited(rz, ry, rx) = true;
+        }
+      }
+
+      return region;
+    };
+
+    // Loop over all pixels in the mask
+    int count = 0;
+    for (std::size_t z = 0; z < zsize; ++z) {
+      for (std::size_t y = 0; y < ysize; ++y) {
+        for (std::size_t x = 0; x < xsize; ++x) {
+          // Look for unvisited Background pixels
+          if (!visited(z, y, x) && is_background(z, y, x)) {
+            bool touches_boundary = false;
+            auto region = flood_fill(z, y, x, touches_boundary);
+
+            // Only fill regions that do not touch the boundary
+            if (!touches_boundary) {
+              for (const auto& pixel : region) {
+                int rz = std::get<0>(pixel);
+                int ry = std::get<1>(pixel);
+                int rx = std::get<2>(pixel);
+
+                mask(rz, ry, rx) &= ~Background;
+                mask(rz, ry, rx) |= Foreground;
+                count++;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return mask;
+  }
+
+  void tof_calculate_shoebox_seed_skewness_mask(af::reflection_table& reflection_table,
+                                                Experiment& experiment,
+                                                float d_skewness_threshold) {
+    af::shared<Shoebox<>> shoeboxes = reflection_table["shoebox"];
+
+    for (std::size_t i = 0; i < reflection_table.size(); ++i) {
+      Shoebox<> shoebox = shoeboxes[i];
+      af::ref<int, af::c_grid<3>> mask = shoebox.mask.ref();
+
+      af::ref<float, af::c_grid<3>> data = shoebox.data.ref();
+      std::size_t zsize = data.accessor()[0];
+      std::size_t ysize = data.accessor()[1];
+      std::size_t xsize = data.accessor()[2];
+
+      std::set<std::size_t> selected_pixels;
+
+      // Initial seed
+      float max_val = -500;
+      std::size_t max_idx = -1;
+      for (std::size_t j = 0; j < data.size(); ++j) {
+        if (data[j] > max_val) {
+          max_val = data[j];
+          max_idx = j;
+        }
+      }
+      DIALS_ASSERT(max_idx != -1);
+      selected_pixels.insert(max_idx);
+
+      float skewness = calculate_skewness(data, selected_pixels);
+      float d_skewness = 0.0;
+      int min_iterations = 10;
+
+      int count = 0;
+      while ((d_skewness < 0 && std::abs(d_skewness) > d_skewness_threshold)
+             || (count < min_iterations)) {
+        std::set<std::size_t> neighbors;
+
+        // Collect neighbors of all selected pixels
+        for (std::size_t idx : selected_pixels) {
+          auto neighbor_indices = get_shoebox_pixel_neighbors(idx, zsize, ysize, xsize);
+          for (std::size_t n_idx : neighbor_indices) {
+            neighbors.insert(n_idx);
+          }
+        }
+
+        // Find the neighbor with the maximum value
+        std::size_t max_neighbor_index = -1;
+        float max_neighbor_value = -500.;
+
+        for (std::size_t neighbor_index : neighbors) {
+          if (selected_pixels.find(neighbor_index) == selected_pixels.end()
+              && data[neighbor_index] > max_neighbor_value) {
+            max_neighbor_value = data[neighbor_index];
+            max_neighbor_index = neighbor_index;
+          }
+        }
+
+        // If a valid neighbor was found, add it to the selected pixels
+        if (max_neighbor_index != static_cast<std::size_t>(-1)) {
+          selected_pixels.insert(max_neighbor_index);
+        } else {
+          break;  // No more neighbors to add
+        }
+
+        float new_skewness = calculate_skewness(data, selected_pixels);
+        d_skewness = new_skewness - skewness;
+        skewness = new_skewness;
+        count++;
+      }
+
+      // Apply the mask
+      for (std::size_t m = 0; m < mask.size(); ++m) {
+        int mask_value =
+          selected_pixels.find(m) != selected_pixels.end() ? Foreground : Background;
+        mask[m] |= mask_value;
+      }
+
+      int foreground_count = 0;
+      for (std::size_t m = 0; m < mask.size(); ++m) {
+        if ((mask[m] & Foreground) == Foreground) {
+          foreground_count++;
+        }
+      }
+      mask = fill_holes_in_mask(mask);
+      foreground_count = 0;
+      for (std::size_t m = 0; m < mask.size(); ++m) {
+        if ((mask[m] & Foreground) == Foreground) {
+          foreground_count++;
+        }
+      }
+    }
+  }
+
 }}  // namespace dials::algorithms
 
 #endif /* DIALS_ALGORITHMS_INTEGRATION_TOF_INTEGRATION_H */
