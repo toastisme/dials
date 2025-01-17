@@ -293,7 +293,7 @@ def add_batch_list(
             umat_array[i, j] = U_t_elements[j]
 
     # We ignore panels beyond the first one, at the moment
-    panel = experiment.detector[6]
+    panel = experiment.detector[0]
     panel_size = panel.get_image_size()
     panel_distance = panel.get_directed_distance()
 
