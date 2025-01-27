@@ -74,12 +74,12 @@ calculated{
     .help = "The resolution spots are integrated to when using integration_type.calculated"
 
 }
-method{
-line_profile_fitting = False
-    .type = bool
-    .help = "Use integration by profile fitting using a Gaussian"
-    "convoluted with back-to-back exponential functions"
-}
+method = *summation seed_skewness profile1d
+    .type = choice
+    .help = "Integration method. profile1d fits a Gaussian convoluted with back-"
+            "to-back exponential functions"
+
+
 corrections{
     lorentz = False
         .type = bool
@@ -123,10 +123,10 @@ mp{
         .help = "Number of processors to use during parallelized steps."
         "If set to Auto DIALS will choose automatically."
 }
-bbox_tof_padding = 30
+bbox_tof_padding = 2
     .type = int
     .help = "Additional ToF frames added to calculated bounding boxes"
-bbox_xy_padding = 5
+bbox_xy_padding = 1
     .type = int
     .help = "Additional pixels added to calculated bounding boxes"
 keep_shoeboxes = False
@@ -191,7 +191,7 @@ def update_bounding_box(bbox, centroid, new_centroid, padding, image_size):
 
 
 def output_reflections_as_hkl(
-    reflections, filename, min_partiality=None, min_i_sigma=None
+    reflections, filename, min_partiality=0.8, min_i_sigma=0.1
 ):
     def get_corrected_intensity_and_variance(reflections, idx):
         intensity = reflections["intensity.sum.value"][idx]
@@ -576,6 +576,15 @@ def run_integrate(params, experiments, reflections):
 
     predicted_reflections.compute_d(experiments)
     # predicted_reflections.compute_partiality(experiments)
+    overlaps = predicted_reflections.find_overlaps()
+    overlap_sel = flex.bool(len(predicted_reflections), False)
+    for item in overlaps.edges():
+        i0 = overlaps.source(item)
+        i1 = overlaps.target(item)
+        overlap_sel[i0] = True
+        overlap_sel[i1] = True
+    logger.info("Rejecting %i overlapping bounding boxes", overlap_sel.count(True))
+    predicted_reflections = predicted_reflections.select(~overlap_sel)
 
     # Shoeboxes
     print("Getting shoebox data")
@@ -644,7 +653,14 @@ def run_integrate(params, experiments, reflections):
                     corrections_data,
                     params.corrections.lorentz,
                 )
-                tof_calculate_shoebox_mask(expt_reflections, expt)
+
+                if params.method == "seed_skewness":
+                    print(f"Calculating seed skewness mask for expt {idx}")
+                    tof_calculate_shoebox_seed_skewness_mask(
+                        expt_reflections, expt, 1e-7
+                    )
+                else:
+                    tof_calculate_shoebox_mask(expt_reflections, expt)
 
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
@@ -660,7 +676,7 @@ def run_integrate(params, experiments, reflections):
 
                 expt_reflections.compute_summed_intensity()
 
-                if params.method.line_profile_fitting:
+                if params.method == "profile1d":
                     print(f"Calculating line profile fitted intensities for expt {idx}")
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
@@ -680,6 +696,13 @@ def run_integrate(params, experiments, reflections):
                     params.corrections.lorentz,
                 )
                 tof_calculate_shoebox_mask(expt_reflections, expt)
+                if params.method == "seed_skewness":
+                    print(f"Calculating seed skewness mask for expt {idx}")
+                    tof_calculate_shoebox_seed_skewness_mask(
+                        expt_reflections, expt, 1e-7
+                    )
+                else:
+                    tof_calculate_shoebox_mask(expt_reflections, expt)
                 expt_reflections.is_overloaded(experiments)
                 expt_reflections.contains_invalid_pixels()
 
@@ -694,7 +717,7 @@ def run_integrate(params, experiments, reflections):
 
                 expt_reflections.compute_summed_intensity()
 
-                if params.method.line_profile_fitting:
+                if params.method == "profile1d":
                     print(f"Calculating line profile fitted intensities for expt {idx}")
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
@@ -721,8 +744,12 @@ def run_integrate(params, experiments, reflections):
             r = expt_reflections.select(expt_sel)
             expt_reflections.set_flags(~expt_sel, expt_reflections.flags.dont_integrate)
 
-            print("Computing seed skewness mask")
-            tof_calculate_shoebox_seed_skewness_mask(r, expt, 1e-7)
+            if params.method == "seed_skewness":
+                print(f"Calculating seed skewness mask for expt {idx}")
+                tof_calculate_shoebox_seed_skewness_mask(r, expt, 1e-7)
+            else:
+                tof_calculate_shoebox_mask(r, expt)
+
             r.is_overloaded(experiments)
             r.contains_invalid_pixels()
 
@@ -735,10 +762,10 @@ def run_integrate(params, experiments, reflections):
             if params.corrections.lorentz:
                 logger.info("  Applying Lorentz correction to target run")
 
-            print("  Calculating summed intensities")
+            print(f"  Calculating summed intensities for expt {expt}")
             r.compute_summed_intensity()
 
-            if params.method.line_profile_fitting:
+            if params.method == "profile1d":
                 print(f"  Calculating line profile fitted intensities for expt {idx}")
                 r = compute_line_profile_intensity(r)
             expt_reflections.set_selected(expt_sel, r)

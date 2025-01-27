@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from multiprocessing import Pool
+
 import numpy as np
 from scipy import integrate
 from scipy.optimize import least_squares
@@ -9,6 +11,7 @@ import cctbx.array_family.flex
 from dxtbx import flumpy
 
 from dials.algorithms.shoebox import MaskCode
+from dials.array_family import flex
 
 
 class BackToBackExponential:
@@ -65,11 +68,14 @@ class BackToBackExponential:
             )
             self.params = res.x
             self.cov = None
-        except Exception as e:
-            print(f"An error occurred during fitting: {e}")
+        except Exception:
+
             self.params = None
             self.cov = None
             raise ValueError
+
+        except RuntimeWarning:
+            pass
 
     def result(self):
         return self.func(self.tof, *(self.params))
@@ -100,12 +106,11 @@ def compute_line_profile_data_for_shoebox(
     n_signal = np.sum(intensity_mask)
 
     # Remove background and project onto ToF axis
-    background = background[bg_mask]
+    background = background[intensity_mask]
     avg_background = sum(background) / len(background)
-    intensity = data[intensity_mask] - avg_background
+    intensity = data - avg_background
     background_sum = np.sum(background)
     summation_intensity = float(np.sum(intensity))
-    coords = coords[intensity_mask]
     tof = coords[:, 2]
 
     summed_values = {}
@@ -132,16 +137,14 @@ def compute_line_profile_data_for_shoebox(
         l = BackToBackExponential(
             tof=tof,
             intensities=projected_intensity,
-            A=max(projected_intensity),
+            A=max(5, max(projected_intensity)),
             alpha=alpha,
             beta=beta,
             sigma=sigma,
             T=T,
         )
-        print(f"TEST start params {l.params[:-1]}")
         l.fit()
         line_profile = l.result()
-        print(f"TEST fitted params {l.params[:-1]}")
         fit_intensity = integrate.simpson(line_profile, x=tof)
     except ValueError as e:
         print("fit error", e)
@@ -170,74 +173,93 @@ def compute_line_profile_data_for_shoebox(
     )
 
 
-def compute_line_profile_intensity(reflections):
+def process_reflection(args):
+    i, data, background, coords, mask, alpha, beta, sigma = args
+    intensity = data.ravel()
+    coords = flumpy.to_numpy(coords)
 
-    # A = 200.0
+    bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
+    bg_mask = (mask & bg_code) == bg_code
+
+    foreground_mask = (mask & MaskCode.Foreground) == MaskCode.Foreground
+    valid_mask = (mask & MaskCode.Valid) == MaskCode.Valid
+    not_overlapped_mask = (mask & MaskCode.Overlapped) == 0
+    intensity_mask = foreground_mask & valid_mask & not_overlapped_mask
+    n_background = np.sum(np.bitwise_and(~intensity_mask, bg_mask))
+    n_signal = np.sum(intensity_mask)
+
+    # Remove background and project onto ToF axis
+    background = background[intensity_mask]
+    background_sum = np.sum(background)
+    tof = coords[:, 2]
+
+    summed_values = {}
+
+    # Remove background and project onto ToF axis
+    for j in np.unique(tof):
+        indices = np.where(tof == j)
+        summed_values[j] = np.sum(intensity[indices])
+
+    projected_intensity = np.array(list(summed_values.values()))
+    tof = np.array(list(summed_values.keys()))
+
+    fit_intensity = None
+    try:
+        T = tof[np.argmax(projected_intensity)]
+        l = BackToBackExponential(
+            tof=tof,
+            intensities=projected_intensity,
+            A=max(5, max(projected_intensity)),
+            alpha=alpha,
+            beta=beta,
+            sigma=sigma,
+            T=T,
+        )
+        l.fit()
+        fit_intensity = l.calc_intensity()
+    except RuntimeWarning:
+        return i, -1, -1
+    except ValueError:
+        return i, -1, -1
+
+    if n_background > 0:
+        m_n = n_signal / n_background
+    else:
+        m_n = 0.0
+
+    fit_variance = abs(fit_intensity) + abs(background_sum) * (1.0 + m_n)
+    return i, fit_intensity, fit_variance
+
+
+def compute_line_profile_intensity(reflections, nproc=8):
     alpha = 1.0
     beta = 0.2
     sigma = 1.0
 
-    bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
-
     fit_intensities = cctbx.array_family.flex.double(len(reflections))
     fit_variances = cctbx.array_family.flex.double(len(reflections))
 
-    for i in range(len(reflections)):
-        shoebox = reflections[i]["shoebox"]
-        data = flumpy.to_numpy(shoebox.data).ravel()
-        background = flumpy.to_numpy(shoebox.background).ravel()
-        mask = flumpy.to_numpy(shoebox.mask).ravel()
-        coords = flumpy.to_numpy(shoebox.coords())
-        m = mask & MaskCode.Foreground == MaskCode.Foreground
-        bg_m = mask & bg_code == bg_code
-        n_background = np.sum(np.bitwise_and(~m, bg_m))
+    args = [
+        (
+            i,
+            flumpy.to_numpy(
+                reflections[i]["shoebox"].data - reflections["background.mean"][i]
+            ),
+            flumpy.to_numpy(reflections[i]["shoebox"].background),
+            flumpy.to_numpy(reflections[i]["shoebox"].coords()),
+            flumpy.to_numpy(reflections[i]["shoebox"].mask),
+            alpha,
+            beta,
+            sigma,
+        )
+        for i in range(len(reflections))
+    ]
 
-        m = np.bitwise_and(m, mask & MaskCode.Valid == MaskCode.Valid)
-        m = np.bitwise_and(m, mask & MaskCode.Overlapped == 0)
+    with Pool(processes=nproc) as pool:
+        results = pool.map(process_reflection, args)
 
-        n_signal = np.sum(m)
-
-        background = background[m]
-        intensity = data[m] - background
-        background_sum = np.sum(background)
-        coords = coords[m]
-        tof = coords[:, 2]
-
-        summed_values = {}
-
-        # Remove background and project onto ToF axis
-        for j in np.unique(tof):
-            indices = np.where(tof == j)
-            summed_values[j] = np.sum(intensity[indices]) - np.sum(background[indices])
-
-        projected_intensity = np.array(list(summed_values.values()))
-        tof = np.array(list(summed_values.keys()))
-
-        fit_intensity = None
-        try:
-            T = tof[np.argmax(projected_intensity)]
-            l = BackToBackExponential(
-                tof=tof,
-                intensities=projected_intensity,
-                A=max(5, max(projected_intensity)),
-                alpha=alpha,
-                beta=beta,
-                sigma=sigma,
-                T=T,
-            )
-            l.fit()
-            fit_intensity = l.calc_intensity()
-            fit_intensities[i] = fit_intensity
-        except ValueError:
-            fit_intensities[i] = -1
-            fit_variances[i] = -1
-            continue
-
-        if n_background > 0:
-            m_n = n_signal / n_background
-        else:
-            m_n = 0.0
-        fit_variance = abs(fit_intensity) + abs(background_sum) * (1.0 + m_n)
+    for i, fit_intensity, fit_variance in results:
+        fit_intensities[i] = fit_intensity
         fit_variances[i] = fit_variance
 
     reflections["intensity.prf.value"] = fit_intensities
@@ -246,8 +268,21 @@ def compute_line_profile_intensity(reflections):
         reflections["intensity.prf.value"] < 0,
         reflections.flags.failed_during_profile_fitting,
     )
+
+    i_sig_sum = reflections["intensity.sum.value"] / flex.sqrt(
+        reflections["intensity.sum.variance"]
+    )
+    i_sig_prf = reflections["intensity.prf.value"] / flex.sqrt(
+        reflections["intensity.prf.variance"]
+    )
+
     reflections.set_flags(
-        reflections["intensity.prf.value"] > 0,
+        i_sig_sum > i_sig_prf,
+        reflections.flags.failed_during_profile_fitting,
+    )
+
+    reflections.set_flags(
+        (reflections["intensity.prf.value"] > 0) & (i_sig_prf > i_sig_sum),
         reflections.flags.integrated_prf,
     )
     return reflections
