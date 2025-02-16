@@ -86,7 +86,7 @@ class BackToBackExponential:
 
 
 def compute_line_profile_data_for_shoebox(
-    shoebox, A=200.0, alpha=1.0, beta=0.2, sigma=1.0
+    shoebox, alpha=1.0, beta=0.2, sigma=1.0, integration_method="summation"
 ):
 
     bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
@@ -132,42 +132,53 @@ def compute_line_profile_data_for_shoebox(
         abs(summation_intensity) + abs(background_sum) * (1.0 + m_n)
     )
 
-    try:
-        T = tof[np.argmax(projected_intensity)]
-        l = BackToBackExponential(
-            tof=tof,
-            intensities=projected_intensity,
-            A=max(5, max(projected_intensity)),
-            alpha=alpha,
-            beta=beta,
-            sigma=sigma,
-            T=T,
-        )
-        l.fit()
-        line_profile = l.result()
-        fit_intensity = integrate.simpson(line_profile, x=tof)
-    except ValueError as e:
-        print("fit error", e)
-        return (
-            tof,
-            projected_intensity,
-            projected_background,
-            [],
-            -1,
-            -1,
-            summation_intensity,
-            summation_std,
-        )
+    if integration_method == "profile1d":
+        try:
+            T = tof[np.argmax(projected_intensity)]
+            l = BackToBackExponential(
+                tof=tof,
+                intensities=projected_intensity,
+                A=max(5, max(projected_intensity)),
+                alpha=alpha,
+                beta=beta,
+                sigma=sigma,
+                T=T,
+            )
+            l.fit()
+            line_profile = l.result()
+            fit_intensity = integrate.simpson(line_profile, x=tof)
+            fit_std = np.sqrt(abs(fit_intensity) + abs(background_sum) * (1.0 + m_n))
 
-    fit_std = np.sqrt(abs(fit_intensity) + abs(background_sum) * (1.0 + m_n))
+            return (
+                tof,
+                projected_intensity,
+                projected_background,
+                line_profile,
+                fit_intensity,
+                fit_std,
+                summation_intensity,
+                summation_std,
+            )
+        except ValueError as e:
+            print("fit error", e)
+            return (
+                tof,
+                projected_intensity,
+                projected_background,
+                [],
+                -1,
+                -1,
+                summation_intensity,
+                summation_std,
+            )
 
     return (
         tof,
         projected_intensity,
         projected_background,
-        line_profile,
-        fit_intensity,
-        fit_std,
+        [],
+        -1,
+        -1,
         summation_intensity,
         summation_std,
     )
