@@ -625,11 +625,15 @@ def run_integrate(params, experiments, reflections):
 
             if applying_spherical_absorption_correction(params):
                 logger.info(
-                    "Applying spherical absorption correction to target and Vanadium runs"
+                    f"Applying spherical absorption correction to target and Vanadium runs for experiment {idx}"
                 )
-                logger.info("Normalising target run with Vanadium run")
+                logger.info(
+                    f"Normalising target run with Vanadium run for experiment {idx}"
+                )
                 if params.corrections.lorentz:
-                    logger.info("Applying Lorentz correction to target run")
+                    logger.info(
+                        f"Applying Lorentz correction to target run for experiment {idx}"
+                    )
                 corrections_data = TOFCorrectionsData(
                     expt_proton_charge,
                     incident_proton_charge,
@@ -677,13 +681,19 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.compute_summed_intensity()
 
                 if params.method == "profile1d":
-                    print(f"Calculating line profile fitted intensities for expt {idx}")
+                    print(
+                        f"Calculating line profile fitted intensities for experiment {idx}"
+                    )
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
             else:
-                logger.info("Normalising target run with Vanadium run")
+                logger.info(
+                    f"Normalising target run with Vanadium run for experiment {idx}"
+                )
                 if params.corrections.lorentz:
-                    logger.info("Applying Lorentz correction to target run")
+                    logger.info(
+                        f"Applying Lorentz correction to target run for experiment {idx}"
+                    )
                 tof_extract_shoeboxes_to_reflection_table(
                     expt_reflections,
                     expt,
@@ -697,7 +707,7 @@ def run_integrate(params, experiments, reflections):
                 )
                 tof_calculate_shoebox_mask(expt_reflections, expt)
                 if params.method == "seed_skewness":
-                    print(f"Calculating seed skewness mask for expt {idx}")
+                    print(f"Calculating seed skewness mask for experiment {idx}")
                     tof_calculate_shoebox_seed_skewness_mask(
                         expt_reflections, expt, 1e-7
                     )
@@ -718,7 +728,9 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.compute_summed_intensity()
 
                 if params.method == "profile1d":
-                    print(f"Calculating line profile fitted intensities for expt {idx}")
+                    print(
+                        f"Calculating line profile fitted intensities for experiment {idx}"
+                    )
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
                 predicted_reflections.set_selected(sel, expt_reflections)
     else:
