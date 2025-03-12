@@ -90,6 +90,7 @@ def compute_line_profile_data_for_shoebox(
 ):
 
     bg_code = MaskCode.Valid | MaskCode.Background | MaskCode.BackgroundUsed
+    fg_code = MaskCode.Foreground | MaskCode.Valid
 
     data = flumpy.to_numpy(shoebox.data).ravel()
     background = flumpy.to_numpy(shoebox.background).ravel()
@@ -97,20 +98,17 @@ def compute_line_profile_data_for_shoebox(
     coords = flumpy.to_numpy(shoebox.coords())
 
     bg_mask = (mask & bg_code) == bg_code
+    fg_mask = (mask & fg_code) == fg_code
 
-    foreground_mask = (mask & MaskCode.Foreground) == MaskCode.Foreground
-    valid_mask = (mask & MaskCode.Valid) == MaskCode.Valid
-    not_overlapped_mask = (mask & MaskCode.Overlapped) == 0
-    intensity_mask = foreground_mask & valid_mask & not_overlapped_mask
-    n_background = np.sum(np.bitwise_and(~intensity_mask, bg_mask))
-    n_signal = np.sum(intensity_mask)
+    n_background = np.sum(np.bitwise_and(~fg_mask, bg_mask))
+    n_signal = np.sum(fg_mask)
 
     # Remove background and project onto ToF axis
-    background = background[intensity_mask]
-    avg_background = sum(background) / len(background)
+    background_pixels = background[bg_mask]
+    avg_background = sum(background_pixels) / len(background_pixels)
     intensity = data - avg_background
-    background_sum = np.sum(background)
-    summation_intensity = float(np.sum(intensity))
+    background_sum_in_signal = np.sum(background[fg_mask])
+    summation_intensity = float(np.sum(intensity[fg_mask]))
     tof = coords[:, 2]
 
     summed_values = {}
@@ -129,7 +127,7 @@ def compute_line_profile_data_for_shoebox(
     else:
         m_n = 0.0
     summation_std = np.sqrt(
-        abs(summation_intensity) + abs(background_sum) * (1.0 + m_n)
+        abs(summation_intensity) + abs(background_sum_in_signal) * (1.0 + m_n)
     )
 
     if integration_method == "profile1d":
@@ -147,7 +145,9 @@ def compute_line_profile_data_for_shoebox(
             l.fit()
             line_profile = l.result()
             fit_intensity = integrate.simpson(line_profile, x=tof)
-            fit_std = np.sqrt(abs(fit_intensity) + abs(background_sum) * (1.0 + m_n))
+            fit_std = np.sqrt(
+                abs(fit_intensity) + abs(background_sum_in_signal) * (1.0 + m_n)
+            )
 
             return (
                 tof,

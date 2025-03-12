@@ -215,7 +215,10 @@ def output_reflections_as_hkl(
     with open(filename, "w") as g:
         for i in range(len(reflections)):
             h, k, l = reflections["miller_index"][i]
-            batch_number = 1
+            if "imageset_id" in reflections:
+                batch_number = reflections["imageset_id"][i]
+            else:
+                batch_number = reflections["id"][i]
             intensity, variance = get_corrected_intensity_and_variance(reflections, i)
             if not valid_intensity(intensity, variance):
                 continue
@@ -241,7 +244,6 @@ def output_reflections_as_hkl(
                     float(wavelength),
                 )
             )
-            # g.write(f"{int(h)} {int(k)} {int(l)} {float(intensity)} {float(sigma)} {int(batch_number)} {float(wavelength)}\n")
         g.write(
             ""
             + "{:4d}{:4d}{:4d}{:8.1f}{:9.2f}{:4d}{:8.4f}\n".format(
@@ -656,6 +658,7 @@ def run_integrate(params, experiments, reflections):
                     empty_data,
                     corrections_data,
                     params.corrections.lorentz,
+                    expt.scan.has_property("time_of_flight_bin_widths"),
                 )
 
                 if params.method == "seed_skewness":
@@ -704,6 +707,7 @@ def run_integrate(params, experiments, reflections):
                     incident_proton_charge,
                     empty_proton_charge,
                     params.corrections.lorentz,
+                    expt.scan.has_property("time_of_flight_bin_widths"),
                 )
                 tof_calculate_shoebox_mask(expt_reflections, expt)
                 if params.method == "seed_skewness":
@@ -744,6 +748,7 @@ def run_integrate(params, experiments, reflections):
                 expt,
                 expt_data,
                 params.corrections.lorentz,
+                expt.scan.has_property("time_of_flight_bin_widths"),
             )
 
             # Filter any shoeboxes that contain no data

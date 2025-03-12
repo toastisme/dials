@@ -23,6 +23,7 @@ namespace dials_scaling { namespace boost_python {
     void (*extract_shoeboxes1)(dials::af::reflection_table &,
                                dxtbx::model::Experiment &,
                                dxtbx::ImageSequence &,
+                               bool,
                                bool) = &tof_extract_shoeboxes_to_reflection_table;
     void (*extract_shoeboxes2)(dials::af::reflection_table &,
                                dxtbx::model::Experiment &,
@@ -30,6 +31,7 @@ namespace dials_scaling { namespace boost_python {
                                dxtbx::ImageSequence &,
                                dxtbx::ImageSequence &,
                                TOFCorrectionsData &,
+                               bool,
                                bool) = &tof_extract_shoeboxes_to_reflection_table;
     void (*extract_shoeboxes3)(dials::af::reflection_table &,
                                dxtbx::model::Experiment &,
@@ -39,6 +41,7 @@ namespace dials_scaling { namespace boost_python {
                                double,
                                double,
                                double,
+                               bool,
                                bool) = &tof_extract_shoeboxes_to_reflection_table;
 
     def("tof_extract_shoeboxes_to_reflection_table", extract_shoeboxes1);

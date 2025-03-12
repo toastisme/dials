@@ -275,7 +275,8 @@ void tof_extract_shoeboxes_to_reflection_table(
   dials::af::reflection_table &reflection_table,
   Experiment &experiment,
   ImageSequence &data,
-  bool apply_lorentz_correction) {
+  bool apply_lorentz_correction,
+  bool normalize_by_tof_bin_width) {
   Detector detector = *experiment.get_detector();
   Scan scan = *experiment.get_scan();
 
@@ -290,7 +291,12 @@ void tof_extract_shoeboxes_to_reflection_table(
   // Required scan params
   scitbx::af::shared<double> img_tof = scan.get_property<double>("time_of_flight");
 
-  // Required detector params
+  scitbx::af::shared<double> tof_bin_widths;
+  if (normalize_by_tof_bin_width) {
+    DIALS_ASSERT(scan.contains("time_of_flight_bin_widths"));
+    tof_bin_widths = scan.get_property<double>("time_of_flight_bin_widths");
+  }
+
   int n_panels = detector.size();
   int num_images = data.size();
   vec2<std::size_t> image_size = detector[0].get_image_size();
@@ -344,6 +350,11 @@ void tof_extract_shoeboxes_to_reflection_table(
 
           double pixel_data = shoebox.data(z, y, x);
 
+          if (normalize_by_tof_bin_width) {
+            DIALS_ASSERT(frame_z < tof_bin_widths.size());
+            pixel_data /= tof_bin_widths[frame_z];
+          }
+
           scitbx::vec3<double> s1 =
             detector[panel].get_pixel_lab_coord(scitbx::vec2<double>(panel_x, panel_y));
           double distance = s1.length() + sample_to_source_distance;
@@ -380,7 +391,8 @@ void tof_extract_shoeboxes_to_reflection_table(
   double sample_proton_charge,
   double incident_proton_charge,
   double empty_proton_charge,
-  bool apply_lorentz_correction) {
+  bool apply_lorentz_correction,
+  bool normalize_by_tof_bin_width) {
   Detector detector = *experiment.get_detector();
   Scan scan = *experiment.get_scan();
 
@@ -394,6 +406,12 @@ void tof_extract_shoeboxes_to_reflection_table(
 
   // Required scan params
   scitbx::af::shared<double> img_tof = scan.get_property<double>("time_of_flight");
+
+  scitbx::af::shared<double> tof_bin_widths;
+  if (normalize_by_tof_bin_width) {
+    DIALS_ASSERT(scan.contains("time_of_flight_bin_widths"));
+    tof_bin_widths = scan.get_property<double>("time_of_flight_bin_widths");
+  }
 
   // Required detector params
   int n_panels = detector.size();
@@ -509,6 +527,13 @@ void tof_extract_shoeboxes_to_reflection_table(
           incident_pixel_data /= incident_proton_charge;
           empty_pixel_data /= empty_proton_charge;
 
+          if (normalize_by_tof_bin_width) {
+            DIALS_ASSERT(frame_z < tof_bin_widths.size());
+            pixel_data /= tof_bin_widths[frame_z];
+            incident_pixel_data /= tof_bin_widths[frame_z];
+            empty_pixel_data /= tof_bin_widths[frame_z];
+          }
+
           // Subtract empty from incident and sample
           pixel_data -= empty_pixel_data;
           incident_pixel_data -= empty_pixel_data;
@@ -557,7 +582,8 @@ void tof_extract_shoeboxes_to_reflection_table(
   ImageSequence &incident_data,
   ImageSequence &empty_data,
   TOFCorrectionsData &corrections_data,
-  bool apply_lorentz_correction) {
+  bool apply_lorentz_correction,
+  bool normalize_by_tof_bin_width) {
   Detector detector = *experiment.get_detector();
   Scan scan = *experiment.get_scan();
 
@@ -571,6 +597,12 @@ void tof_extract_shoeboxes_to_reflection_table(
 
   // Required scan params
   scitbx::af::shared<double> img_tof = scan.get_property<double>("time_of_flight");
+
+  scitbx::af::shared<double> tof_bin_widths;
+  if (normalize_by_tof_bin_width) {
+    DIALS_ASSERT(scan.contains("time_of_flight_bin_widths"));
+    tof_bin_widths = scan.get_property<double>("time_of_flight_bin_widths");
+  }
 
   // Required detector params
   int n_panels = detector.size();
@@ -685,6 +717,13 @@ void tof_extract_shoeboxes_to_reflection_table(
           pixel_data /= corrections_data.sample_proton_charge;
           incident_pixel_data /= corrections_data.incident_proton_charge;
           empty_pixel_data /= corrections_data.empty_proton_charge;
+
+          if (normalize_by_tof_bin_width) {
+            DIALS_ASSERT(frame_z < tof_bin_widths.size());
+            pixel_data /= tof_bin_widths[frame_z];
+            incident_pixel_data /= tof_bin_widths[frame_z];
+            empty_pixel_data /= tof_bin_widths[frame_z];
+          }
 
           // Subtract empty from incident and sample
           pixel_data -= empty_pixel_data;

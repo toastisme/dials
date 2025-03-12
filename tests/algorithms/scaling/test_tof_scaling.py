@@ -31,7 +31,7 @@ def test_tof_extract_shoeboxes(dials_data):
     ## Shoeboxes with no corrections
 
     tof_extract_shoeboxes_to_reflection_table(
-        reflections, experiments[0], expt_data, False
+        reflections, experiments[0], expt_data, False, False
     )
 
     ## Shoeboxes with Lorentz correction
@@ -43,7 +43,7 @@ def test_tof_extract_shoeboxes(dials_data):
         flatten=False,
     )
     tof_extract_shoeboxes_to_reflection_table(
-        reflections, experiments[0], expt_data, True
+        reflections, experiments[0], expt_data, True, False
     )
 
     ## Shoeboxes with incident/empty run normalisation
@@ -83,6 +83,7 @@ def test_tof_extract_shoeboxes(dials_data):
         incident_proton_charge,
         empty_proton_charge,
         False,
+        False,
     )
 
     ## Shoeboxes with incident/empty run normalisation
@@ -103,6 +104,7 @@ def test_tof_extract_shoeboxes(dials_data):
         incident_proton_charge,
         empty_proton_charge,
         True,
+        False,
     )
 
     ## Shoeboxes with incident/empty run normalisation
@@ -144,6 +146,7 @@ def test_tof_extract_shoeboxes(dials_data):
         empty_data,
         corrections_data,
         False,
+        False,
     )
 
     ## Shoeboxes with incident/empty run normalisation,
@@ -162,4 +165,5 @@ def test_tof_extract_shoeboxes(dials_data):
         empty_data,
         corrections_data,
         True,
+        False,
     )
