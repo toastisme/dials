@@ -189,6 +189,99 @@ class MADMergedMTZWriter(MergedMTZWriter):
         )
 
 
+def add_batch_orientation_tof(mtz, experiment, wavelength, dataset_id, batch_number):
+    """Add batch metadata to the gemmi mtz object."""
+
+    # Recalculate useful numbers and references here
+    umat_array = flex.float(flex.grid(1, 9))
+    cell_array = flex.float(flex.grid(1, 6))
+
+    # Reciprocal lattice vectors in the lab frame at zero scan angle
+    if experiment.goniometer:
+        S = matrix.sqr(experiment.goniometer.get_setting_rotation())
+        F = matrix.sqr(experiment.goniometer.get_fixed_rotation())
+        UBlab = S * F * matrix.sqr(experiment.crystal.get_A())
+
+        axis = matrix.col(experiment.goniometer.get_rotation_axis())
+
+    else:
+        UBlab = matrix.sqr(experiment.crystal.get_A())
+
+    unit_cell = experiment.crystal.get_unit_cell()
+    _UBlab = UBlab
+
+    U = matrix.sqr(dials.util.ext.ub_to_mosflm_u(_UBlab, unit_cell))
+
+    # FIXME need to get what was refined and what was constrained from the
+    # crystal model - see https://github.com/dials/dials/issues/355
+    _unit_cell_params = unit_cell.parameters()
+    for j in range(6):
+        cell_array[0, j] = _unit_cell_params[j]
+    # Transpose to put in column-major order for MTZ export
+    U_t_elements = U.transpose().elems
+    for j in range(9):
+        umat_array[0, j] = U_t_elements[j]
+
+    # We ignore panels beyond the first one, at the moment
+    panel = experiment.detector[0]
+    panel_size = panel.get_image_size()
+    panel_distance = panel.get_directed_distance()
+
+    if experiment.goniometer:
+        axis = flex.float(experiment.goniometer.get_rotation_axis())
+    else:
+        axis = flex.float((0.0, 0.0, 0.0))
+
+    source = flex.float(experiment.beam.get_sample_to_source_direction())
+
+    # get the mosaic spread though today it may not actually be set - should
+    # this be in the BATCH headers?
+    try:
+        mosaic = experiment.crystal.get_mosaicity()
+    except AttributeError:
+        mosaic = 0.0
+
+    if gemmi is None:
+        raise gemmi_import_error
+    batch = gemmi.Mtz.Batch()
+
+    # Setting fields that are the same for all batches
+    batch.dataset_id = dataset_id
+    batch.wavelength = wavelength
+    batch.ints[12] = 1  # ncryst
+    batch.ints[14] = 2  # ldtype 3D
+    batch.ints[15] = 1  # jsaxs - goniostat scan axis number
+    batch.ints[17] = 1  # ngonax - number of goniostat axes
+    batch.ints[19] = 1  # ndet
+
+    batch.floats[21] = mosaic  # crydat[0]
+    for j in range(3):
+        batch.floats[38 + j] = axis[j]  # scanax
+    batch.floats[43] = 1.0  # bscale (batch scale)
+    for j in range(3):
+        batch.floats[59 + j] = axis[j]  # e1
+    batch.floats[80 + flex.min_index(source)] = -1.0  # idealised source vector
+    for j in range(3):
+        batch.floats[83 + j] = source[j]  # source including tilts
+    batch.floats[111] = panel_distance  # dx
+    batch.floats[114] = panel_size[0]  # NX
+    batch.floats[116] = panel_size[1]  # NY
+    batch.axes = ["AXIS"]  # gonlab[0]
+
+    # Setting fields that differ
+    batch.number = batch_number
+    batch.title = f"Batch {batch.number}"
+    for j in range(6):
+        batch.floats[j] = cell_array[0, j]  # cell
+    for j in range(9):
+        batch.floats[6 + j] = umat_array[0, j]  # Umat
+
+    # Append this batch
+    mtz.batches.append(batch)
+
+    return
+
+
 def add_batch_list(
     mtz,
     image_range,
@@ -599,17 +692,17 @@ def write_columns_tof(mtz, reflection_table):
         len(mtz_data.columns), "PACK_ID", flumpy.to_numpy(reflection_table["panel"])
     )
 
-    mtz.add_column("PLATE", type_table["PLATE"])
-    mtz_data.insert(len(mtz_data.columns), "PLATE", np.ones(nref).astype("int32"))
+    # mtz.add_column("PLATE", type_table["PLATE"])
+    # mtz_data.insert(len(mtz_data.columns), "PLATE", np.ones(nref).astype("int32"))
 
-    mtz.add_column("XF", type_table["XF"])
-    mtz_data.insert(
-        len(mtz_data.columns), "XF", flumpy.to_numpy(xdet).astype("float32")
-    )
-    mtz.add_column("YF", type_table["YF"])
-    mtz_data.insert(
-        len(mtz_data.columns), "YF", flumpy.to_numpy(ydet).astype("float32")
-    )
+    # mtz.add_column("XF", type_table["XF"])
+    # mtz_data.insert(
+    #    len(mtz_data.columns), "XF", flumpy.to_numpy(xdet).astype("float32")
+    # )
+    # mtz.add_column("YF", type_table["YF"])
+    # mtz_data.insert(
+    #    len(mtz_data.columns), "YF", flumpy.to_numpy(ydet).astype("float32")
+    # )
 
     mtz.add_column("LAMBDA", type_table["LAMBDA"])
     mtz_data.insert(
@@ -643,12 +736,12 @@ def write_columns_tof(mtz, reflection_table):
     mtz.add_column("MAXHARM", type_table["MAXHARM"])
     mtz_data.insert(len(mtz_data.columns), "MAXHARM", np.ones(nref).astype("int32"))
 
-    mtz.add_column("NOVPIX", type_table["NOVPIX"])
-    x0, x1, y0, y1, z0, z1 = reflection_table["bbox"].parts()
-    novpix = (x1 - x0) * (y1 - y0) * (z1 - z0)
-    mtz_data.insert(
-        len(mtz_data.columns), "NOVPIX", flumpy.to_numpy(novpix).astype("int32")
-    )
+    # mtz.add_column("NOVPIX", type_table["NOVPIX"])
+    # x0, x1, y0, y1, z0, z1 = reflection_table["bbox"].parts()
+    # novpix = (x1 - x0) * (y1 - y0) * (z1 - z0)
+    # mtz_data.insert(
+    #    len(mtz_data.columns), "NOVPIX", flumpy.to_numpy(novpix).astype("int32")
+    # )
 
     mtz_data.insert(len(mtz_data.columns), "M/ISYM", np.zeros(nref, dtype="float32"))
 
@@ -692,25 +785,25 @@ def write_columns_tof(mtz, reflection_table):
             len(mtz_data.columns), "SIGBG", flumpy.to_numpy(sigbg).astype("float32")
         )
 
-    if "fractioncalc" in reflection_table:
-        mtz.add_column("FRACTIONCALC", type_table["FRACTIONCALC"])
-        mtz_data.insert(
-            len(mtz_data.columns),
-            "FRACTIONCALC",
-            flumpy.to_numpy(reflection_table["fractioncalc"]).astype("float32"),
-        )
+    # if "fractioncalc" in reflection_table:
+    #    mtz.add_column("FRACTIONCALC", type_table["FRACTIONCALC"])
+    #    mtz_data.insert(
+    #        len(mtz_data.columns),
+    #        "FRACTIONCALC",
+    #        flumpy.to_numpy(reflection_table["fractioncalc"]).astype("float32"),
+    #    )
 
-    mtz.add_column("XDET", type_table["XDET"])
-    mtz_data.insert(
-        len(mtz_data.columns), "XDET", flumpy.to_numpy(xdet).astype("float32")
-    )
-    mtz.add_column("YDET", type_table["YDET"])
-    mtz_data.insert(
-        len(mtz_data.columns), "YDET", flumpy.to_numpy(ydet).astype("float32")
-    )
+    # mtz.add_column("XDET", type_table["XDET"])
+    # mtz_data.insert(
+    #    len(mtz_data.columns), "XDET", flumpy.to_numpy(xdet).astype("float32")
+    # )
+    # mtz.add_column("YDET", type_table["YDET"])
+    # mtz_data.insert(
+    #    len(mtz_data.columns), "YDET", flumpy.to_numpy(ydet).astype("float32")
+    # )
 
     mtz.switch_to_original_hkl()
-    mtz.set_data(mtz_data)
+    mtz.set_data(mtz_data.to_numpy())
 
 
 def export_mtz(
@@ -1045,7 +1138,6 @@ def export_mtz_tof(
         unique_offsets = set(effective_offsets)
     else:
         logger.debug("Keeping existing batches")
-    image_ranges = get_image_ranges(experiment_list)
     if len(unique_offsets) != len(batch_offsets):
         raise ValueError(
             "Duplicate batch offsets detected: %s"
@@ -1077,36 +1169,28 @@ def export_mtz_tof(
     #   integrated at the same time
     # ✓ decide a sensible BATCH increment to apply to the BATCH value between
     #   experiments and add this
-    for id_ in expids_in_table.keys():
+
+    reflection_table["batch"] = flex.int(len(reflection_table))
+    for idx, id_ in enumerate(expids_in_table.keys()):
         # Grab our subset of the data
         loc = expids_in_list.index(
             expids_in_table[id_]
         )  # get strid and use to find loc in list
         experiment = experiment_list[loc]
-        wavelength = -1
+        wavelength = 4
         dataset_id = 1
         reflections = reflection_table.select(reflection_table["id"] == id_)
-        batch_offset = batch_offsets[loc]
-        image_range = image_ranges[loc]
-        reflections = assign_batches_to_reflections([reflections], [batch_offset])[0]
+        reflections["batch"] = flex.int(len(reflections), idx + 1)
         experiment.data = dict(reflections)
-        add_batch_list(
-            mtz,
-            image_range,
-            experiment,
-            wavelength,
-            dataset_id,
-            batch_offset=batch_offset,
-            force_static_model=True,
+        add_batch_orientation_tof(
+            mtz, experiment, wavelength, dataset_id, batch_number=idx + 1
         )
         # Create the batch offset array. This gives us an experiment (id)-dependent
         # batch offset to calculate the correct batch from image number.
-        experiment.data["batch_offset"] = flex.int(
-            len(experiment.data["id"]), batch_offset
-        )
+        experiment.data["batch_offset"] = flex.int(len(experiment.data["id"]), idx + 1)
         # Calculate whether we have a ROT value for this experiment, and set the column
-        _, _, z = experiment.data["xyzcal.px"].parts()
-        experiment.data["ROT"] = z
+        # _, _, z = experiment.data["xyzcal.px"].parts()
+        # experiment.data["ROT"] = z
     mtz.set_cell_for_all(gemmi.UnitCell(*best_unit_cell.parameters()))
 
     # Combine all of the experiment data columns before writing
