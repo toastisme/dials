@@ -13,6 +13,7 @@ import numpy as np
 from numpy.polynomial.chebyshev import chebval
 from scipy.optimize import least_squares
 
+from dxtbx import flumpy
 from dxtbx.serialize import load
 from scitbx.matrix import col
 
@@ -43,6 +44,7 @@ class ReflectionGroup:
         init_s_image: np.ndarray,
         normalized_wavelength_bins: Tuple[float, ...],
         integration_type: IntegrationType = IntegrationType.summation,
+        regularization_factor: float = 2,
     ):
 
         self.reflections = reflections
@@ -53,6 +55,7 @@ class ReflectionGroup:
         self.integration_type = integration_type
         self.raw_intensities = self.get_raw_intensities()
         self.raw_intensities_sigma = self.get_raw_intensities_sigma()
+        self.regularization_factor = regularization_factor
 
     def get_wl_bin_idxs(self, normalized_wavelength_bins: Tuple[float]) -> Tuple[int]:
 
@@ -71,15 +74,19 @@ class ReflectionGroup:
 
     def get_raw_intensities(self) -> flex.double:
         if self.integration_type == IntegrationType.profile:
-            return self.reflections["intensity.prf.value"]
+            return flumpy.to_numpy(self.reflections["intensity.prf.value"])
         else:
-            return self.reflections["intensity.sum.value"]
+            return flumpy.to_numpy(self.reflections["intensity.sum.value"])
 
     def get_raw_intensities_sigma(self) -> flex.double:
         if self.integration_type == IntegrationType.profile:
-            return flex.sqrt(self.reflections["intensity.prf.variance"])
+            return flumpy.to_numpy(
+                flex.sqrt(self.reflections["intensity.prf.variance"])
+            )
         else:
-            return flex.sqrt(self.reflections["intensity.sum.variance"])
+            return flumpy.to_numpy(
+                flex.sqrt(self.reflections["intensity.sum.variance"])
+            )
 
     def get_f_image(self, refl_idx: int) -> float:
 
@@ -97,13 +104,18 @@ class ReflectionGroup:
         b_i = self.b_image[image_idx]
         return s_i * np.exp(-2 * b_i * (f_l / np.square(wl)))
 
-    def get_corrected_intensities(self) -> np.ndarray:
+    def get_corrected_intensities(self, return_corrections: bool = False) -> np.ndarray:
         intensities = []
+        corrections = []
         for i in range(len(self.raw_intensities)):
-            intensity = self.reflections["lorentz_factor"][i] * self.raw_intensities[i]
-            intensity *= self.f_lambda[self.wl_bin_idxs[i]]
-            intensity *= self.get_f_image(i)
+            correction = self.reflections["lorentz_factor"][i]
+            correction *= self.f_lambda[self.wl_bin_idxs[i]]
+            correction *= self.get_f_image(i)
+            intensity = self.raw_intensities[i] * correction
             intensities.append(intensity)
+            corrections.append(correction)
+        if return_corrections:
+            return np.array(intensities), np.array(corrections)
         return np.array(intensities)
 
     def get_corrected_intensities_sigma(self) -> np.ndarray:
@@ -131,10 +143,15 @@ class ReflectionGroup:
         intensities = self.get_corrected_intensities()
         sigmas = self.get_corrected_intensities_sigma()
         avg_intensity = self.get_corrected_avg_intensity()
+        avg_raw_intensity = self.get_raw_avg_intensity()
+
         for idx, i in enumerate(intensities):
             if sigmas[idx] > 0 and i > 0:
-                val += np.square((i - avg_intensity) / (1e-7 + sigmas[idx]))
-        return val
+                val += np.square((i - avg_intensity) / (sigmas[idx] + 1e-3))
+
+        constraint = np.square(avg_intensity - avg_raw_intensity)
+
+        return val + (constraint * self.regularization_factor)
 
     def get_raw_avg_intensity(self) -> float:
         return sum(self.raw_intensities) / len(self.raw_intensities)
@@ -177,15 +194,19 @@ class TOFWavelengthNormalizer:
         f_lambda_coeffs: np.ndarray | None = None,
         integration_type: IntegrationType = IntegrationType.summation,
         min_partiality: float = 0.99,
-        min_i_sigma: float = 0.0,
-        positive_i: bool = True,
+        min_i_sigma: float = 1.0,
+        min_i: float = 1.0,
         ref_wavelength=None,
+        intensity_scaling_factor: int = 1000,
+        regularization_factor: float = 2,
     ) -> None:
 
         logger.info("Setting up scaler..")
 
         # Data
         self.integration_type = integration_type
+        self.intensity_scaling_factor = intensity_scaling_factor
+        self.regularization_factor = regularization_factor
         self.experiments_file_path = experiments_path
         self.reflections_file_path = reflections_path
         self.experiments = load.experiment_list(experiments_path)
@@ -197,8 +218,9 @@ class TOFWavelengthNormalizer:
         self.reflections = self.get_filtered_reflections(
             min_partiality=min_partiality,
             min_i_sigma=min_i_sigma,
-            positive_i=positive_i,
+            min_i=min_i,
         )
+        self.multiply_reflection_intensities_by_scaling_factor()
 
         wl_range = self.get_wavelength_range()
 
@@ -219,17 +241,44 @@ class TOFWavelengthNormalizer:
         self.residual_history = []
         self.save_filename = None
         self.f_lorentz = None  # Size of len(self.reflections)
+        self.s_image = None
+        self.b_image = None
+        self.ref_wavelength = None
+        self.f_lambda_coeffs = None
+        self.setup_optimization_params(
+            f_lambda_coeffs=f_lambda_coeffs,
+            s_image=s_image,
+            b_image=b_image,
+            ref_wavelength=ref_wavelength,
+            lambda_polynomial_degree=lambda_polynomial_degree,
+            wl_range=wl_range,
+        )
+
+        self.reflection_groups = self.get_reflection_groups()
+
+        logger.info("Finished setup")
+
+    def setup_optimization_params(
+        self,
+        f_lambda_coeffs: np.ndarray,
+        s_image: np.ndarray,
+        b_image: np.ndarray,
+        ref_wavelength: float,
+        lambda_polynomial_degree: int,
+        wl_range: Tuple[float, ...],
+    ):
+
         if s_image is not None:
             logger.info("Starting from previous s_image values")
             self.s_image = s_image  # Size of len(imageset_ids) + 1
         else:
-            self.s_image = np.random.random(max(self.reflections["imageset_id"]) + 1)
+            self.s_image = np.ones(max(self.reflections["imageset_id"]) + 1)
 
         if b_image is not None:
             logger.info("Starting from previous b_image values")
             self.b_image = b_image  # Size of len(imageset_ids) + 1
         else:
-            self.b_image = np.random.random(max(self.reflections["imageset_id"]) + 1)
+            self.b_image = np.ones(max(self.reflections["imageset_id"]) + 1)
 
         if ref_wavelength is not None:
             logger.info(f"Reference wavelength set as {ref_wavelength} (A)")
@@ -240,7 +289,7 @@ class TOFWavelengthNormalizer:
                 )
             )
         else:
-            ref_wl = (wl_range[0] + wl_range[1]) * 0.5
+            ref_wl = round((wl_range[0] + wl_range[1]) * 0.5, 3)
             logger.info(
                 f"Reference wavelength set by default as half the range ({ref_wl} (A))"
             )
@@ -261,15 +310,11 @@ class TOFWavelengthNormalizer:
                 f_lambda_coeffs  # Size of len(lambda_polynomial_degree) + 1
             )
         else:
-            self.f_lambda_coeffs = np.random.random(lambda_polynomial_degree + 1)
+            self.f_lambda_coeffs = np.ones(lambda_polynomial_degree + 1)
         self.f_lambda = self.get_f_lambda()
 
         logger.info(f"Using a lambda polynomial degree of {lambda_polynomial_degree}")
         self.lambda_polynomial_degree = lambda_polynomial_degree
-
-        self.reflection_groups = self.get_reflection_groups()
-
-        logger.info("Finished setup")
 
     def optimize(
         self,
@@ -326,16 +371,7 @@ class TOFWavelengthNormalizer:
         if self.save_filename is not None:
             if self.num_optimization_iterations == 0:
                 filename = f"{self.save_filename}_params.json"
-                logger.info(f"Saving to {filename}")
-                with open(filename, "w") as f:
-                    json.dump(
-                        {
-                            "f_lambda_coeffs": self.f_lambda_coeffs.tolist(),
-                            "s_image": self.s_image.tolist(),
-                            "b_image": self.b_image.tolist(),
-                        },
-                        f,
-                    )
+                self.save_optimization_params(filename)
 
         residuals = []
         for i in self.reflection_groups:
@@ -346,6 +382,30 @@ class TOFWavelengthNormalizer:
         self.residual_history.append(avg_residual)
         self.num_optimization_iterations += 1
         return np.array(residuals)
+
+    def save_optimization_params(self, filename: str) -> None:
+        logger.info(f"Saving optimization params to {filename}")
+        with open(filename, "w") as f:
+            json.dump(
+                {
+                    "f_lambda_coeffs": self.f_lambda_coeffs.tolist(),
+                    "s_image": self.s_image.tolist(),
+                    "b_image": self.b_image.tolist(),
+                },
+                f,
+            )
+
+    def load_optimization_params(self, filename: str) -> None:
+        logger.info(f"Loading optimization params from {filename}")
+        with open(filename, "r") as f:
+            params = json.load(f)
+            self.f_lambda_coeffs = np.array(params["f_lambda_coeffs"])
+            self.s_image = np.array(params["s_image"])
+            self.b_image = np.array(params["b_image"])
+            self.f_lambda = self.get_f_lambda()
+            self.update_reflection_groups_refine_params(
+                self.f_lambda, self.s_image, self.b_image
+            )
 
     def get_lorentz_factors(self) -> flex.double:
 
@@ -374,33 +434,92 @@ class TOFWavelengthNormalizer:
     def get_filtered_reflections(
         self,
         min_partiality: float = 0.99,
-        min_i_sigma: float = 0.0,
-        positive_i: bool = True,
+        min_i_sigma: float = 1.0,
+        min_i: float = 1.0,
     ) -> reflection_table:
 
+        sel = self.reflections["partiality"] > min_partiality
         reflections = self.reflections.select(
             self.reflections["partiality"] > min_partiality
         )
+        logger.info(
+            f"Removed {sel.count(False)} reflections with partiality < {min_partiality}"
+        )
 
         if self.integration_type == IntegrationType.profile:
+            sel = ~reflections.get_flags(
+                reflections.flags.failed_during_profile_fitting
+            )
             reflections = reflections.select(
                 ~reflections.get_flags(reflections.flags.failed_during_profile_fitting)
             )
-            if positive_i:
-                reflections = reflections.select(reflections["intensity.prf.value"] > 0)
-                i_sigma = reflections["intensity.sum.value"] / flex.sqrt(
-                    reflections["intensity.sum.variance"]
-                )
-                reflections = reflections.select(i_sigma > min_i_sigma)
-        else:
-            if positive_i:
-                reflections = reflections.select(reflections["intensity.sum.value"] > 0)
+            logger.info(
+                f"Removed {sel.count(False)} reflections that failed during profile fitting"
+            )
+
+            sel = reflections["intensity.prf.value"] > min_i
+
+            reflections = reflections.select(sel)
+            logger.info(
+                f"Removed {sel.count(False)} reflections with intensity < {min_i}"
+            )
             i_sigma = reflections["intensity.sum.value"] / flex.sqrt(
                 reflections["intensity.sum.variance"]
             )
-            reflections = reflections.select(i_sigma > min_i_sigma)
-        logger.info(f"Filtered {len(self.reflections) - len(reflections)} reflections")
+            sel = i_sigma > min_i_sigma
+            reflections = reflections.select(sel)
+            logger.info(
+                f"Removed {sel.count(False)} reflections with i/sigma < {min_i_sigma}"
+            )
+        else:
+            sel = reflections["intensity.sum.value"] > min_i
+            reflections = reflections.select(sel)
+            logger.info(
+                f"Removed {sel.count(False)} reflections with intensity < {min_i}"
+            )
+            i_sigma = reflections["intensity.sum.value"] / flex.sqrt(
+                reflections["intensity.sum.variance"]
+            )
+            sel = i_sigma > min_i_sigma
+            reflections = reflections.select(sel)
+            logger.info(
+                f"Removed {sel.count(False)} reflections with i/sigma < {min_i_sigma}"
+            )
+        logger.info(f"Number of reflections after filtering: {len(reflections)}")
         return reflections
+
+    def multiply_reflection_intensities_by_scaling_factor(self) -> None:
+
+        if self.intensity_scaling_factor != 1:
+            logger.info(f"Scaling intensities by {self.intensity_scaling_factor}")
+        self.reflections["intensity.sum.value"] = (
+            self.reflections["intensity.sum.value"] * self.intensity_scaling_factor
+        )
+        self.reflections["intensity.sum.variance"] = (
+            self.reflections["intensity.sum.variance"]
+            * self.intensity_scaling_factor**2
+        )
+        logger.info(
+            f"Summation intensity range ({round(min(self.reflections['intensity.sum.value']),3)} - {round(max(self.reflections['intensity.sum.value']),3)})"
+        )
+        logger.info(
+            f"Summation variance range ({round(min(self.reflections['intensity.sum.variance']),3)} - {round(max(self.reflections['intensity.sum.variance']),3)})"
+        )
+
+        if self.integration_type == IntegrationType.profile:
+            self.reflections["intensity.prf.value"] = (
+                self.reflections["intensity.prf.value"] * self.intensity_scaling_factor
+            )
+            self.reflections["intensity.prf.variance"] = (
+                self.reflections["intensity.prf.variance"]
+                * self.intensity_scaling_factor**2
+            )
+            logger.info(
+                f"Profile intensity range ({round(min(self.reflections['intensity.prf.value']),3)} - {round(max(self.reflections['intensity.prf.value']),3)})"
+            )
+            logger.info(
+                f"Profile variance range ({round(min(self.reflections['intensity.prf.variance']),3)} - {round(max(self.reflections['intensity.prf.variance']),3)})"
+            )
 
     def get_scaled_reflections(self) -> reflection_table:
         def get_f_image(reflection, s_image, b_image):
@@ -518,7 +637,7 @@ class TOFWavelengthNormalizer:
 
     def get_wavelength_range(self) -> Tuple[float, float]:
         wls = self.reflections["wavelength_cal"]
-        return (min(wls), max(wls))
+        return (round(min(wls), 3), round(max(wls), 3))
 
     def add_normalized_wavelengths_to_reflections(self) -> None:
         wls = self.reflections["wavelength_cal"]
@@ -559,19 +678,25 @@ class TOFWavelengthNormalizer:
                 init_b_image=self.b_image,
                 normalized_wavelength_bins=self.normalized_wavelength_bins,
                 integration_type=self.integration_type,
+                regularization_factor=self.regularization_factor,
             )
 
             reflection_groups[tuple(idx_group)] = refl_group
         return reflection_groups
 
-    def get_mean_intensities_per_wavelength_bin(self) -> np.ndarray:
+    def get_mean_intensities_per_wavelength_bin(
+        self, raw_intensities: bool = False
+    ) -> np.ndarray:
         mean_intensities = np.zeros(len(self.normalized_wavelength_bins))
         mean_intensities_count = np.zeros(len(self.normalized_wavelength_bins))
 
         for i in self.reflection_groups:
-            corrected_intensities = self.reflection_groups[
-                i
-            ].get_corrected_intensities()
+            if raw_intensities:
+                corrected_intensities = self.reflection_groups[i].get_raw_intensities()
+            else:
+                corrected_intensities = self.reflection_groups[
+                    i
+                ].get_corrected_intensities()
             bin_idxs = self.reflection_groups[i].wl_bin_idxs
             for j in range(len(corrected_intensities)):
                 mean_intensities[bin_idxs[j]] += corrected_intensities[j]
@@ -582,14 +707,53 @@ class TOFWavelengthNormalizer:
         )
         return mean_intensities
 
+    def get_errors_per_wavelength_bin(
+        self, raw_intensities: bool = False
+    ) -> Tuple[Tuple[float, ...], Tuple[float, ...]]:
+        mean_intensities = self.get_mean_intensities_per_wavelength_bin(
+            raw_intensities=raw_intensities
+        )
+        errors_y = []
+        errors_x = []
+
+        for i in self.reflection_groups:
+            if raw_intensities:
+                intensities = self.reflection_groups[i].get_raw_intensities()
+            else:
+                intensities = self.reflection_groups[i].get_corrected_intensities()
+            bin_idxs = self.reflection_groups[i].wl_bin_idxs
+            for j in range(len(intensities)):
+                errors_x.append(self.normalized_wavelength_bins[bin_idxs[j]])
+                i_mean = mean_intensities[bin_idxs[j]]
+                errors_y.append((intensities[j] - i_mean) / i_mean)
+
+        return tuple(errors_x), tuple(errors_y)
+
+    def plot_errors_per_wavelength_bin(self, raw_intensities: bool = False) -> None:
+        errors_x, errors_y = self.get_errors_per_wavelength_bin(
+            raw_intensities=raw_intensities
+        )
+        plt.plot(errors_x, errors_y, "o", markersize=2)
+        plt.plot(
+            self.normalized_wavelength_bins,
+            [0 for i in range(len(self.normalized_wavelength_bins))],
+            color="black",
+        )
+        plt.xlabel("Normalized wavelength (AU)")
+        plt.ylabel(r"$(I_{scaled} - I_{mean})/I_{mean}$")
+        plt.show()
+
     def plot_wavelength_normalization_curve(
         self,
         scale_factor: float = 1,
         xlim: Tuple[float, float] | None = None,
         ylim: Tuple[float, float] | None = None,
+        raw_intensities: bool = False,
     ) -> None:
 
-        mean_intensities = self.get_mean_intensities_per_wavelength_bin()
+        mean_intensities = self.get_mean_intensities_per_wavelength_bin(
+            raw_intensities=raw_intensities
+        )
 
         plt.scatter(
             self.normalized_wavelength_bins,
@@ -603,13 +767,19 @@ class TOFWavelengthNormalizer:
             color="red",
         )
         plt.xlabel("Normalized Wavelength (AU)")
-        plt.ylabel("Normalized Mean Intensity (AU)")
+        plt.ylabel("Mean Intensity (AU)")
         if xlim is not None:
             plt.xlim(xlim[0], xlim[1])
         if ylim is not None:
             plt.ylim(ylim[0], ylim[1])
         plt.legend()
         plt.grid()
+        plt.show()
+
+    def plot_residual_history(self):
+        plt.plot(list(range(len(self.residual_history))), self.residual_history)
+        plt.xlabel("Num Iterations")
+        plt.ylabel("Residual (AU)")
         plt.show()
 
     @staticmethod
