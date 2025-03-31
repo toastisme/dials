@@ -102,6 +102,16 @@ def process_block(
     return grid, counts
 
 
+def process_block_tof(block, imageset, grid_size, max_resolution):
+
+    grid = flex.double(flex.grid(grid_size, grid_size, grid_size), 0)
+    counts = flex.int(flex.grid(grid_size, grid_size, grid_size), 0)
+
+    recviewer.fill_voxels_tof(block, imageset, max_resolution, grid, counts)
+
+    return grid, counts
+
+
 class Script:
     def __init__(self):
         """Initialise the script."""
@@ -153,13 +163,20 @@ class Script:
             self.nproc = CPU_COUNT
             logger.info("Setting nproc={}".format(self.nproc))
 
-        for i_expt, experiment in enumerate(self.experiments):
-            logger.info(f"Calculation for experiment {i_expt}")
-            for i_panel in range(len(experiment.detector)):
-                grid, counts = self.process_imageset(experiment.imageset, i_panel)
-
+        if self.experiments.all_tof():
+            for i_expt, experiment in enumerate(self.experiments):
+                logger.info(f"Calculation for experiment {i_expt}")
+                grid, counts = self.process_imageset_tof(experiment.imageset)
                 self.grid += grid
                 self.counts += counts
+        else:
+            for i_expt, experiment in enumerate(self.experiments):
+                logger.info(f"Calculation for experiment {i_expt}")
+                for i_panel in range(len(experiment.detector)):
+                    grid, counts = self.process_imageset(experiment.imageset, i_panel)
+
+                    self.grid += grid
+                    self.counts += counts
 
         recviewer.normalize_voxels(self.grid, self.counts)
 
@@ -179,6 +196,42 @@ class Script:
             self.grid,
             flex.std_string(["cctbx.miller.fft_map"]),
         )
+
+    def process_imageset_tof(self, imageset):
+
+        # Split imageset into up to nproc blocks of at least 10 images
+        nblocks = min(self.nproc, int(math.ceil(len(imageset) / 10)))
+        blocks = np.array_split(range(len(imageset)), nblocks)
+        blocks = [block.tolist() for block in blocks]
+
+        if len(blocks) == 1:
+            results = [
+                process_block_tof(
+                    blocks[0], imageset, self.grid_size, self.max_resolution
+                ),
+            ]
+        else:
+            with concurrent.futures.ProcessPoolExecutor(
+                max_workers=len(blocks)
+            ) as pool:
+                results = [
+                    pool.submit(
+                        process_block_tof,
+                        block,
+                        imageset,
+                        self.grid_size,
+                        self.max_resolution,
+                    )
+                    for block in blocks
+                ]
+            results = [e.result() for e in results]
+
+        grid, counts = results[0]
+        for g, c in results[1:]:
+            grid += g
+            counts += c
+
+        return grid, counts
 
     def process_imageset(self, imageset, i_panel):
         rec_range = 1 / self.max_resolution
