@@ -86,7 +86,8 @@ namespace recviewer { namespace ext {
 
     DIALS_ASSERT(imageset.size() == tof_bins.size());
 
-    for (size_t img_idx = 0; img_idx < image_idxs.size(); img_idx++) {
+    for (size_t i = 0; i < image_idxs.size(); i++) {
+      std::size_t img_idx = image_idxs[i];
       DIALS_ASSERT(img_idx >= 0 && img_idx < tof_bins.size());
       tof = tof_bins[img_idx] * std::pow(10, -6);  // (s);
       img_data = imageset.get_raw_data(img_idx).as_int();
