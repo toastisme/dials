@@ -12,6 +12,9 @@ import libtbx
 from dxtbx import flumpy
 
 import dials.util.log
+from dials.algorithms.integration.fit.tof_gutmann_profile import (
+    compute_gutmann_profile_intensity,
+)
 from dials.algorithms.integration.fit.tof_line_profile import (
     compute_line_profile_intensity,
 )
@@ -74,11 +77,13 @@ calculated{
     .help = "The resolution spots are integrated to when using integration_type.calculated"
 
 }
-method = *summation seed_skewness profile1d
+method = *summation seed_skewness profile1d profile3d
     .type = choice
-    .help = "Integration method. profile1d fits a Gaussian convoluted with back-"
-            "to-back exponential functions"
-
+    .help = "Integration method: "
+            "summation: shoebox summation"
+            "seed_skewness: https://doi.org/10.1107/S0021889803021939"
+            "profile1d: https://doi.org/10.1038/srep36628 "
+            "profile3d: https://doi.org/10.1016/j.nima.2016.12.026"
 
 corrections{
     lorentz = False
@@ -319,7 +324,7 @@ def get_predicted_observed_reflections(params, experiments, reflections):
         if dmin is None or expt_dmin < dmin:
             dmin = expt_dmin
 
-    print(f"dmin {dmin}")
+    logger.info(f"dmin {dmin}")
     predicted_reflections = None
     miller_indices = reflections["miller_index"]
     for idx, experiment in enumerate(experiments):
@@ -589,7 +594,7 @@ def run_integrate(params, experiments, reflections):
     predicted_reflections = predicted_reflections.select(~overlap_sel)
 
     # Shoeboxes
-    print("Getting shoebox data")
+    logger.info("Getting shoebox data")
     predicted_reflections["shoebox"] = flex.shoebox(
         predicted_reflections["panel"],
         predicted_reflections["bbox"],
@@ -662,7 +667,7 @@ def run_integrate(params, experiments, reflections):
                 )
 
                 if params.method == "seed_skewness":
-                    print(f"Calculating seed skewness mask for expt {idx}")
+                    logger.info(f"Calculating seed skewness mask for expt {idx}")
                     tof_calculate_shoebox_seed_skewness_mask(
                         expt_reflections, expt, 1e-7
                     )
@@ -684,10 +689,17 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.compute_summed_intensity()
 
                 if params.method == "profile1d":
-                    print(
+                    logger.info(
                         f"Calculating line profile fitted intensities for experiment {idx}"
                     )
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
+                if params.method == "profile3d":
+                    logger.info(
+                        f"Calculating 3D profile fitted intensities for experiment {idx}"
+                    )
+                    expt_reflections = compute_gutmann_profile_intensity(
+                        expt_reflections
+                    )
                 predicted_reflections.set_selected(sel, expt_reflections)
             else:
                 logger.info(
@@ -711,7 +723,7 @@ def run_integrate(params, experiments, reflections):
                 )
                 tof_calculate_shoebox_mask(expt_reflections, expt)
                 if params.method == "seed_skewness":
-                    print(f"Calculating seed skewness mask for experiment {idx}")
+                    logger.info(f"Calculating seed skewness mask for experiment {idx}")
                     tof_calculate_shoebox_seed_skewness_mask(
                         expt_reflections, expt, 1e-7
                     )
@@ -732,14 +744,21 @@ def run_integrate(params, experiments, reflections):
                 expt_reflections.compute_summed_intensity()
 
                 if params.method == "profile1d":
-                    print(
+                    logger.info(
                         f"Calculating line profile fitted intensities for experiment {idx}"
                     )
                     expt_reflections = compute_line_profile_intensity(expt_reflections)
+                elif params.method == "profile3d":
+                    logger.info(
+                        f"Calculating 3D profile fitted intensities for experiment {idx}"
+                    )
+                    expt_reflections = compute_gutmann_profile_intensity(
+                        expt_reflections
+                    )
                 predicted_reflections.set_selected(sel, expt_reflections)
     else:
         for idx, expt in enumerate(experiments):
-            print(f"Computing for experiment {idx}")
+            logger.info(f"Computing for experiment {idx}")
             sel = predicted_reflections["id"] == idx
             expt_reflections = predicted_reflections.select(sel)
             expt_data = expt.imageset
@@ -762,7 +781,7 @@ def run_integrate(params, experiments, reflections):
             expt_reflections.set_flags(~expt_sel, expt_reflections.flags.dont_integrate)
 
             if params.method == "seed_skewness":
-                print(f"Calculating seed skewness mask for expt {idx}")
+                logger.info(f"Calculating seed skewness mask for expt {idx}")
                 tof_calculate_shoebox_seed_skewness_mask(r, expt, 1e-7)
             else:
                 tof_calculate_shoebox_mask(r, expt)
@@ -779,12 +798,21 @@ def run_integrate(params, experiments, reflections):
             if params.corrections.lorentz:
                 logger.info("  Applying Lorentz correction to target run")
 
-            print(f"  Calculating summed intensities for expt {expt}")
+            logger.info(f"  Calculating summed intensities for expt {idx}")
             r.compute_summed_intensity()
 
             if params.method == "profile1d":
-                print(f"  Calculating line profile fitted intensities for expt {idx}")
+                logger.info(
+                    f"  Calculating line profile fitted intensities for expt {idx}"
+                )
                 r = compute_line_profile_intensity(r)
+
+            elif params.method == "profile3d":
+                logger.info(
+                    f"  Calculating 3D profile fitted intensities for expt {idx}"
+                )
+                r = compute_gutmann_profile_intensity(r)
+
             expt_reflections.set_selected(expt_sel, r)
             predicted_reflections.set_selected(sel, expt_reflections)
 
