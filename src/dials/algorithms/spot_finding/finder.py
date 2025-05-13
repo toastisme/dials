@@ -1057,15 +1057,19 @@ class TOFSpotFinder(SpotFinder):
         )
         return merged_reflections
 
-    def _post_process(self, reflections):
+    def _post_process(
+        self, reflections, merge_nearby_reflections=True, correct_centroid=True
+    ):
 
-        reflections = self._merge_nearby_reflections(
-            reflections,
-            threshold_xy=self.merge_threshold_xy,
-            threshold_z=self.merge_threshold_z,
-        )
+        if merge_nearby_reflections:
+            reflections = self._merge_nearby_reflections(
+                reflections,
+                threshold_xy=self.merge_threshold_xy,
+                threshold_z=self.merge_threshold_z,
+            )
 
-        reflections = self._correct_centroid_tof(reflections)
+        if correct_centroid:
+            reflections = self._correct_centroid_tof(reflections)
 
         # Filter any reflections outside of the tof range
         for i, expt in enumerate(self.experiments):

@@ -490,6 +490,16 @@ def get_predicted_calculated_reflections(params, experiments, reflections):
             predicted_reflections["bbox"].set_selected(p_sel, bboxes)
             predicted_reflections["partiality"].set_selected(p_sel, partiality)
 
+    _, _, _, _, z1, z2 = predicted_reflections["bbox"].parts()
+    sel = z2 > z1
+    predicted_reflections = predicted_reflections.select(sel)
+    _, _, y1, y2, _, _ = predicted_reflections["bbox"].parts()
+    sel = y2 > y1
+    predicted_reflections = predicted_reflections.select(sel)
+    x1, x2, _, _, _, _ = predicted_reflections["bbox"].parts()
+    sel = x2 > x1
+    predicted_reflections = predicted_reflections.select(sel)
+
     return predicted_reflections
 
 
@@ -583,6 +593,7 @@ def run_integrate(params, experiments, reflections):
 
     predicted_reflections.compute_d(experiments)
     # predicted_reflections.compute_partiality(experiments)
+    """
     overlaps = predicted_reflections.find_overlaps()
     overlap_sel = flex.bool(len(predicted_reflections), False)
     for item in overlaps.edges():
@@ -592,6 +603,7 @@ def run_integrate(params, experiments, reflections):
         overlap_sel[i1] = True
     logger.info("Rejecting %i overlapping bounding boxes", overlap_sel.count(True))
     predicted_reflections = predicted_reflections.select(~overlap_sel)
+    """
 
     # Shoeboxes
     logger.info("Getting shoebox data")
