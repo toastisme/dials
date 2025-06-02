@@ -58,7 +58,7 @@ def get_valid_image_ranges(experiments):
     """Extract valid image ranges from experiments, returning None if no scan"""
     valid_images_ranges = []
     for exp in experiments:
-        if exp.scan and (exp.scan.get_oscillation()[1] != 0.0):
+        if exp.scan and not exp.scan.is_still():
             valid_images_ranges.append(exp.scan.get_valid_image_ranges(exp.identifier))
         else:
             valid_images_ranges.append(None)
@@ -71,7 +71,7 @@ def set_initial_valid_image_ranges(experiments):
     Also this function can be called for a mix of sequences and scanless experiments.
     """
     for exp in experiments:
-        if exp.scan and (exp.scan.get_oscillation()[1] != 0.0):
+        if exp.scan and not exp.scan.is_still():
             if not exp.scan.get_valid_image_ranges(exp.identifier):
                 exp.scan.set_valid_image_ranges(
                     exp.identifier, [exp.scan.get_image_range()]
