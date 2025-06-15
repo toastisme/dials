@@ -18,6 +18,8 @@ find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(CCTBX COMPONENTS cctbx scitbx ccp4io annlib REQUIRED)
 find_package(DXTBX REQUIRED)
 find_package(OpenMP)
+find_package(gemmi 0.7.0 CONFIG REQUIRED)
+
 # Handle msgpack.. between versions 3 and 6, split into separate packages.
 # While we still support both, look for both names
 find_package(msgpack-cxx REQUIRED NAMES msgpack-cxx msgpack)

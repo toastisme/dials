@@ -11,3 +11,4 @@ Python_add_library(
 )
 target_link_libraries( dials_scaling_ext PUBLIC CCTBX::cctbx Boost::python )
 target_link_libraries( dials_tof_scaling_ext PUBLIC CCTBX::cctbx Boost::python )
+target_link_libraries( dials_tof_scaling_ext PRIVATE gemmi::gemmi_cpp )
