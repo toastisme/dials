@@ -18,6 +18,7 @@ import dials.util.log
 from dials.algorithms.integration.integrator import (
     generate_phil_scope as integrator_phil_scope,
 )
+from dials.algorithms.integration.overlaps_filter import OverlapsFilter
 from dials.algorithms.integration.report import IntegrationReport
 from dials.algorithms.shoebox import MaskCode
 from dials.algorithms.spot_prediction import TOFReflectionPredictor
@@ -29,7 +30,8 @@ from dials.util.phil import parse
 from dials.util.version import dials_version
 from dials_algorithms_tof_integration_ext import (
     TOFProfile1DParams,
-    TOFProfile3DParams,
+    TOFProfile3DGutmannParams,
+    TOFProfile3DICParams,
     integrate_reflection_table,
     tof_calculate_ellipse_shoebox_mask,
     tof_calculate_seed_skewness_shoebox_mask,
@@ -73,12 +75,13 @@ calculated{
     .help = "The resolution spots are integrated to when using integration_type.calculated"
 
 }
-method = *summation profile1d profile3d
+method = *summation profile_1d profile_3d_gutmann profile_3d_ic
     .type = choice
     .help = "Integration method: "
             "summation: shoebox summation"
-            "profile1d: https://doi.org/10.1038/srep36628 "
-            "profile3d: https://doi.org/10.1016/j.nima.2016.12.026"
+            "profile_1d: https://doi.org/10.1038/srep36628 "
+            "profile_3d_gutmann: https://doi.org/10.1016/j.nima.2016.12.026"
+            "profile_3d_ic: separable Ikeda-Carpenter x Bivariate-Gaussian 3D profile"
 
 mask = *ellipse seed_skewness
     .type = choice
@@ -136,7 +139,7 @@ corrections{
         }
     }
 }
-profile1d{
+profile_1d{
     init_alpha = 0.03
         .type = float
         .help = "Initial alpha value before optimization"
@@ -160,7 +163,7 @@ profile1d{
         .help = "If fit fails, number of additional attempts with perturbed params"
 
 }
-profile3d{
+profile_3d_gutmann{
     init_alpha = 1.0
         .type = float
         .help = "Initial alpha value before optimization"
@@ -186,6 +189,74 @@ profile3d{
         .type = choice
         .help = "Method used to calculate gradients"
 }
+profile_3d_ic{
+    init_A = 0.5
+        .type = float
+        .help = "Initial Ikeda-Carpenter A"
+    min_A = 1e-3
+        .type = float
+        .help = "Min A for optimization"
+    max_A = 20.0
+        .type = float
+        .help = "Max A for optimization"
+    init_B = 0.1
+        .type = float
+        .help = "Initial Ikeda-Carpenter B"
+    min_B = 1e-4
+        .type = float
+        .help = "Min B for optimization"
+    max_B = 2.0
+        .type = float
+        .help = "Max B for optimization"
+    init_R = 0.05
+        .type = float
+        .help = "Initial fast/slow neutron ratio (0 to 1)"
+    min_R = 0.0
+        .type = float
+        .help = "Min R for optimization"
+    max_R = 0.5
+        .type = float
+        .help = "Max R for optimization"
+    init_SigX = 1.0
+        .type = float
+        .help = "Initial spatial sigma in the X direction"
+    min_SigX = 0.1
+        .type = float
+        .help = "Min SigX for optimization"
+    max_SigX = 10.0
+        .type = float
+        .help = "Max SigX for optimization"
+    init_SigY = 1.0
+        .type = float
+        .help = "Initial spatial sigma in the Y direction"
+    min_SigY = 0.1
+        .type = float
+        .help = "Min SigY for optimization"
+    max_SigY = 10.0
+        .type = float
+        .help = "Max SigY for optimization"
+    init_SigP = 0.0
+        .type = float
+        .help = "Initial spatial correlation (-1 to 1)"
+    min_SigP = -0.9
+        .type = float
+        .help = "Min SigP for optimization"
+    max_SigP = 0.9
+        .type = float
+        .help = "Max SigP for optimization"
+    hat_width = 5.0
+        .type = float
+        .help = "Half-width of rectangular convolution kernel in ToF bins"
+    kconv = 120.0
+        .type = float
+        .help = "Gaussian convolution kernel decay constant"
+    n_restarts = 100
+        .type = int(value_min=0)
+        .help = "If fit fails, number of additional attempts with perturbed params"
+    optimize_convolution_params = True
+        .type = bool
+        .help = "If True, hat_width and kconv are included in the optimization"
+}
 
 mp{
     nproc = auto
@@ -208,7 +279,7 @@ keep_shoeboxes = False
 """
 Usage:
 $ dials.tof_integrate.py refined.expt refined.refl
-$ dials.tof_integrate refined.expt refined.refl corrections.incident_run=vanadium_run.nxs corrections.empty_run=empty_run.nxs corrections.lorentz=True bbox_tof_padding=15 bbox_xy_padding=5 mask=ellipse method=profile3d mp.nproc=16 background_model=linear3d
+$ dials.tof_integrate refined.expt refined.refl corrections.incident_run=vanadium_run.nxs corrections.empty_run=empty_run.nxs corrections.lorentz=True bbox_tof_padding=15 bbox_xy_padding=5 mask=ellipse method=profile_3d_gutmann mp.nproc=16 background_model=linear3d
 """
 
 phil_scope.adopt_scope(integrator_phil_scope())
@@ -291,24 +362,25 @@ def integrate_reflection_table_for_experiment(
     **kwargs: Dict,
 ) -> flex.reflection_table:
     apply_lorentz = params.corrections.lorentz
-    profile1d_params = None
-    profile3d_params = None
+    profile_1d_params = None
+    profile_3d_gutmann_params = None
+    profile_3d_ic_params = None
     incident_params = None
     absorption_params = None
 
     logger.info(f"    Integrating using {params.method}")
 
     show_profile_failures = logger.getEffectiveLevel() == logging.DEBUG
-    if params.method == "profile1d":
-        alpha = params.profile1d.init_alpha
-        beta = params.profile1d.init_beta
+    if params.method == "profile_1d":
+        alpha = params.profile_1d.init_alpha
+        beta = params.profile_1d.init_beta
         A = 1.0
-        min_alpha = params.profile1d.min_alpha
-        max_alpha = params.profile1d.max_alpha
-        min_beta = params.profile1d.min_beta
-        max_beta = params.profile1d.max_beta
-        n_restarts = params.profile1d.n_restarts
-        profile1d_params = TOFProfile1DParams(
+        min_alpha = params.profile_1d.min_alpha
+        max_alpha = params.profile_1d.max_alpha
+        min_beta = params.profile_1d.min_beta
+        max_beta = params.profile_1d.max_beta
+        n_restarts = params.profile_1d.n_restarts
+        profile_1d_params = TOFProfile1DParams(
             A,
             alpha,
             min_alpha,
@@ -320,16 +392,18 @@ def integrate_reflection_table_for_experiment(
             True,
             show_profile_failures,
         )
-    elif params.method == "profile3d":
-        alpha = params.profile3d.init_alpha
-        beta = params.profile3d.init_beta
-        min_alpha = params.profile3d.min_alpha
-        max_alpha = params.profile3d.max_alpha
-        min_beta = params.profile3d.min_beta
-        max_beta = params.profile3d.max_beta
-        n_restarts = params.profile3d.n_restarts
-        use_central_diff = params.profile3d.gradient_method == "central_difference"
-        profile3d_params = TOFProfile3DParams(
+    elif params.method == "profile_3d_gutmann":
+        alpha = params.profile_3d_gutmann.init_alpha
+        beta = params.profile_3d_gutmann.init_beta
+        min_alpha = params.profile_3d_gutmann.min_alpha
+        max_alpha = params.profile_3d_gutmann.max_alpha
+        min_beta = params.profile_3d_gutmann.min_beta
+        max_beta = params.profile_3d_gutmann.max_beta
+        n_restarts = params.profile_3d_gutmann.n_restarts
+        use_central_diff = (
+            params.profile_3d_gutmann.gradient_method == "central_difference"
+        )
+        profile_3d_gutmann_params = TOFProfile3DGutmannParams(
             alpha,
             min_alpha,
             max_alpha,
@@ -339,6 +413,34 @@ def integrate_reflection_table_for_experiment(
             n_restarts,
             True,
             use_central_diff,
+            show_profile_failures,
+        )
+    elif params.method == "profile_3d_ic":
+        p = params.profile_3d_ic
+        profile_3d_ic_params = TOFProfile3DICParams(
+            p.init_A,
+            p.min_A,
+            p.max_A,
+            p.init_B,
+            p.min_B,
+            p.max_B,
+            p.init_R,
+            p.min_R,
+            p.max_R,
+            p.init_SigX,
+            p.min_SigX,
+            p.max_SigX,
+            p.init_SigY,
+            p.min_SigY,
+            p.max_SigY,
+            p.init_SigP,
+            p.min_SigP,
+            p.max_SigP,
+            p.hat_width,
+            p.kconv,
+            p.n_restarts,
+            True,
+            p.optimize_convolution_params,
             show_profile_failures,
         )
 
@@ -367,8 +469,9 @@ def integrate_reflection_table_for_experiment(
         absorption_params,
         apply_lorentz,
         params.mp.nproc,
-        profile1d_params,
-        profile3d_params,
+        profile_1d_params,
+        profile_3d_gutmann_params,
+        profile_3d_ic_params,
     )
 
     return expt_reflections
@@ -387,6 +490,15 @@ def remove_overlapping_reflections(
     logger.info("Rejecting %i overlapping bounding boxes", overlap_sel.count(True))
     reflections = reflections.select(~overlap_sel)
     return reflections
+
+
+def overlapping_foreground_reflections(
+    reflections: flex.reflection_table, experiment: Experiment
+) -> flex.bool:
+
+    overlaps_filter = OverlapsFilter(reflections, experiment)
+    overlaps_filter.create_referenced_mask(overlaps_filter.code_fgd, "foreground")
+    return overlaps_filter.filter_overlaps_using_referenced_mask("foreground")
 
 
 def compute_partiality(bbox: Tuple, image_size: Tuple) -> float:
@@ -776,8 +888,6 @@ def run_integrate(
             params=params, experiments=experiments, reflections=reflections
         )
 
-    predicted_reflections = remove_overlapping_reflections(predicted_reflections)
-
     corrections_data = get_corrections_data(experiments=experiments, params=params)
 
     experiment_cls = experiments[0].imageset.get_format_class()
@@ -831,6 +941,13 @@ def run_integrate(
         expt_reflections.set_flags(
             ~success, expt_reflections.flags.failed_during_background_modelling
         )
+
+        overlap_sel = overlapping_foreground_reflections(
+            reflections=expt_reflections, experiment=expt
+        )
+        expt_reflections.set_flags(~overlap_sel, expt_reflections.flags.dont_integrate)
+
+        logger.info(f"    Removed {overlap_sel.count(False)} due to foreground overlap")
 
         expt_reflections = integrate_reflection_table_for_experiment(
             expt,

@@ -1,10 +1,12 @@
 
+#define BOOST_PYTHON_MAX_ARITY 30
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <dials/algorithms/integration/tof/tof_mask_calculator.h>
 #include <dials/algorithms/integration/tof/tof_integration.h>
-#include <dials/algorithms/integration/tof/tof_profile1d.h>
-#include <dials/algorithms/integration/tof/tof_profile3d.h>
+#include <dials/algorithms/integration/tof/tof_profile_1d.h>
+#include <dials/algorithms/integration/tof/tof_profile_3d_gutmann.h>
+#include <dials/algorithms/integration/tof/tof_profile_3d_ic.h>
 #include <dials/algorithms/scaling/tof/tof_scaling.h>
 
 namespace dials { namespace algorithms { namespace boost_python {
@@ -18,17 +20,24 @@ namespace dials { namespace algorithms { namespace boost_python {
                                           object absorption_params_obj,
                                           const bool& apply_lorentz,
                                           int n_threads,
-                                          object profile1d_params_obj,
-                                          object profile3d_params_obj) {
-    boost::optional<TOFProfile1DParams> profile1d_params;
-    boost::optional<TOFProfile3DParams> profile3d_params;
+                                          object profile_1d_params_obj,
+                                          object profile_3d_gutmann_params_obj,
+                                          object profile_3d_ic_params_obj) {
+    boost::optional<TOFProfile1DParams> profile_1d_params;
+    boost::optional<TOFProfile3DGutmannParams> profile_3d_gutmann_params;
+    boost::optional<TOFProfile3DICParams> profile_3d_ic_params;
 
-    if (!profile1d_params_obj.is_none()) {
-      profile1d_params = extract<TOFProfile1DParams>(profile1d_params_obj);
+    if (!profile_1d_params_obj.is_none()) {
+      profile_1d_params = extract<TOFProfile1DParams>(profile_1d_params_obj);
     }
 
-    if (!profile3d_params_obj.is_none()) {
-      profile3d_params = extract<TOFProfile3DParams>(profile3d_params_obj);
+    if (!profile_3d_gutmann_params_obj.is_none()) {
+      profile_3d_gutmann_params =
+        extract<TOFProfile3DGutmannParams>(profile_3d_gutmann_params_obj);
+    }
+
+    if (!profile_3d_ic_params_obj.is_none()) {
+      profile_3d_ic_params = extract<TOFProfile3DICParams>(profile_3d_ic_params_obj);
     }
 
     if (absorption_params_obj.is_none() && incident_params_obj.is_none()) {
@@ -37,8 +46,9 @@ namespace dials { namespace algorithms { namespace boost_python {
                                  data,
                                  apply_lorentz,
                                  n_threads,
-                                 profile1d_params,
-                                 profile3d_params);
+                                 profile_1d_params,
+                                 profile_3d_gutmann_params,
+                                 profile_3d_ic_params);
 
       return;
     }
@@ -58,8 +68,9 @@ namespace dials { namespace algorithms { namespace boost_python {
                                    absorption_params,
                                    apply_lorentz,
                                    n_threads,
-                                   profile1d_params,
-                                   profile3d_params);
+                                   profile_1d_params,
+                                   profile_3d_gutmann_params,
+                                   profile_3d_ic_params);
       }
 
       else {
@@ -69,10 +80,32 @@ namespace dials { namespace algorithms { namespace boost_python {
                                    incident_params,
                                    apply_lorentz,
                                    n_threads,
-                                   profile1d_params,
-                                   profile3d_params);
+                                   profile_1d_params,
+                                   profile_3d_gutmann_params,
+                                   profile_3d_ic_params);
       }
     }
+  }
+
+  boost::python::tuple fit_profile_3d_ic_wrapper(
+    scitbx::af::versa<scitbx::vec3<double>, scitbx::af::c_grid<3>> coords,
+    scitbx::af::versa<double, scitbx::af::c_grid<3>> intensities,
+    scitbx::af::versa<double, scitbx::af::c_grid<3>> background_variances,
+    TOFProfile3DICParams& profile_params,
+    boost::python::object profile_3d_obj) {
+    double I_prf = 0.0;
+    boost::optional<scitbx::af::versa<double, scitbx::af::c_grid<3>>> profile_3d_out;
+    if (!profile_3d_obj.is_none()) {
+      profile_3d_out =
+        extract<scitbx::af::versa<double, scitbx::af::c_grid<3>>>(profile_3d_obj);
+    }
+    const bool success = dials::algorithms::fit_ic_profile3d(coords.const_ref(),
+                                                             intensities,
+                                                             background_variances,
+                                                             profile_params,
+                                                             I_prf,
+                                                             profile_3d_out);
+    return boost::python::make_tuple(success, I_prf);
   }
 
   BOOST_PYTHON_MODULE(dials_algorithms_tof_integration_ext) {
@@ -91,20 +124,20 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def_readwrite("show_profile_failures",
                      &TOFProfile1DParams::show_profile_failures);
 
-    class_<TOFProfile3DParams>("TOFProfile3DParams", no_init)
+    class_<TOFProfile3DGutmannParams>("TOFProfile3DGutmannParams", no_init)
       .def(
         init<double, double, double, double, double, double, int, bool, bool, bool>())
-      .def_readwrite("alpha", &TOFProfile3DParams::alpha)
-      .def_readwrite("alpha_min", &TOFProfile3DParams::alpha_min)
-      .def_readwrite("alpha_max", &TOFProfile3DParams::alpha_max)
-      .def_readwrite("beta", &TOFProfile3DParams::beta)
-      .def_readwrite("beta_min", &TOFProfile3DParams::beta_min)
-      .def_readwrite("beta_max", &TOFProfile3DParams::beta_max)
-      .def_readwrite("n_restarts", &TOFProfile3DParams::n_restarts)
-      .def_readwrite("optimize_profile", &TOFProfile3DParams::optimize_profile)
-      .def_readwrite("use_central_diff", &TOFProfile3DParams::use_central_diff)
+      .def_readwrite("alpha", &TOFProfile3DGutmannParams::alpha)
+      .def_readwrite("alpha_min", &TOFProfile3DGutmannParams::alpha_min)
+      .def_readwrite("alpha_max", &TOFProfile3DGutmannParams::alpha_max)
+      .def_readwrite("beta", &TOFProfile3DGutmannParams::beta)
+      .def_readwrite("beta_min", &TOFProfile3DGutmannParams::beta_min)
+      .def_readwrite("beta_max", &TOFProfile3DGutmannParams::beta_max)
+      .def_readwrite("n_restarts", &TOFProfile3DGutmannParams::n_restarts)
+      .def_readwrite("optimize_profile", &TOFProfile3DGutmannParams::optimize_profile)
+      .def_readwrite("use_central_diff", &TOFProfile3DGutmannParams::use_central_diff)
       .def_readwrite("show_profile_failures",
-                     &TOFProfile3DParams::show_profile_failures);
+                     &TOFProfile3DGutmannParams::show_profile_failures);
 
     def("tof_calculate_ellipse_shoebox_mask",
         &tof_calculate_ellipse_shoebox_mask,
@@ -130,7 +163,9 @@ namespace dials { namespace algorithms { namespace boost_python {
          arg("absorption_params"),
          arg("apply_lorentz_correction"),
          arg("n_threads"),
-         arg("profile1d_params") = object()));
+         arg("profile_1d_params") = object(),
+         arg("profile_3d_gutmann_params") = object(),
+         arg("profile_3d_ic_params") = object()));
 
     def("calculate_line_profile_for_reflection",
         static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
@@ -147,13 +182,13 @@ namespace dials { namespace algorithms { namespace boost_python {
         static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
                                              dxtbx::model::Experiment&,
                                              dxtbx::ImageSequence&,
-                                             scitbx::af::shared<vec3<double> >,
+                                             scitbx::af::shared<vec3<double>>,
                                              scitbx::af::shared<double>,
                                              scitbx::af::shared<double>,
                                              scitbx::af::shared<double>,
                                              scitbx::af::shared<double>,
                                              const bool&,
-                                             TOFProfile3DParams&)>(
+                                             TOFProfile3DGutmannParams&)>(
           &calculate_line_profile_for_reflection_3d));
 
     def("calculate_line_profile_for_reflection",
@@ -222,6 +257,67 @@ namespace dials { namespace algorithms { namespace boost_python {
           scitbx::af::shared<double>,
           const bool&,
           TOFProfile1DParams&)>(&calculate_line_profile_for_reflection));
+
+    class_<TOFProfile3DICParams>("TOFProfile3DICParams", no_init)
+      .def(init<double,
+                double,
+                double,  // A, A_min, A_max
+                double,
+                double,
+                double,  // B, B_min, B_max
+                double,
+                double,
+                double,  // R, R_min, R_max
+                double,
+                double,
+                double,  // SigX, SigX_min, SigX_max
+                double,
+                double,
+                double,  // SigY, SigY_min, SigY_max
+                double,
+                double,
+                double,  // SigP, SigP_min, SigP_max
+                double,
+                double,  // HatWidth, KConv
+                int,
+                bool,
+                bool,
+                bool>())  // n_restarts, optimize_profile,
+                          // optimize_convolution_params, show_profile_failures
+      .def_readwrite("A", &TOFProfile3DICParams::A)
+      .def_readwrite("A_min", &TOFProfile3DICParams::A_min)
+      .def_readwrite("A_max", &TOFProfile3DICParams::A_max)
+      .def_readwrite("B", &TOFProfile3DICParams::B)
+      .def_readwrite("B_min", &TOFProfile3DICParams::B_min)
+      .def_readwrite("B_max", &TOFProfile3DICParams::B_max)
+      .def_readwrite("R", &TOFProfile3DICParams::R)
+      .def_readwrite("R_min", &TOFProfile3DICParams::R_min)
+      .def_readwrite("R_max", &TOFProfile3DICParams::R_max)
+      .def_readwrite("SigX", &TOFProfile3DICParams::SigX)
+      .def_readwrite("SigX_min", &TOFProfile3DICParams::SigX_min)
+      .def_readwrite("SigX_max", &TOFProfile3DICParams::SigX_max)
+      .def_readwrite("SigY", &TOFProfile3DICParams::SigY)
+      .def_readwrite("SigY_min", &TOFProfile3DICParams::SigY_min)
+      .def_readwrite("SigY_max", &TOFProfile3DICParams::SigY_max)
+      .def_readwrite("SigP", &TOFProfile3DICParams::SigP)
+      .def_readwrite("SigP_min", &TOFProfile3DICParams::SigP_min)
+      .def_readwrite("SigP_max", &TOFProfile3DICParams::SigP_max)
+      .def_readwrite("HatWidth", &TOFProfile3DICParams::HatWidth)
+      .def_readwrite("KConv", &TOFProfile3DICParams::KConv)
+      .def_readwrite("n_restarts", &TOFProfile3DICParams::n_restarts)
+      .def_readwrite("optimize_profile", &TOFProfile3DICParams::optimize_profile)
+      .def_readwrite("optimize_convolution_params",
+                     &TOFProfile3DICParams::optimize_convolution_params)
+      .def_readwrite("show_profile_failures",
+                     &TOFProfile3DICParams::show_profile_failures);
+
+    def("fit_profile_3d_ic",
+        &fit_profile_3d_ic_wrapper,
+        (arg("coords"),
+         arg("intensities"),
+         arg("background_variances"),
+         arg("profile_params"),
+         arg("profile_3d_out") = object()));
   }
 
 }}}  // namespace dials::algorithms::boost_python
