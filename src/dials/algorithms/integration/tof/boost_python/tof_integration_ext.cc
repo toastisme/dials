@@ -99,12 +99,12 @@ namespace dials { namespace algorithms { namespace boost_python {
       profile_3d_out =
         extract<scitbx::af::versa<double, scitbx::af::c_grid<3>>>(profile_3d_obj);
     }
-    const bool success = dials::algorithms::fit_ic_profile3d(coords.const_ref(),
-                                                             intensities,
-                                                             background_variances,
-                                                             profile_params,
-                                                             I_prf,
-                                                             profile_3d_out);
+    const bool success = dials::algorithms::fit_profile_3d_ic(coords.const_ref(),
+                                                              intensities,
+                                                              background_variances,
+                                                              profile_params,
+                                                              I_prf,
+                                                              profile_3d_out);
     return boost::python::make_tuple(success, I_prf);
   }
 

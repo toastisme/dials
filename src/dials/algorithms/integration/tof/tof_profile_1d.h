@@ -535,7 +535,7 @@ namespace dials { namespace algorithms {
     }
   };
 
-  bool fit_profile1d(
+  bool fit_profile_1d(
     scitbx::af::const_ref<double> projected_intensity,
     scitbx::af::const_ref<double> tof_z,
     TOFProfile1DParams& profile_params,
