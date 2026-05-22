@@ -34,8 +34,8 @@ namespace dials { namespace algorithms {
     double R, R_min, R_max;  // fast/slow neutron ratio
                              //
     // BVG parameters
-    double SigX, SigX_min, SigX_max;
-    double SigY, SigY_min, SigY_max;
+    double SigX_min, SigX_max;
+    double SigY_min, SigY_max;
     double SigP, SigP_min, SigP_max;  // spatial correlation
                                       //
     // Convolution parameters (optimised by default but can be fixed with
@@ -58,10 +58,8 @@ namespace dials { namespace algorithms {
                          double R_,
                          double R_min_,
                          double R_max_,
-                         double SigX_,
                          double SigX_min_,
                          double SigX_max_,
-                         double SigY_,
                          double SigY_min_,
                          double SigY_max_,
                          double SigP_,
@@ -82,10 +80,8 @@ namespace dials { namespace algorithms {
           R(R_),
           R_min(R_min_),
           R_max(R_max_),
-          SigX(SigX_),
           SigX_min(SigX_min_),
           SigX_max(SigX_max_),
-          SigY(SigY_),
           SigY_min(SigY_min_),
           SigY_max(SigY_max_),
           SigP(SigP_),
@@ -419,8 +415,6 @@ namespace dials { namespace algorithms {
                    double A,
                    double B,
                    double R,
-                   double SigX,
-                   double SigY,
                    double SigP,
                    double HatWidth,
                    double KConv,
@@ -781,8 +775,6 @@ namespace dials { namespace algorithms {
                            profile_params.A,
                            profile_params.B,
                            profile_params.R,
-                           profile_params.SigX,
-                           profile_params.SigY,
                            profile_params.SigP,
                            profile_params.HatWidth,
                            profile_params.KConv,
@@ -806,8 +798,6 @@ namespace dials { namespace algorithms {
         profile_params.A = profile.get_A();
         profile_params.B = profile.get_B();
         profile_params.R = profile.get_R();
-        profile_params.SigX = profile.get_SigX();
-        profile_params.SigY = profile.get_SigY();
         profile_params.SigP = profile.get_SigP();
       }
 
