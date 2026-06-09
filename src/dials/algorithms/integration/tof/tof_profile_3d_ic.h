@@ -734,7 +734,7 @@ namespace dials { namespace algorithms {
       }
 
       const double corr = num / std::sqrt(denom_d * denom_m + 1e-12);
-      if (corr < 0.75) {
+      if (corr < 0.8) {
         if (show_error)
           std::cerr << "profile_3d_ic fitting failure: low correlation (" << corr
                     << ")\n";
