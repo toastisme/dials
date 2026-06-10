@@ -108,34 +108,34 @@ corrections{
         incident_spectrum{
             sample_number_density = 0.0722
                 .type = float
-                .help = "Sample number density for incident run."
+                .help = "Sample number density (num_atoms/A^3) for incident run."
                         "Default is Vanadium used at SXD"
-            sample_radius = 0.03
+            sample_radius = 0.003
                 .type = float
-                .help = "Sample radius incident run."
+                .help = "Sample radius (mm) for incident run."
                         "Default is Vanadium used at SXD"
             scattering_x_section = 5.158
                 .type = float
-                .help = "Sample scattering cross section used for incident run."
+                .help = "Sample scattering cross section (barns) used for incident run."
                         "Default is Vanadium used at SXD"
             absorption_x_section = 4.4883
                 .type = float
-                .help = "Sample absorption cross section for incident run."
+                .help = "Sample absorption cross section (barns) for incident run."
                         "Default is Vanadium used at SXD"
         }
         target_spectrum{
             sample_number_density = None
                 .type = float
-                .help = "Sample number density for target run."
+                .help = "Sample number density (num_atoms/A^3) for target run."
             sample_radius = None
                 .type = float
-                .help = "Sample radius target run."
+                .help = "Sample radius (mm) for target run."
             scattering_x_section = None
                 .type = float
-                .help = "Sample scattering cross section used for target run."
+                .help = "Sample scattering cross section (barns) for target run."
             absorption_x_section = None
                 .type = float
-                .help = "Sample absorption cross section for target run."
+                .help = "Sample absorption cross section (barns) for target run."
         }
     }
 }

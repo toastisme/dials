@@ -243,14 +243,14 @@ struct TOFIncidentSpectrumParams {
  * Holds constants required for correcting time-of-flight data for absorption
  */
 struct TOFAbsorptionParams {
-  double sample_radius;
-  double sample_scattering_x_section;
-  double sample_absorption_x_section;
-  double sample_number_density;
-  double incident_radius;
-  double incident_scattering_x_section;
-  double incident_absorption_x_section;
-  double incident_number_density;
+  double sample_radius;                  // (mm)
+  double sample_scattering_x_section;    // (barns)
+  double sample_absorption_x_section;    // (barns)
+  double sample_number_density;          // (num_atoms/A^3)
+  double incident_radius;                // (mm)
+  double incident_scattering_x_section;  // (barns)
+  double incident_absorption_x_section;  // (barns)
+  double incident_number_density;        // (num_atoms/A^3)
   double sample_linear_scattering_c;
   double incident_linear_scattering_c;
   double sample_linear_absorption_c;
