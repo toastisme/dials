@@ -49,41 +49,53 @@ namespace dials { namespace algorithms { namespace boost_python {
                                  profile_1d_params,
                                  profile_3d_gutmann_params,
                                  profile_3d_ic_params);
-
       return;
     }
 
-    if (!incident_params_obj.is_none()) {
-      dials_scaling::TOFIncidentSpectrumParams incident_params =
-        extract<dials_scaling::TOFIncidentSpectrumParams>(incident_params_obj);
+    if (incident_params_obj.is_none()) {
+      // Absorption correction only (no incident spectrum normalisation)
+      dials_scaling::TOFAbsorptionParams absorption_params =
+        extract<dials_scaling::TOFAbsorptionParams>(absorption_params_obj);
 
-      if (!absorption_params_obj.is_none()) {
-        dials_scaling::TOFAbsorptionParams absorption_params =
-          extract<dials_scaling::TOFAbsorptionParams>(absorption_params_obj);
+      integrate_reflection_table(reflection_table,
+                                 experiment,
+                                 data,
+                                 absorption_params,
+                                 apply_lorentz,
+                                 n_threads,
+                                 profile_1d_params,
+                                 profile_3d_gutmann_params,
+                                 profile_3d_ic_params);
+      return;
+    }
 
-        integrate_reflection_table(reflection_table,
-                                   experiment,
-                                   data,
-                                   incident_params,
-                                   absorption_params,
-                                   apply_lorentz,
-                                   n_threads,
-                                   profile_1d_params,
-                                   profile_3d_gutmann_params,
-                                   profile_3d_ic_params);
-      }
+    dials_scaling::TOFIncidentSpectrumParams incident_params =
+      extract<dials_scaling::TOFIncidentSpectrumParams>(incident_params_obj);
 
-      else {
-        integrate_reflection_table(reflection_table,
-                                   experiment,
-                                   data,
-                                   incident_params,
-                                   apply_lorentz,
-                                   n_threads,
-                                   profile_1d_params,
-                                   profile_3d_gutmann_params,
-                                   profile_3d_ic_params);
-      }
+    if (!absorption_params_obj.is_none()) {
+      dials_scaling::TOFAbsorptionParams absorption_params =
+        extract<dials_scaling::TOFAbsorptionParams>(absorption_params_obj);
+
+      integrate_reflection_table(reflection_table,
+                                 experiment,
+                                 data,
+                                 incident_params,
+                                 absorption_params,
+                                 apply_lorentz,
+                                 n_threads,
+                                 profile_1d_params,
+                                 profile_3d_gutmann_params,
+                                 profile_3d_ic_params);
+    } else {
+      integrate_reflection_table(reflection_table,
+                                 experiment,
+                                 data,
+                                 incident_params,
+                                 apply_lorentz,
+                                 n_threads,
+                                 profile_1d_params,
+                                 profile_3d_gutmann_params,
+                                 profile_3d_ic_params);
     }
   }
 
@@ -178,19 +190,6 @@ namespace dials { namespace algorithms { namespace boost_python {
                                              const bool&)>(
           &calculate_line_profile_for_reflection));
 
-    def("calculate_line_profile_for_reflection_3d",
-        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
-                                             dxtbx::model::Experiment&,
-                                             dxtbx::ImageSequence&,
-                                             scitbx::af::shared<vec3<double>>,
-                                             scitbx::af::shared<double>,
-                                             scitbx::af::shared<double>,
-                                             scitbx::af::shared<double>,
-                                             scitbx::af::shared<double>,
-                                             const bool&,
-                                             TOFProfile3DGutmannParams&)>(
-          &calculate_line_profile_for_reflection_3d));
-
     def("calculate_line_profile_for_reflection",
         static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
                                              dxtbx::model::Experiment&,
@@ -202,6 +201,32 @@ namespace dials { namespace algorithms { namespace boost_python {
                                              scitbx::af::shared<double>,
                                              const bool&,
                                              TOFProfile1DParams&)>(
+          &calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
+                                             dxtbx::model::Experiment&,
+                                             dxtbx::ImageSequence&,
+                                             scitbx::af::shared<vec3<double>>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             const bool&,
+                                             TOFProfile3DGutmannParams&)>(
+          &calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
+                                             dxtbx::model::Experiment&,
+                                             dxtbx::ImageSequence&,
+                                             scitbx::af::shared<vec3<double>>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             const bool&,
+                                             TOFProfile3DICParams&)>(
           &calculate_line_profile_for_reflection));
 
     def("calculate_line_profile_for_reflection",
@@ -236,6 +261,34 @@ namespace dials { namespace algorithms { namespace boost_python {
           dxtbx::model::Experiment&,
           dxtbx::ImageSequence&,
           const dials_scaling::TOFIncidentSpectrumParams&,
+          scitbx::af::shared<vec3<double>>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          const bool&,
+          TOFProfile3DGutmannParams&)>(&calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(
+          dials::af::reflection_table&,
+          dxtbx::model::Experiment&,
+          dxtbx::ImageSequence&,
+          const dials_scaling::TOFIncidentSpectrumParams&,
+          scitbx::af::shared<vec3<double>>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          const bool&,
+          TOFProfile3DICParams&)>(&calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(
+          dials::af::reflection_table&,
+          dxtbx::model::Experiment&,
+          dxtbx::ImageSequence&,
+          const dials_scaling::TOFIncidentSpectrumParams&,
           const dials_scaling::TOFAbsorptionParams&,
           scitbx::af::shared<double>,
           scitbx::af::shared<double>,
@@ -258,6 +311,90 @@ namespace dials { namespace algorithms { namespace boost_python {
           const bool&,
           TOFProfile1DParams&)>(&calculate_line_profile_for_reflection));
 
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(
+          dials::af::reflection_table&,
+          dxtbx::model::Experiment&,
+          dxtbx::ImageSequence&,
+          const dials_scaling::TOFIncidentSpectrumParams&,
+          const dials_scaling::TOFAbsorptionParams&,
+          scitbx::af::shared<vec3<double>>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          const bool&,
+          TOFProfile3DGutmannParams&)>(&calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(
+          dials::af::reflection_table&,
+          dxtbx::model::Experiment&,
+          dxtbx::ImageSequence&,
+          const dials_scaling::TOFIncidentSpectrumParams&,
+          const dials_scaling::TOFAbsorptionParams&,
+          scitbx::af::shared<vec3<double>>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          scitbx::af::shared<double>,
+          const bool&,
+          TOFProfile3DICParams&)>(&calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
+                                             dxtbx::model::Experiment&,
+                                             dxtbx::ImageSequence&,
+                                             const dials_scaling::TOFAbsorptionParams&,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             const bool&)>(
+          &calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
+                                             dxtbx::model::Experiment&,
+                                             dxtbx::ImageSequence&,
+                                             const dials_scaling::TOFAbsorptionParams&,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             const bool&,
+                                             TOFProfile1DParams&)>(
+          &calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
+                                             dxtbx::model::Experiment&,
+                                             dxtbx::ImageSequence&,
+                                             const dials_scaling::TOFAbsorptionParams&,
+                                             scitbx::af::shared<vec3<double>>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             const bool&,
+                                             TOFProfile3DGutmannParams&)>(
+          &calculate_line_profile_for_reflection));
+
+    def("calculate_line_profile_for_reflection",
+        static_cast<boost::python::tuple (*)(dials::af::reflection_table&,
+                                             dxtbx::model::Experiment&,
+                                             dxtbx::ImageSequence&,
+                                             const dials_scaling::TOFAbsorptionParams&,
+                                             scitbx::af::shared<vec3<double>>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             scitbx::af::shared<double>,
+                                             const bool&,
+                                             TOFProfile3DICParams&)>(
+          &calculate_line_profile_for_reflection));
+
     class_<TOFProfile3DICParams>("TOFProfile3DICParams", no_init)
       .def(init<double,
                 double,
@@ -269,11 +406,9 @@ namespace dials { namespace algorithms { namespace boost_python {
                 double,
                 double,  // R, R_min, R_max
                 double,
+                double,  // SigX_min, SigX_max
                 double,
-                double,  // SigX, SigX_min, SigX_max
-                double,
-                double,
-                double,  // SigY, SigY_min, SigY_max
+                double,  // SigY_min, SigY_max
                 double,
                 double,
                 double,  // SigP, SigP_min, SigP_max
@@ -293,10 +428,8 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def_readwrite("R", &TOFProfile3DICParams::R)
       .def_readwrite("R_min", &TOFProfile3DICParams::R_min)
       .def_readwrite("R_max", &TOFProfile3DICParams::R_max)
-      .def_readwrite("SigX", &TOFProfile3DICParams::SigX)
       .def_readwrite("SigX_min", &TOFProfile3DICParams::SigX_min)
       .def_readwrite("SigX_max", &TOFProfile3DICParams::SigX_max)
-      .def_readwrite("SigY", &TOFProfile3DICParams::SigY)
       .def_readwrite("SigY_min", &TOFProfile3DICParams::SigY_min)
       .def_readwrite("SigY_max", &TOFProfile3DICParams::SigY_max)
       .def_readwrite("SigP", &TOFProfile3DICParams::SigP)

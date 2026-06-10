@@ -4,8 +4,8 @@ from __future__ import annotations
 import logging
 import multiprocessing
 from copy import deepcopy
-from math import ceil, floor
-from typing import Dict, Tuple
+from math import ceil, erf, floor, sqrt
+from typing import Dict, Sequence, Tuple
 
 import numpy as np
 
@@ -88,7 +88,7 @@ mask = *ellipse seed_skewness
     .help = "Foreground/background mask method: "
             "seed_skewness: https://doi.org/10.1107/S0021889803021939"
 ellipse_mask{
-    scale = 1.0
+    scale = 3.0
     .type = float (value_min=0.5)
     .help = "Number of standard deviations to use when generating the ellipse mask"
 }
@@ -158,16 +158,16 @@ profile_1d{
     max_beta = 1.0
         .type = float
         .help = "Max beta value for optimization"
-    n_restarts = 8
+    n_restarts = 5000
         .type = int(value_min=0)
         .help = "If fit fails, number of additional attempts with perturbed params"
 
 }
 profile_3d_gutmann{
-    init_alpha = 1.0
+    init_alpha = 3.0
         .type = float
         .help = "Initial alpha value before optimization"
-    init_beta = 0.1
+    init_beta = 0.5
         .type = float
         .help = "Initial beta value before optimization"
     min_alpha = 0.5
@@ -176,13 +176,13 @@ profile_3d_gutmann{
     max_alpha = 20.
         .type = float
         .help = "Max alpha value for optimization"
-    min_beta = 1e-7
+    min_beta = 1e-2
         .type = float
         .help = "Min beta value for optimization"
     max_beta = 5.0
         .type = float
         .help = "Max beta value for optimization"
-    n_restarts = 8
+    n_restarts = 1000
         .type = int(value_min=0)
         .help = "If fit fails, number of additional attempts with perturbed params"
     gradient_method = *forward_difference central_difference
@@ -190,10 +190,10 @@ profile_3d_gutmann{
         .help = "Method used to calculate gradients"
 }
 profile_3d_ic{
-    init_A = 0.5
+    init_A = 1.0
         .type = float
         .help = "Initial Ikeda-Carpenter A"
-    min_A = 1e-3
+    min_A = 1e-1
         .type = float
         .help = "Min A for optimization"
     max_A = 20.0
@@ -202,7 +202,7 @@ profile_3d_ic{
     init_B = 0.1
         .type = float
         .help = "Initial Ikeda-Carpenter B"
-    min_B = 1e-4
+    min_B = 1e-2
         .type = float
         .help = "Min B for optimization"
     max_B = 2.0
@@ -217,18 +217,12 @@ profile_3d_ic{
     max_R = 0.5
         .type = float
         .help = "Max R for optimization"
-    init_SigX = 1.0
-        .type = float
-        .help = "Initial spatial sigma in the X direction"
     min_SigX = 0.1
         .type = float
         .help = "Min SigX for optimization"
     max_SigX = 10.0
         .type = float
         .help = "Max SigX for optimization"
-    init_SigY = 1.0
-        .type = float
-        .help = "Initial spatial sigma in the Y direction"
     min_SigY = 0.1
         .type = float
         .help = "Min SigY for optimization"
@@ -250,7 +244,7 @@ profile_3d_ic{
     kconv = 120.0
         .type = float
         .help = "Gaussian convolution kernel decay constant"
-    n_restarts = 100
+    n_restarts = 1000
         .type = int(value_min=0)
         .help = "If fit fails, number of additional attempts with perturbed params"
     optimize_convolution_params = True
@@ -270,6 +264,14 @@ bbox_tof_padding = 2
 bbox_xy_padding = 1
     .type = int
     .help = "Additional pixels added to calculated bounding boxes"
+partiality_n_sigma_xy = 2.5
+    .type = float (value_min=0.1)
+    .help = "Assumed number of sigma the bounding box half-width spans in x/y."
+            "Used to estimate the Gaussian sigma for partiality calculation."
+partiality_n_sigma_z = 2.5
+    .type = float (value_min=0.1)
+    .help = "Assumed number of sigma the bounding box half-width spans in z (ToF)."
+            "Used to estimate the Gaussian sigma for partiality calculation."
 keep_shoeboxes = False
     .type = bool
     .help = "Retain shoeboxes in output reflection table"
@@ -319,17 +321,17 @@ def get_corrections_data(
         corrections["incident_proton_charge"] = incident_proton_charge
         corrections["empty_proton_charge"] = empty_proton_charge
 
-        if applying_spherical_absorption_correction(params):
-            corrections["absorption_params"] = TOFAbsorptionParams(
-                params.corrections.absorption.target_spectrum.sample_radius,
-                params.corrections.absorption.target_spectrum.scattering_x_section,
-                params.corrections.absorption.target_spectrum.absorption_x_section,
-                params.corrections.absorption.target_spectrum.sample_number_density,
-                params.corrections.absorption.incident_spectrum.sample_radius,
-                params.corrections.absorption.incident_spectrum.scattering_x_section,
-                params.corrections.absorption.incident_spectrum.absorption_x_section,
-                params.corrections.absorption.incident_spectrum.sample_number_density,
-            )
+    if applying_spherical_absorption_correction(params):
+        corrections["absorption_params"] = TOFAbsorptionParams(
+            params.corrections.absorption.target_spectrum.sample_radius,
+            params.corrections.absorption.target_spectrum.scattering_x_section,
+            params.corrections.absorption.target_spectrum.absorption_x_section,
+            params.corrections.absorption.target_spectrum.sample_number_density,
+            params.corrections.absorption.incident_spectrum.sample_radius,
+            params.corrections.absorption.incident_spectrum.scattering_x_section,
+            params.corrections.absorption.incident_spectrum.absorption_x_section,
+            params.corrections.absorption.incident_spectrum.sample_number_density,
+        )
 
     return corrections
 
@@ -427,10 +429,8 @@ def integrate_reflection_table_for_experiment(
             p.init_R,
             p.min_R,
             p.max_R,
-            p.init_SigX,
             p.min_SigX,
             p.max_SigX,
-            p.init_SigY,
             p.min_SigY,
             p.max_SigY,
             p.init_SigP,
@@ -457,9 +457,9 @@ def integrate_reflection_table_for_experiment(
         )
         logger.info("    Adding incident spectrum correction")
 
-        if "absorption_params" in kwargs:
-            logger.info("    Adding absorption correction")
-            absorption_params = kwargs["absorption_params"]
+    if "absorption_params" in kwargs:
+        logger.info("    Adding absorption correction")
+        absorption_params = kwargs["absorption_params"]
 
     integrate_reflection_table(
         expt_reflections,
@@ -498,26 +498,80 @@ def overlapping_foreground_reflections(
 
     overlaps_filter = OverlapsFilter(reflections, experiment)
     overlaps_filter.create_referenced_mask(overlaps_filter.code_fgd, "foreground")
+    """
+    for j in range(10):
+        for i in overlaps_filter.masks["foreground"][j]:
+            val = overlaps_filter.masks["foreground"][j][i]
+            if len(val) > 1:
+                print(
+                    f"TEST overlapping val({i}:{val}) {[(reflections['bbox'][k], reflections['panel'][k]) for k in val]}"
+                )
+    """
+
     return overlaps_filter.filter_overlaps_using_referenced_mask("foreground")
 
 
-def compute_partiality(bbox: Tuple, image_size: Tuple) -> float:
+def _gaussian_fraction(center: float, lo: float, hi: float, sigma: float) -> float:
+    """Fraction of N(center, sigma^2) integral lying in [lo, hi]."""
+    s2 = sigma * sqrt(2)
+    return 0.5 * (erf((hi - center) / s2) - erf((lo - center) / s2))
+
+
+def compute_partiality(
+    bbox: Sequence,
+    image_size: Sequence,
+    centroid: Sequence,
+    n_sigma_xy: float = 2.5,
+    n_sigma_z: float = 2.5,
+) -> float:
     """
-    Approximate partiality by looking at overlap of bounding box with panel
+    Estimate partiality by modelling intensity as a 3D separable Gaussian and
+    computing the fraction of the total integral that lies within the observed
+    (panel/frame-clipped) region.
+
+    sigma in each dimension is estimated from the bounding box half-width:
+      sigma = half_width / n_sigma
+    so n_sigma controls how many standard deviations the bbox edge is from the
+    centroid when the reflection is fully visible.
     """
+    cx0 = max(image_size[0], bbox[0])
+    cx1 = min(image_size[1], bbox[1])
+    cy0 = max(image_size[2], bbox[2])
+    cy1 = min(image_size[3], bbox[3])
+    cz0 = max(image_size[4], bbox[4])
+    cz1 = min(image_size[5], bbox[5])
 
-    intersect_x0 = max(image_size[0], bbox[0])
-    intersect_y0 = max(image_size[2], bbox[2])
-    intersect_x1 = min(image_size[1], bbox[1])
-    intersect_y1 = min(image_size[3], bbox[3])
+    if cx0 >= cx1 or cy0 >= cy1 or cz0 >= cz1:
+        return 0.0
 
-    if intersect_x0 >= intersect_x1 or intersect_y0 >= intersect_y1:
-        return 0
+    sigma_x = (bbox[1] - bbox[0]) / (2.0 * n_sigma_xy)
+    sigma_y = (bbox[3] - bbox[2]) / (2.0 * n_sigma_xy)
+    sigma_z = (bbox[5] - bbox[4]) / (2.0 * n_sigma_z)
 
-    intersection_area = (intersect_x1 - intersect_x0) * (intersect_y1 - intersect_y0)
-    square_area = (bbox[1] - bbox[0]) * (bbox[3] - bbox[2])
+    if sigma_x <= 0.0 or sigma_y <= 0.0 or sigma_z <= 0.0:
+        return 0.0
 
-    return intersection_area / square_area
+    cx, cy, cz = centroid
+
+    # Integral over the clipped (observed) region
+    p_clip = (
+        _gaussian_fraction(cx, cx0, cx1, sigma_x)
+        * _gaussian_fraction(cy, cy0, cy1, sigma_y)
+        * _gaussian_fraction(cz, cz0, cz1, sigma_z)
+    )
+
+    # Integral over the full bbox (normaliser — accounts for Gaussian tails
+    # beyond the bbox so a fully-visible reflection returns partiality 1.0)
+    p_full = (
+        _gaussian_fraction(cx, bbox[0], bbox[1], sigma_x)
+        * _gaussian_fraction(cy, bbox[2], bbox[3], sigma_y)
+        * _gaussian_fraction(cz, bbox[4], bbox[5], sigma_z)
+    )
+
+    if p_full < 1e-12:
+        return 0.0
+
+    return p_clip / p_full
 
 
 def update_bounding_box(
@@ -526,11 +580,13 @@ def update_bounding_box(
     new_centroid: Tuple,
     padding: Tuple,  # x,y,z
     image_size: Tuple,
+    n_sigma_xy: float = 2.5,
+    n_sigma_z: float = 2.5,
 ) -> Tuple[Tuple, float]:
     """
     Calculates a new bounding box originally at centroid at position
     new_centroid with padding.
-    Returns the bounding box and its partiality
+    Returns the bounding box and its partiality.
     """
 
     diff_centroid = (
@@ -548,7 +604,9 @@ def update_bounding_box(
     updated_bbox[4] += diff_centroid[2] - padding[2]
     updated_bbox[5] += diff_centroid[2] + padding[2]
 
-    partiality = compute_partiality(updated_bbox, image_size)
+    partiality = compute_partiality(
+        updated_bbox, image_size, new_centroid, n_sigma_xy, n_sigma_z
+    )
 
     updated_bbox[0] = max(floor(updated_bbox[0]), image_size[0])
     updated_bbox[1] = min(ceil(updated_bbox[1]), image_size[1])
@@ -621,6 +679,8 @@ def get_predicted_observed_reflections(
     # Calculate predicted bounding boxes and partiality
     tof_padding = params.bbox_tof_padding
     xy_padding = params.bbox_xy_padding
+    n_sigma_xy = params.partiality_n_sigma_xy
+    n_sigma_z = params.partiality_n_sigma_z
     image_size = experiments[0].detector[0].get_image_size()
     tof_size = len(experiments[0].scan.get_property("time_of_flight"))
     bboxes = flex.int6(len(predicted_reflections))
@@ -632,6 +692,8 @@ def get_predicted_observed_reflections(
             predicted_reflections["xyzcal.px"][i],
             (int(xy_padding), int(xy_padding), int(tof_padding)),
             (0, image_size[0], 0, image_size[1], 0, tof_size),
+            n_sigma_xy=n_sigma_xy,
+            n_sigma_z=n_sigma_z,
         )
     predicted_reflections["bbox"] = bboxes
     predicted_reflections["partiality"] = partiality
@@ -700,6 +762,8 @@ def get_predicted_calculated_reflections(
 
     tof_padding = params.bbox_tof_padding
     xy_padding = params.bbox_xy_padding
+    n_sigma_xy = params.partiality_n_sigma_xy
+    n_sigma_z = params.partiality_n_sigma_z
     image_size = experiments[0].detector[0].get_image_size()
     tof_size = len(experiments[0].scan.get_property("time_of_flight"))
     predicted_reflections["bbox"] = flex.int6(len(predicted_reflections))
@@ -746,6 +810,8 @@ def get_predicted_calculated_reflections(
                         expt_p_reflections["xyzcal.px"][i],
                         (int(xy_padding), int(xy_padding), int(tof_padding)),
                         (0, image_size[0], 0, image_size[1], 0, tof_size),
+                        n_sigma_xy=n_sigma_xy,
+                        n_sigma_z=n_sigma_z,
                     )
 
                 else:
@@ -761,6 +827,8 @@ def get_predicted_calculated_reflections(
                         expt_p_reflections["xyzcal.px"][i],
                         (int(xy_padding), int(xy_padding), int(tof_padding)),
                         (0, image_size[0], 0, image_size[1], 0, tof_size),
+                        n_sigma_xy=n_sigma_xy,
+                        n_sigma_z=n_sigma_z,
                     )
             predicted_reflections["bbox"].set_selected(p_sel, bboxes)
             predicted_reflections["partiality"].set_selected(p_sel, partiality)
