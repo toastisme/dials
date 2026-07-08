@@ -41,97 +41,128 @@ class OverlapsFilter:
         self.refl = refl
         self.expt = expt
         self.masks = {}
-        det = self.expt.detector
-        assert len(det) == 1  # for now
-        self.size_fast, self.size_slow = det[0].get_image_size()
-        self.array_size = self.size_fast * self.size_slow
+
+        self.det = self.expt.detector
+        self.panel_sizes = []
+        self.panel_array_sizes = []
+
+        for p in self.det:
+            size_fast, size_slow = p.get_image_size()
+            self.panel_sizes.append((size_fast, size_slow))
+            self.panel_array_sizes.append(size_fast * size_slow)
 
     def create_simple_mask(self):
-        self.masks["simple_mask"] = flex.size_t(self.array_size)
+        self.masks["simple_mask"] = [{} for _ in self.panel_array_sizes]
+
         for obs in self.refl.rows():
             shoebox = obs["shoebox"]
-            fast_coords = range(shoebox.xsize())
-            slow_coords = range(shoebox.ysize())
-            for f, s in zip(fast_coords, slow_coords):
-                f_abs = f + shoebox.bbox[0]  # relative to detector
-                s_abs = s + shoebox.bbox[2]  # relative to detector
-                posn = f_abs + s_abs * self.size_fast  # position in mask array
-                posn_in_shoebox = f + shoebox.xsize() * s  # position in shoebox
-                try:
-                    self.masks["simple_mask"][posn] |= shoebox.mask[posn_in_shoebox]
-                except IndexError:  # bbox may extend past detector limits
-                    continue
+            panel = obs["panel"]
+            size_fast, size_slow = self.panel_sizes[panel]
+            mask = self.masks["simple_mask"][panel]
+
+            for z in range(shoebox.zsize()):
+                z_abs = shoebox.bbox[4] + z
+                for s in range(shoebox.ysize()):
+                    s_abs = shoebox.bbox[2] + s
+                    if s_abs < 0 or s_abs >= size_slow:
+                        continue
+                    for f in range(shoebox.xsize()):
+                        f_abs = shoebox.bbox[0] + f
+                        if f_abs < 0 or f_abs >= size_fast:
+                            continue
+                        posn_in_shoebox = (
+                            z * shoebox.ysize() * shoebox.xsize()
+                            + s * shoebox.xsize()
+                            + f
+                        )
+                        key = (z_abs, s_abs, f_abs)
+                        mask[key] = mask.get(key, 0) | shoebox.mask[posn_in_shoebox]
 
     def create_referenced_mask(self, test_code, mask_name):
-        self.masks[mask_name] = [flex.size_t() for _ in range(self.array_size)]
+        self.masks[mask_name] = [{} for _ in self.panel_array_sizes]
+
         for idx in range(len(self.refl)):
             obs = self.refl[idx]
             shoebox = obs["shoebox"]
-            fast_coords = range(shoebox.xsize())
-            slow_coords = range(shoebox.ysize())
-            for f, s in zip(fast_coords, slow_coords):
-                f_abs = f + shoebox.bbox[0]  # relative to detector
-                s_abs = s + shoebox.bbox[2]  # relative to detector
-                posn = f_abs + s_abs * self.size_fast  # position in mask array
-                posn_in_shoebox = f + shoebox.xsize() * s  # position in shoebox
-                if (shoebox.mask[posn_in_shoebox] & test_code) == test_code:
-                    try:
-                        self.masks[mask_name][posn].append(idx)
-                    except IndexError:  # bbox may extend past detector limits
+            panel = obs["panel"]
+            size_fast, size_slow = self.panel_sizes[panel]
+            mask = self.masks[mask_name][panel]
+
+            for z in range(shoebox.zsize()):
+                z_abs = shoebox.bbox[4] + z
+                for s in range(shoebox.ysize()):
+                    s_abs = shoebox.bbox[2] + s
+                    if s_abs < 0 or s_abs >= size_slow:
                         continue
+                    for f in range(shoebox.xsize()):
+                        f_abs = shoebox.bbox[0] + f
+                        if f_abs < 0 or f_abs >= size_fast:
+                            continue
+                        posn_in_shoebox = (
+                            z * shoebox.ysize() * shoebox.xsize()
+                            + s * shoebox.xsize()
+                            + f
+                        )
+                        if (shoebox.mask[posn_in_shoebox] & test_code) == test_code:
+                            key = (z_abs, s_abs, f_abs)
+                            if key not in mask:
+                                mask[key] = []
+                            mask[key].append(idx)
 
     def filter_using_simple_mask(self, mask_lambda, shoebox_lambda=lambda x: True):
-        """At each pixel, examine the simple mask to determine if contributing
-        observations should be excluded. When this condition mask_lambda is met,
-        for each contributing observation, use optional condition shoebox_lambda
-        to determine if the observation should be excluded (e.g. to exclude only
-        those reflections contributing foreground). Return the mask reflecting
-        this filter.
-        """
         keep_refl_bool = flex.bool(len(self.refl), True)
+
         for idx in range(len(self.refl)):
             obs = self.refl[idx]
             shoebox = obs["shoebox"]
-            fast_coords = range(shoebox.xsize())
-            slow_coords = range(shoebox.ysize())
-            for f, s in zip(fast_coords, slow_coords):
-                f_abs = f + shoebox.bbox[0]  # relative to detector
-                s_abs = s + shoebox.bbox[2]  # relative to detector
-                posn = f_abs + s_abs * self.size_fast  # position in mask array
-                posn_in_shoebox = f + shoebox.xsize() * s  # position in shoebox
-                try:
-                    if mask_lambda(
-                        self.masks["simple_mask"][posn]
-                    ):  # condition met in simple mask
-                        if shoebox_lambda(
+            panel = obs["panel"]
+            size_fast, size_slow = self.panel_sizes[panel]
+            mask = self.masks["simple_mask"][panel]
+
+            for z in range(shoebox.zsize()):
+                z_abs = shoebox.bbox[4] + z
+                for s in range(shoebox.ysize()):
+                    s_abs = shoebox.bbox[2] + s
+                    if s_abs < 0 or s_abs >= size_slow:
+                        continue
+                    for f in range(shoebox.xsize()):
+                        f_abs = shoebox.bbox[0] + f
+                        if f_abs < 0 or f_abs >= size_fast:
+                            continue
+                        key = (z_abs, s_abs, f_abs)
+                        if key not in mask:
+                            continue
+                        posn_in_shoebox = (
+                            z * shoebox.ysize() * shoebox.xsize()
+                            + s * shoebox.xsize()
+                            + f
+                        )
+                        if mask_lambda(mask[key]) and shoebox_lambda(
                             shoebox.mask[posn_in_shoebox]
-                        ):  # condition met in shoebox
+                        ):
                             keep_refl_bool[idx] = False
-                except IndexError:  # bbox may extend past detector limits
-                    continue
+
         return keep_refl_bool
 
     def filter_all_using_referenced_mask(self, mask_name):
-        """Return the mask reflecting the exclusion of any reflections for which the
-        mask condition is true (e.g. untrusted pixels).
-        """
         keep_refl_bool = flex.bool(len(self.refl), True)
-        for i in self.masks[mask_name]:
-            if len(i) > 0:
-                for ref in i:
+
+        for panel_mask in self.masks[mask_name]:
+            for refs in panel_mask.values():
+                for ref in refs:
                     keep_refl_bool[ref] = False
+
         return keep_refl_bool
 
     def filter_overlaps_using_referenced_mask(self, mask_name):
-        """At each pixel, define an overlap to be more than one reference (to an
-        observation) indicated in the mask. Return the mask reflecting the exclusion
-        of any overlaps (e.g. foreground with foreground).
-        """
         keep_refl_bool = flex.bool(len(self.refl), True)
-        for i in self.masks[mask_name]:
-            if len(i) > 1:
-                for ref in i:
-                    keep_refl_bool[ref] = False
+
+        for panel_mask in self.masks[mask_name]:
+            for refs in panel_mask.values():
+                if len(refs) > 1:
+                    for ref in refs:
+                        keep_refl_bool[ref] = False
+
         return keep_refl_bool
 
     def remove_foreground_foreground_overlaps(self):
