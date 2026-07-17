@@ -158,15 +158,6 @@ namespace dials { namespace algorithms {
       double Ng = std::sqrt(detH) / std::pow(2.0 * PI, 1.5);  // (3)
       double f1 = N * Ng * std::sqrt(PI / (2.0 * H6));
 
-      double u = 0.5 * a * (a + 2.0 * H6 * dt + 2.0 * H3 * dx + 2.0 * H5 * dy);
-      double v = 0.5 * b * (b - 2.0 * H6 * dt - 2.0 * H3 * dx - 2.0 * H5 * dy);
-
-      v = std::max(-700.0, std::min(v, 700.0));
-      u = std::max(-700.0, std::min(u, 700.0));
-
-      double y = (a + H6 * dt + H3 * dx + H5 * dy) / std::sqrt(2.0 * H6);
-      double w = (b - H6 * dt - H3 * dx - H5 * dy) / std::sqrt(2.0 * H6);
-
       double f2 =
         std::exp(-0.5 * H1 * dx * dx - H2 * dx * dy - 0.5 * H4 * dy * dy
                  + (H3 * H3 * dx * dx + 2.0 * H3 * H5 * dx * dy + H5 * H5 * dy * dy)
@@ -205,13 +196,25 @@ namespace dials { namespace algorithms {
        */
 
       double sum = 0;
+      double max_abs = 0.0;
       for (std::size_t c_x = 0; c_x < coords.accessor()[0]; ++c_x) {
         for (std::size_t c_y = 0; c_y < coords.accessor()[1]; ++c_y) {
           for (std::size_t c_z = 0; c_z < coords.accessor()[2]; ++c_z) {
-            sum +=
+            double v =
               func(coords(c_x, c_y, c_z), H, alpha, beta, 1.0, 1.0, dt_widths[c_z], T0);
+            sum += v;
+            max_abs = std::max(max_abs, std::abs(v));
           }
         }
+      }
+      // Harden against a degenerate model whose peak has moved out of the fitting
+      // window: the grid sum can then collapse to ~0 or become non-finite, which
+      // makes the amplitude solve (calc_A) ill-conditioned and the returned
+      // intensity meaningless. Floor the normalisation to a strictly positive,
+      // finite value tied to the largest voxel contribution so every downstream
+      // division stays well-defined.
+      if (!std::isfinite(sum) || sum <= 0.0) {
+        return (std::isfinite(max_abs) && max_abs > 0.0) ? max_abs : 1.0;
       }
       return sum;
     }
@@ -249,8 +252,12 @@ namespace dials { namespace algorithms {
 
       for (std::size_t i = 0; i < num_data_points; ++i) {
         double obs = intensities[i];
-        double var = background_variances[i];
-        if (!std::isfinite(var) || var <= 0.0) var = std::max(std::abs(obs), 1.0);
+        // Poisson weighting: total variance is signal + background. The signal
+        // contribution is approximated by the observed counts so the weight stays
+        // constant during the fit and the peak centre is weighted correctly.
+        double var_b = background_variances[i];
+        if (!std::isfinite(var_b) || var_b < 0.0) var_b = 0.0;
+        double var = std::max(std::abs(obs) + var_b, 1.0);
         double w = 1.0 / var;
         double p_i = P[i];
         num += w * obs * p_i;
@@ -300,10 +307,10 @@ namespace dials { namespace algorithms {
                                 dt_widths[c_z],
                                 T0);
             double obs = intensities(c_x, c_y, c_z);
-            double var = background_variances(c_x, c_y, c_z);
-            if (!std::isfinite(var) || var <= 0.0) {
-              var = std::max(std::abs(obs), 1.0);
-            }
+            // Poisson weighting (see calc_A): var = |signal| + background.
+            double var_b = background_variances(c_x, c_y, c_z);
+            if (!std::isfinite(var_b) || var_b < 0.0) var_b = 0.0;
+            double var = std::max(std::abs(obs) + var_b, 1.0);
             double sigma = std::sqrt(var);
             double diff = (obs - model) / sigma;
 
@@ -715,7 +722,7 @@ namespace dials { namespace algorithms {
     }
 
     bool fit(bool show_profile_failures,
-             int maxfev = 200,
+             int maxfev = 500,
              double xtol = 1e-8,
              double ftol = 1e-8) {
       /*

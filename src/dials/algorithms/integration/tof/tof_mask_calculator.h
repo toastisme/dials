@@ -523,6 +523,117 @@ namespace dials { namespace algorithms {
     pool.wait();
   }
 
+  void tof_calculate_bboxes_from_foreground_mask(af::reflection_table& reflection_table,
+                                                 int xy_padding = 2,
+                                                 int z_padding = 2,
+                                                 int n_threads = 1) {
+    /**
+     * Redefines each reflection's bounding box from the extent of its foreground
+     * mask, expanded by padding on each side to leave surrounding pixels for
+     * background estimation.
+     *
+     * The shoebox mask is expected to have already been computed (e.g. via
+     * tof_calculate_ellipse_shoebox_mask). Each shoebox's data and mask are
+     * cropped in place to the new bounding box and reflection_table["bbox"] is
+     * updated to match. The padding pixels retain their existing (background)
+     * classification. Reflections with no foreground pixels are left unchanged.
+     *
+     * @param xy_padding Pixels of padding added around the foreground in x and y
+     * @param z_padding ToF frames of padding added around the foreground in z
+     */
+
+    af::shared<Shoebox<>> shoeboxes = reflection_table["shoebox"];
+    af::shared<int6> bboxes = reflection_table["bbox"];
+    std::size_t n_reflections = reflection_table.size();
+
+    auto worker = [&](std::size_t start, std::size_t end) {
+      for (std::size_t i = start; i < end; ++i) {
+        Shoebox<>& shoebox = shoeboxes[i];
+        af::ref<uint8_t, af::c_grid<3>> mask = shoebox.mask.ref();
+        af::ref<float, af::c_grid<3>> data = shoebox.data.ref();
+        int zsize = (int)mask.accessor()[0];
+        int ysize = (int)mask.accessor()[1];
+        int xsize = (int)mask.accessor()[2];
+
+        // Find the extent of the foreground mask in local shoebox coordinates
+        int min_x = xsize, min_y = ysize, min_z = zsize;
+        int max_x = -1, max_y = -1, max_z = -1;
+        for (int z = 0; z < zsize; ++z) {
+          for (int y = 0; y < ysize; ++y) {
+            for (int x = 0; x < xsize; ++x) {
+              if ((mask(z, y, x) & Foreground) == Foreground) {
+                min_x = std::min(min_x, x);
+                max_x = std::max(max_x, x);
+                min_y = std::min(min_y, y);
+                max_y = std::max(max_y, y);
+                min_z = std::min(min_z, z);
+                max_z = std::max(max_z, z);
+              }
+            }
+          }
+        }
+
+        // No foreground pixels: leave the reflection unchanged
+        if (max_x < 0) {
+          continue;
+        }
+
+        // Foreground extent + padding, clamped to the extracted shoebox window
+        int lx0 = std::max(min_x - xy_padding, 0);
+        int lx1 = std::min(max_x + 1 + xy_padding, xsize);
+        int ly0 = std::max(min_y - xy_padding, 0);
+        int ly1 = std::min(max_y + 1 + xy_padding, ysize);
+        int lz0 = std::max(min_z - z_padding, 0);
+        int lz1 = std::min(max_z + 1 + z_padding, zsize);
+
+        int new_zsize = lz1 - lz0;
+        int new_ysize = ly1 - ly0;
+        int new_xsize = lx1 - lx0;
+
+        // Crop the data and mask arrays to the new window
+        af::c_grid<3> accessor(new_zsize, new_ysize, new_xsize);
+        af::versa<float, af::c_grid<3>> new_data(accessor, 0.0);
+        af::versa<uint8_t, af::c_grid<3>> new_mask(accessor, 0);
+        for (int z = 0; z < new_zsize; ++z) {
+          for (int y = 0; y < new_ysize; ++y) {
+            for (int x = 0; x < new_xsize; ++x) {
+              new_data(z, y, x) = data(z + lz0, y + ly0, x + lx0);
+              new_mask(z, y, x) = mask(z + lz0, y + ly0, x + lx0);
+            }
+          }
+        }
+
+        // Update the bounding box (absolute panel/scan coordinates)
+        int6 bbox = bboxes[i];
+        int6 new_bbox(bbox[0] + lx0,
+                      bbox[0] + lx1,
+                      bbox[2] + ly0,
+                      bbox[2] + ly1,
+                      bbox[4] + lz0,
+                      bbox[4] + lz1);
+
+        shoebox.data = new_data;
+        shoebox.mask = new_mask;
+        shoebox.bbox = new_bbox;
+        bboxes[i] = new_bbox;
+      }
+    };
+
+    dials::util::ThreadPool pool(n_threads);
+    std::size_t chunk_size = (n_reflections + n_threads - 1) / n_threads;
+
+    for (int t = 0; t < n_threads; ++t) {
+      std::size_t start = t * chunk_size;
+      std::size_t end = std::min(start + chunk_size, n_reflections);
+      if (start >= end) break;
+
+      pool.post([=]() { worker(start, end); });
+    }
+    pool.wait();
+
+    reflection_table["bbox"] = bboxes;
+  }
+
 }}  // namespace dials::algorithms
 
 #endif /* DIALS_ALGORITHMS_INTEGRATION_TOF_MASK_CALCULATOR_H */

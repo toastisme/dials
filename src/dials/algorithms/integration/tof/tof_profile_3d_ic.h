@@ -4,6 +4,7 @@
 #include <array>
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <limits>
 #include <random>
 #include <boost/optional.hpp>
@@ -41,12 +42,19 @@ namespace dials { namespace algorithms {
     // Convolution parameters (optimised by default but can be fixed with
     // optimize_convolution_params=false)
     double HatWidth;  // half-width of rectangular convolution kernel in ToF bins
-    double KConv;     // Gaussian kernel decay rate
+    double KConv;     // Gaussian kernel decay rate per ToF bin^2 (sigma =
+                      // 1/sqrt(2*KConv) bins)
 
     // Control
     int n_restarts;         // number of attempts when fitting
     bool optimize_profile;  // If false the profile is generated with input params
     bool optimize_convolution_params;  // If false, fix HatWidth and KConv
+    bool optimize_moderator_params;    // If false, fix the Ikeda-Carpenter A, B, R
+                                       // (moderator) params so only the per-reflection
+                                       // shape/position params are fitted
+    bool use_analytic_jacobian;        // If true, use the complex-step semi-analytic
+                                       // Jacobian; if false, fall back to finite
+                                       // differences
     bool show_profile_failures;        // Prints debugging information
 
     TOFProfile3DICParams(double A_,
@@ -70,6 +78,8 @@ namespace dials { namespace algorithms {
                          int n_restarts_,
                          bool optimize_profile_,
                          bool optimize_convolution_params_,
+                         bool optimize_moderator_params_,
+                         bool use_analytic_jacobian_,
                          bool show_profile_failures_)
         : A(A_),
           A_min(A_min_),
@@ -92,38 +102,73 @@ namespace dials { namespace algorithms {
           n_restarts(n_restarts_),
           optimize_profile(optimize_profile_),
           optimize_convolution_params(optimize_convolution_params_),
+          optimize_moderator_params(optimize_moderator_params_),
+          use_analytic_jacobian(use_analytic_jacobian_),
           show_profile_failures(show_profile_failures_) {}
   };
+
+  // Real part of a scalar, for either double or std::complex<double>. Used so the
+  // model functions below can be evaluated in complex arithmetic for complex-step
+  // differentiation while all branch decisions stay on the physical (real) value.
+  inline double as_real(double x) {
+    return x;
+  }
+  inline double as_real(const std::complex<double>& x) {
+    return x.real();
+  }
+
+  // Overflow-guarded exp matching tof_utils::exp_safe but templated on the scalar
+  // type. In the clamped regime the result is constant (zero derivative), which is
+  // the intended behaviour for both the value and its complex-step derivative.
+  template <typename T>
+  inline T exp_safe_t(const T& x) {
+    const double r = as_real(x);
+    if (r > 700.0) return std::exp(T(700.0));
+    if (r < -700.0) return std::exp(T(-700.0));
+    return std::exp(x);
+  }
+
+  template <typename T>
+  static scitbx::af::shared<T> ic_raw_t(scitbx::af::const_ref<double> tof,
+                                        T A,
+                                        T B,
+                                        T R,
+                                        T T0) {
+    /*
+     * Ikeda-Carpenter function with unit amplitude for each tof[i].
+     * Templated on the scalar type so it can be evaluated with std::complex for
+     * complex-step differentiation; the double instantiation is the fitted model.
+     */
+
+    const int n = tof.size();
+    scitbx::af::shared<T> out(n, T(0.0));
+    T dAB = A - B;
+    if (std::abs(as_real(dAB)) < 1e-8) dAB = T(as_real(dAB) >= 0.0 ? 1e-8 : -1e-8);
+    const T dAB3 = dAB * dAB * dAB;
+    const T coeff2 = T(2.0) * R * A * A * B / dAB3;
+    for (int i = 0; i < n; ++i) {
+      const T dt = T(tof[i]) - T0;
+      if (as_real(dt) <= 0.0) continue;
+      const T Adt = A * dt;
+      const T Bdt = B * dt;
+      const T dABdt = dAB * dt;
+      const T expA = exp_safe_t(-Adt);
+      const T expB = exp_safe_t(-Bdt);
+      const T term1 = (T(1.0) - R) * Adt * Adt * expA;
+      const T term2 =
+        coeff2 * (expB - expA * (T(1.0) + dABdt + T(0.5) * dABdt * dABdt));
+      const T val = term1 + term2;
+      out[i] = (std::isfinite(as_real(val)) && as_real(val) > 0.0) ? val : T(0.0);
+    }
+    return out;
+  }
 
   static scitbx::af::shared<double> ic_raw(scitbx::af::const_ref<double> tof,
                                            double A,
                                            double B,
                                            double R,
                                            double T0) {
-    /*
-     * Ikeda-Carpenter function with unit amplitude for each tof[i]
-     */
-
-    const int n = tof.size();
-    scitbx::af::shared<double> out(n, 0.0);
-    double dAB = A - B;
-    if (std::abs(dAB) < 1e-8) dAB = (dAB >= 0.0) ? 1e-8 : -1e-8;
-    const double dAB3 = dAB * dAB * dAB;
-    const double coeff2 = 2.0 * R * A * A * B / dAB3;
-    for (int i = 0; i < n; ++i) {
-      const double dt = tof[i] - T0;
-      if (dt <= 0.0) continue;
-      const double Adt = A * dt;
-      const double Bdt = B * dt;
-      const double dABdt = dAB * dt;
-      const double term1 = (1.0 - R) * Adt * Adt * exp_safe(-Adt);
-      const double expA = exp_safe(-Adt);
-      const double expB = exp_safe(-Bdt);
-      const double term2 = coeff2 * (expB - expA * (1.0 + dABdt + 0.5 * dABdt * dABdt));
-      const double val = term1 + term2;
-      out[i] = (std::isfinite(val) && val > 0.0) ? val : 0.0;
-    }
-    return out;
+    return ic_raw_t<double>(tof, A, B, R, T0);
   }
 
   static scitbx::af::shared<double> make_hat_kernel(int n, double hw) {
@@ -148,15 +193,19 @@ namespace dials { namespace algorithms {
 
   static scitbx::af::shared<double> make_gauss_kernel(int n, double kconv) {
     /*
-     * Normalised Gaussian kernel of length n, decay constant kconv
-     * gc_x is normalised to (-1, 1) over (0, n-1)
+     * Normalised Gaussian kernel of length n. kconv is a decay rate in physical
+     * ToF-bin units: k[i] = exp(-kconv * d^2) with d = (i - centre) measured in
+     * bins. This makes the kernel width independent of the shoebox size (unlike
+     * a window-relative coordinate), with Gaussian standard deviation
+     * sigma = 1/sqrt(2*kconv) bins.
      */
 
     scitbx::af::shared<double> k(n, 0.0);
+    const double mid = (n > 1) ? 0.5 * (n - 1) : 0.0;
     double sum = 0.0;
     for (int i = 0; i < n; ++i) {
-      const double gc_x = (n > 1) ? (2.0 * i / (n - 1) - 1.0) : 0.0;
-      k[i] = std::exp(-kconv * gc_x * gc_x);
+      const double d = i - mid;
+      k[i] = std::exp(-kconv * d * d);
       sum += k[i];
     }
     if (sum > 0.0)
@@ -197,18 +246,24 @@ namespace dials { namespace algorithms {
     return convolve(f_hat.const_ref(), gauss.const_ref());
   }
 
-  // Bivariate Gaussian PDF at (dx, dy) centred at origin
-  static double bvg_func(double dx, double dy, double SigX, double SigY, double SigP) {
+  // Bivariate Gaussian PDF at (dx, dy) centred at origin. Templated on the scalar
+  // type for complex-step differentiation (the double instantiation is the model).
+  template <typename T>
+  static T bvg_func_t(double dx, double dy, T SigX, T SigY, T SigP) {
     const double PI = scitbx::constants::pi;
-    double rho2 = SigP * SigP;
-    if (rho2 >= 1.0 - 1e-10) rho2 = 1.0 - 1e-10;
-    const double one_minus_rho2 = 1.0 - rho2;
-    const double denom = 2.0 * PI * SigX * SigY * std::sqrt(one_minus_rho2);
-    if (denom < 1e-30) return 0.0;
-    const double z = (dx * dx) / (SigX * SigX) + (dy * dy) / (SigY * SigY)
-                     - 2.0 * SigP * dx * dy / (SigX * SigY);
-    const double val = exp_safe(-z / (2.0 * one_minus_rho2)) / denom;
-    return std::isfinite(val) ? val : 0.0;
+    T rho2 = SigP * SigP;
+    if (as_real(rho2) >= 1.0 - 1e-10) rho2 = T(1.0 - 1e-10);
+    const T one_minus_rho2 = T(1.0) - rho2;
+    const T denom = T(2.0 * PI) * SigX * SigY * std::sqrt(one_minus_rho2);
+    if (as_real(denom) < 1e-30) return T(0.0);
+    const T z = T(dx * dx) / (SigX * SigX) + T(dy * dy) / (SigY * SigY)
+                - T(2.0) * SigP * T(dx * dy) / (SigX * SigY);
+    const T val = exp_safe_t(-z / (T(2.0) * one_minus_rho2)) / denom;
+    return std::isfinite(as_real(val)) ? val : T(0.0);
+  }
+
+  static double bvg_func(double dx, double dy, double SigX, double SigY, double SigP) {
+    return bvg_func_t<double>(dx, dy, SigX, SigY, SigP);
   }
 
   struct Profile3DICFunctor {
@@ -221,6 +276,8 @@ namespace dials { namespace algorithms {
     std::array<double, 9> min_bounds, max_bounds;
     int num_data_points, num_params;
     bool optimize_convolution_params;
+    bool optimize_moderator_params;
+    bool use_analytic_jacobian;
     mutable double cached_Scale;
     mutable Eigen::VectorXd last_params;
     mutable bool cache_valid;
@@ -247,13 +304,17 @@ namespace dials { namespace algorithms {
       const std::array<double, 9>& maxb,
       double hat_width,
       double kconv,
-      bool opt_conv_params)
+      bool opt_conv_params,
+      bool opt_moderator_params,
+      bool use_analytic_jacobian_)
         : coords(coords_),
           intensities(intensities_),
           background_variances(background_variances_),
           fixed_hat_width(hat_width),
           fixed_kconv(kconv),
           optimize_convolution_params(opt_conv_params),
+          optimize_moderator_params(opt_moderator_params),
+          use_analytic_jacobian(use_analytic_jacobian_),
           cached_Scale(1.0),
           cache_valid(false) {
       min_bounds = minb;
@@ -320,8 +381,11 @@ namespace dials { namespace algorithms {
           for (int iz = 0; iz < nz; ++iz) {
             const double p = ic_conv[iz] * bvg;
             const double obs = intensities(ix, iy, iz);
-            double var = background_variances(ix, iy, iz);
-            if (!std::isfinite(var) || var <= 0.0) var = std::max(std::abs(obs), 1.0);
+            // Poisson weighting: total variance is signal + background, with the
+            // signal contribution approximated by the observed counts.
+            double var_b = background_variances(ix, iy, iz);
+            if (!std::isfinite(var_b) || var_b < 0.0) var_b = 0.0;
+            const double var = std::max(std::abs(obs) + var_b, 1.0);
             const double w = 1.0 / var;
             num += w * obs * p;
             den += w * p * p;
@@ -364,8 +428,10 @@ namespace dials { namespace algorithms {
           for (int iz = 0; iz < nz; ++iz) {
             const double model = Scale * ic_conv[iz] * bvg;
             const double obs = intensities(ix, iy, iz);
-            double var = background_variances(ix, iy, iz);
-            if (!std::isfinite(var) || var <= 0.0) var = std::max(std::abs(obs), 1.0);
+            // Poisson weighting (see calc_scale): var = |signal| + background.
+            double var_b = background_variances(ix, iy, iz);
+            if (!std::isfinite(var_b) || var_b < 0.0) var_b = 0.0;
+            const double var = std::max(std::abs(obs) + var_b, 1.0);
             const double sigma = std::sqrt(var);
             const double diff = (obs - model) / sigma;
             fvec[count++] = std::isfinite(diff) ? diff : 1e6;
@@ -376,12 +442,25 @@ namespace dials { namespace algorithms {
     }
 
     int df(const Eigen::VectorXd& x, Eigen::MatrixXd& J) const {
+      if (use_analytic_jacobian) return df_analytic(x, J);
+      return df_numerical(x, J);
+    }
+
+    // Finite-difference Jacobian (forward differences). Retained as a fallback
+    // for validating the analytic path via the use_analytic_jacobian flag.
+    int df_numerical(const Eigen::VectorXd& x, Eigen::MatrixXd& J) const {
       J.resize(num_data_points, num_params);
       const double eps = 1e-5;
       const Eigen::VectorXd xc = clamp_params(x);
       Eigen::VectorXd f0(num_data_points);
       operator()(xc, f0);
       for (int j = 0; j < num_params; ++j) {
+        // Hold the Ikeda-Carpenter moderator params (A=0, B=1, R=2) fixed by
+        // giving them a zero Jacobian column, so LM leaves them unchanged.
+        if (!optimize_moderator_params && j <= 2) {
+          J.col(j).setZero();
+          continue;
+        }
         Eigen::VectorXd xp = xc;
         const double delta = eps * (1.0 + std::abs(xc[j]));
         xp[j] += delta;
@@ -394,6 +473,155 @@ namespace dials { namespace algorithms {
         else
           J.col(j) = (fp - f0) / step;
       }
+      return 0;
+    }
+
+    /*
+     * Complex-step semi-analytic Jacobian.
+     *
+     * The model is separable, model = Scale * ic_conv[iz] * bvg[ix,iy]. Holding
+     * the (least-squares optimal) amplitude Scale fixed (Kaufman's variable-
+     * projection approximation), the residual derivative is
+     *   d r_i / d theta = -(1/sigma_i) * Scale * d(model factor)/d theta.
+     *
+     * Exact partials are obtained by the complex-step trick: evaluating a model
+     * function at theta + i*h and taking Im(.)/h gives the derivative to machine
+     * precision with no subtractive cancellation. Because the two convolution
+     * kernels do not depend on the Ikeda-Carpenter (A,B,R,T0) parameters, the
+     * temporal derivative propagates linearly:
+     *   d(ic_conv)/d theta = convolve(convolve(d(ic_raw)/d theta, hat), gauss).
+     * The spatial (SigX,SigY,SigP) partials touch only bvg. Convolution params
+     * (HatWidth non-smooth, KConv) fall back to finite differences when fitted.
+     */
+    int df_analytic(const Eigen::VectorXd& x, Eigen::MatrixXd& J) const {
+      J.resize(num_data_points, num_params);
+      const Eigen::VectorXd xc = clamp_params(x);
+
+      // Refresh cached_Scale for xc and get the base real model factors.
+      Eigen::VectorXd f0(num_data_points);
+      operator()(xc, f0);
+      const double Scale = cached_Scale;
+
+      double A, B, R, T0, SigX, SigY, SigP, HatWidth, KConv;
+      extract_params(xc, A, B, R, T0, SigX, SigY, SigP, HatWidth, KConv);
+
+      const int nx = coords.accessor()[0];
+      const int ny = coords.accessor()[1];
+      const int nz = coords.accessor()[2];
+
+      const scitbx::af::shared<double> ic_conv =
+        ic_profile(tof_axis.const_ref(), A, B, R, T0, HatWidth, KConv);
+      scitbx::af::shared<double> bvg_vals(nx * ny);
+      for (int ix = 0; ix < nx; ++ix)
+        for (int iy = 0; iy < ny; ++iy)
+          bvg_vals[ix * ny + iy] =
+            bvg_func(coords(ix, iy, 0)[0], coords(ix, iy, 0)[1], SigX, SigY, SigP);
+
+      // Precompute 1/sigma per voxel (matches operator()'s Poisson weighting).
+      scitbx::af::shared<double> inv_sigma(num_data_points);
+      {
+        int count = 0;
+        for (int ix = 0; ix < nx; ++ix)
+          for (int iy = 0; iy < ny; ++iy)
+            for (int iz = 0; iz < nz; ++iz) {
+              const double obs = intensities(ix, iy, iz);
+              double var_b = background_variances(ix, iy, iz);
+              if (!std::isfinite(var_b) || var_b < 0.0) var_b = 0.0;
+              const double var = std::max(std::abs(obs) + var_b, 1.0);
+              inv_sigma[count++] = 1.0 / std::sqrt(var);
+            }
+      }
+
+      typedef std::complex<double> cd;
+      const double h = 1e-30;  // complex-step size (no cancellation, so ~0)
+
+      // Kernels are constant w.r.t. the temporal params, reused for propagation.
+      const scitbx::af::shared<double> hat = make_hat_kernel(nz, HatWidth);
+      const scitbx::af::shared<double> gauss = make_gauss_kernel(nz, KConv);
+
+      // Helper: fill column j from a per-voxel d(model)/d theta given the two
+      // separable derivative factors (only one is non-trivial per parameter).
+      auto fill_temporal_col = [&](int j, const scitbx::af::shared<double>& dic_conv) {
+        int count = 0;
+        for (int ix = 0; ix < nx; ++ix)
+          for (int iy = 0; iy < ny; ++iy) {
+            const double bvg = bvg_vals[ix * ny + iy];
+            for (int iz = 0; iz < nz; ++iz) {
+              J(count, j) = -inv_sigma[count] * Scale * dic_conv[iz] * bvg;
+              ++count;
+            }
+          }
+      };
+      auto fill_spatial_col = [&](int j, const scitbx::af::shared<double>& dbvg) {
+        int count = 0;
+        for (int ix = 0; ix < nx; ++ix)
+          for (int iy = 0; iy < ny; ++iy) {
+            const double db = dbvg[ix * ny + iy];
+            for (int iz = 0; iz < nz; ++iz) {
+              J(count, j) = -inv_sigma[count] * Scale * ic_conv[iz] * db;
+              ++count;
+            }
+          }
+      };
+
+      // --- Temporal / moderator params: A(0), B(1), R(2), T0(3) ---
+      for (int j = 0; j <= 3; ++j) {
+        if (!optimize_moderator_params && j <= 2) {  // A, B, R held fixed
+          J.col(j).setZero();
+          continue;
+        }
+        // Perturb the optimizer variable x[j] in the imaginary direction; the log
+        // parameterisation of A, B is handled by taking exp of the complex value.
+        const cd Ac = (j == 0) ? std::exp(cd(xc[0], h)) : cd(A);
+        const cd Bc = (j == 1) ? std::exp(cd(xc[1], h)) : cd(B);
+        const cd Rc = (j == 2) ? cd(R, h) : cd(R);
+        const cd T0c = (j == 3) ? cd(T0, h) : cd(T0);
+        const scitbx::af::shared<cd> icr_c =
+          ic_raw_t<cd>(tof_axis.const_ref(), Ac, Bc, Rc, T0c);
+        scitbx::af::shared<double> dicr(nz);
+        for (int iz = 0; iz < nz; ++iz)
+          dicr[iz] = icr_c[iz].imag() / h;
+        const scitbx::af::shared<double> dicr_hat =
+          convolve(dicr.const_ref(), hat.const_ref());
+        const scitbx::af::shared<double> dic_conv =
+          convolve(dicr_hat.const_ref(), gauss.const_ref());
+        fill_temporal_col(j, dic_conv);
+      }
+
+      // --- Spatial params: SigX(4), SigY(5), SigP(6) ---
+      for (int j = 4; j <= 6; ++j) {
+        const cd SigXc = (j == 4) ? std::exp(cd(xc[4], h)) : cd(SigX);
+        const cd SigYc = (j == 5) ? std::exp(cd(xc[5], h)) : cd(SigY);
+        const cd SigPc = (j == 6) ? cd(SigP, h) : cd(SigP);
+        scitbx::af::shared<double> dbvg(nx * ny);
+        for (int ix = 0; ix < nx; ++ix)
+          for (int iy = 0; iy < ny; ++iy)
+            dbvg[ix * ny + iy] =
+              bvg_func_t<cd>(
+                coords(ix, iy, 0)[0], coords(ix, iy, 0)[1], SigXc, SigYc, SigPc)
+                .imag()
+              / h;
+        fill_spatial_col(j, dbvg);
+      }
+
+      // --- Convolution params: HatWidth(7), KConv(8) via finite differences ---
+      if (optimize_convolution_params) {
+        const double eps = 1e-5;
+        for (int j = 7; j < num_params; ++j) {
+          Eigen::VectorXd xp = xc;
+          const double delta = eps * (1.0 + std::abs(xc[j]));
+          xp[j] += delta;
+          const Eigen::VectorXd xpc = clamp_params(xp);
+          Eigen::VectorXd fp(num_data_points);
+          operator()(xpc, fp);
+          const double step = xpc[j] - xc[j];
+          if (std::abs(step) < 1e-14)
+            J.col(j).setZero();
+          else
+            J.col(j) = (fp - f0) / step;
+        }
+      }
+
       return 0;
     }
   };
@@ -425,7 +653,9 @@ namespace dials { namespace algorithms {
                    const std::array<double, 2>& SigY_bounds,
                    const std::array<double, 2>& SigP_bounds,
                    int n_restarts_,
-                   bool optimize_convolution_params)
+                   bool optimize_convolution_params,
+                   bool optimize_moderator_params,
+                   bool use_analytic_jacobian)
         : coords(get_rel_coords(coords_, intensities_)),
           intensities(intensities_),
           background_variances(background_variances_),
@@ -482,7 +712,7 @@ namespace dials { namespace algorithms {
                     std::log(SigY_bounds[0]),
                     SigP_bounds[0],
                     std::log(0.5),
-                    std::log(10.0)};
+                    std::log(0.02)};
       max_bounds = {std::log(A_bounds[1]),
                     std::log(B_bounds[1]),
                     R_bounds[1],
@@ -491,7 +721,7 @@ namespace dials { namespace algorithms {
                     std::log(SigY_bounds[1]),
                     SigP_bounds[1],
                     std::log(20.0),
-                    std::log(500.0)};
+                    std::log(5.0)};
 
       params.resize(optimize_convolution_params ? 9 : 7);
       params[0] = std::log(A);
@@ -503,7 +733,7 @@ namespace dials { namespace algorithms {
       params[6] = SigP_init;
       if (optimize_convolution_params) {
         params[7] = std::log(std::max(HatWidth, 0.5));
-        params[8] = std::log(std::max(KConv, 10.0));
+        params[8] = std::log(std::min(std::max(KConv, 0.02), 5.0));
       }
 
       functor.emplace(coords,
@@ -513,7 +743,9 @@ namespace dials { namespace algorithms {
                       max_bounds,
                       HatWidth,
                       KConv,
-                      optimize_convolution_params);
+                      optimize_convolution_params,
+                      optimize_moderator_params,
+                      use_analytic_jacobian);
     }
 
     scitbx::af::versa<vec3<double>, af::c_grid<3>> get_rel_coords(
@@ -596,7 +828,7 @@ namespace dials { namespace algorithms {
     }
 
     bool fit(bool show_profile_failures,
-             int maxfev = 200,
+             int maxfev = 500,
              double xtol = 1e-8,
              double ftol = 1e-8) {
       typedef Eigen::LevenbergMarquardt<Profile3DICFunctor, double> LM;
@@ -631,9 +863,13 @@ namespace dials { namespace algorithms {
       std::uniform_real_distribution<double> unit_dist(0.0, 1.0);
       std::normal_distribution<double> norm_dist(0.0, 0.5);
 
-      // Log-scale parameter indices (always 0,1,4,5; plus 7,8 when fitting conv params)
+      // Log-scale parameter indices (always 0,1,4,5; plus 7,8 when fitting conv
+      // params). A (0) and B (1) are moderator params and are only perturbed when the
+      // moderator is being optimised.
+      const bool opt_mod = functor->optimize_moderator_params;
       const int n_log = functor->optimize_convolution_params ? 6 : 4;
       const int log_idx[6] = {0, 1, 4, 5, 7, 8};
+      auto is_fixed = [&](int j) { return !opt_mod && j <= 2; };  // A, B, R fixed
 
       for (int i = 0; i < n_restarts; ++i) {
         Eigen::VectorXd x_try = x0;
@@ -641,16 +877,19 @@ namespace dials { namespace algorithms {
         if (i < n_restarts / 3) {
           // Small log-scale perturbations
           for (int j = 0; j < n_log; ++j)
-            x_try[log_idx[j]] += std::log(0.8 + 0.4 * unit_dist(rng));
+            if (!is_fixed(log_idx[j]))
+              x_try[log_idx[j]] += std::log(0.8 + 0.4 * unit_dist(rng));
         } else if (i < 2 * n_restarts / 3) {
           // Larger uniform log scale
           const double scale = 0.5 + 1.5 * unit_dist(rng);
           for (int j = 0; j < n_log; ++j)
-            x_try[log_idx[j]] += std::log(scale);
+            if (!is_fixed(log_idx[j])) x_try[log_idx[j]] += std::log(scale);
         } else {
           // Random within bounds
           for (int j = 0; j < functor->num_params; ++j)
-            x_try[j] = min_bounds[j] + unit_dist(rng) * (max_bounds[j] - min_bounds[j]);
+            if (!is_fixed(j))
+              x_try[j] =
+                min_bounds[j] + unit_dist(rng) * (max_bounds[j] - min_bounds[j]);
         }
         x_try = functor->clamp_params(x_try);
 
@@ -785,7 +1024,9 @@ namespace dials { namespace algorithms {
                            SigY_bounds,
                            SigP_bounds,
                            profile_params.n_restarts,
-                           profile_params.optimize_convolution_params);
+                           profile_params.optimize_convolution_params,
+                           profile_params.optimize_moderator_params,
+                           profile_params.use_analytic_jacobian);
 
     bool profile_success = true;
     if (profile_params.optimize_profile)

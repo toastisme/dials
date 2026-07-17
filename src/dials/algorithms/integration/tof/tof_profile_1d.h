@@ -548,6 +548,12 @@ namespace dials { namespace algorithms {
      * position in tof_z
      */
 
+    // Sanity check intensity
+    double intensity_max =
+      *std::max_element(projected_intensity.begin(), projected_intensity.end());
+    if (intensity_max < 1) {
+      return false;
+    }
     // Get T_ph (peak position)
     auto max_it =
       std::max_element(projected_intensity.begin(), projected_intensity.end());

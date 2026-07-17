@@ -166,6 +166,13 @@ namespace dials { namespace algorithms { namespace boost_python {
          arg("min_iterations"),
          arg("n_threads") = 1));
 
+    def("tof_calculate_bboxes_from_foreground_mask",
+        &tof_calculate_bboxes_from_foreground_mask,
+        (arg("reflection_table"),
+         arg("xy_padding") = 2,
+         arg("z_padding") = 2,
+         arg("n_threads") = 1));
+
     def("integrate_reflection_table",
         &integrate_reflection_table_wrapper,
         (arg("reflection_table"),
@@ -417,8 +424,11 @@ namespace dials { namespace algorithms { namespace boost_python {
                 int,
                 bool,
                 bool,
+                bool,
+                bool,
                 bool>())  // n_restarts, optimize_profile,
-                          // optimize_convolution_params, show_profile_failures
+                          // optimize_convolution_params, optimize_moderator_params,
+                          // use_analytic_jacobian, show_profile_failures
       .def_readwrite("A", &TOFProfile3DICParams::A)
       .def_readwrite("A_min", &TOFProfile3DICParams::A_min)
       .def_readwrite("A_max", &TOFProfile3DICParams::A_max)
@@ -441,6 +451,10 @@ namespace dials { namespace algorithms { namespace boost_python {
       .def_readwrite("optimize_profile", &TOFProfile3DICParams::optimize_profile)
       .def_readwrite("optimize_convolution_params",
                      &TOFProfile3DICParams::optimize_convolution_params)
+      .def_readwrite("optimize_moderator_params",
+                     &TOFProfile3DICParams::optimize_moderator_params)
+      .def_readwrite("use_analytic_jacobian",
+                     &TOFProfile3DICParams::use_analytic_jacobian)
       .def_readwrite("show_profile_failures",
                      &TOFProfile3DICParams::show_profile_failures);
 

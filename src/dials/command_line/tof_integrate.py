@@ -33,6 +33,7 @@ from dials_algorithms_tof_integration_ext import (
     TOFProfile3DGutmannParams,
     TOFProfile3DICParams,
     integrate_reflection_table,
+    tof_calculate_bboxes_from_foreground_mask,
     tof_calculate_ellipse_shoebox_mask,
     tof_calculate_seed_skewness_shoebox_mask,
 )
@@ -74,6 +75,17 @@ calculated{
     .type = float (value_min=0.5)
     .help = "The resolution spots are integrated to when using integration_type.calculated"
 
+    bbox_from_foreground = True
+    .type = bool
+    .help = "If True, an initial bounding box padded by init_bbox_xy_padding /"
+            "init_bbox_tof_padding is used to extract each shoebox, and the"
+            "bounding box is then redefined from the extent of the foreground"
+            "mask plus bbox_xy_padding / bbox_tof_padding, giving surrounding"
+            "pixels for background estimation."
+            "If False, each calculated bounding box is copied from the nearest"
+            "observed reflection's bounding box (or, if none is available, sized"
+            "from the average observed bounding box), padded by bbox_xy_padding /"
+            "bbox_tof_padding; init_bbox_xy_padding / init_bbox_tof_padding are unused."
 }
 method = *summation profile_1d profile_3d_gutmann profile_3d_ic
     .type = choice
@@ -88,10 +100,14 @@ mask = *ellipse seed_skewness
     .help = "Foreground/background mask method: "
             "seed_skewness: https://doi.org/10.1107/S0021889803021939"
 ellipse_mask{
-    scale = 3.0
+    scale = 2.0
     .type = float (value_min=0.5)
     .help = "Number of standard deviations to use when generating the ellipse mask"
 }
+
+wavelength_range = None
+    .type = floats(size=2)
+    .help = "Reflections outside of this range are not considered"
 
 
 corrections{
@@ -110,7 +126,7 @@ corrections{
                 .type = float
                 .help = "Sample number density (num_atoms/A^3) for incident run."
                         "Default is Vanadium used at SXD"
-            sample_radius = 0.003
+            sample_radius = 0.03
                 .type = float
                 .help = "Sample radius (mm) for incident run."
                         "Default is Vanadium used at SXD"
@@ -241,15 +257,29 @@ profile_3d_ic{
     hat_width = 5.0
         .type = float
         .help = "Half-width of rectangular convolution kernel in ToF bins"
-    kconv = 120.0
+    kconv = 0.2
         .type = float
-        .help = "Gaussian convolution kernel decay constant"
+        .help = "Gaussian convolution decay rate per ToF bin^2"
+                "(sigma = 1/sqrt(2*kconv) bins)"
     n_restarts = 1000
         .type = int(value_min=0)
         .help = "If fit fails, number of additional attempts with perturbed params"
-    optimize_convolution_params = True
+    optimize_convolution_params = False
         .type = bool
-        .help = "If True, hat_width and kconv are included in the optimization"
+        .help = "If True, hat_width and kconv are included in the optimization."
+                "Fixing them (default) reduces the number of correlated free"
+                "parameters and improves fit robustness."
+    optimize_moderator_params = True
+        .type = bool
+        .help = "If True, the Ikeda-Carpenter moderator params (A, B, R) are fitted"
+                "per reflection. Set False to hold them fixed at the init values"
+                "(e.g. from calibration) so only the per-reflection shape/position"
+                "params are optimized."
+    use_analytic_jacobian = True
+        .type = bool
+        .help = "If True, use the complex-step semi-analytic Jacobian during"
+                "optimization (faster and less noisy). Set False to fall back to"
+                "finite differences for comparison."
 }
 
 mp{
@@ -258,12 +288,36 @@ mp{
         .help = "Number of processors to use during parallelized steps."
         "If set to auto DIALS will choose automatically."
 }
+init_bbox_tof_padding = 2
+    .type = int
+    .help = "Only used when calculated.bbox_from_foreground=True. Additional ToF"
+            "frames added to the initial bounding box estimate used to extract"
+            "each reflection's shoebox, before it is redefined from the"
+            "foreground mask extent."
+init_bbox_xy_padding = 1
+    .type = int
+    .help = "Only used when calculated.bbox_from_foreground=True. Additional"
+            "pixels added to the initial bounding box estimate used to extract"
+            "each reflection's shoebox, before it is redefined from the"
+            "foreground mask extent."
 bbox_tof_padding = 2
     .type = int
-    .help = "Additional ToF frames added to calculated bounding boxes"
+    .help = "Additional ToF frames added to calculated bounding boxes: when"
+            "redefining them from the foreground mask extent"
+            "(calculated.bbox_from_foreground=True), when copying from the"
+            "nearest observed reflection or average bbox size"
+            "(calculated.bbox_from_foreground=False), or, for"
+            "integration_type=observed, added directly to each observed"
+            "reflection's bounding box."
 bbox_xy_padding = 1
     .type = int
-    .help = "Additional pixels added to calculated bounding boxes"
+    .help = "Additional pixels added to calculated bounding boxes: when"
+            "redefining them from the foreground mask extent"
+            "(calculated.bbox_from_foreground=True), when copying from the"
+            "nearest observed reflection or average bbox size"
+            "(calculated.bbox_from_foreground=False), or, for"
+            "integration_type=observed, added directly to each observed"
+            "reflection's bounding box."
 partiality_n_sigma_xy = 2.5
     .type = float (value_min=0.1)
     .help = "Assumed number of sigma the bounding box half-width spans in x/y."
@@ -441,6 +495,8 @@ def integrate_reflection_table_for_experiment(
             p.n_restarts,
             True,
             p.optimize_convolution_params,
+            p.optimize_moderator_params,
+            p.use_analytic_jacobian,
             show_profile_failures,
         )
 
@@ -757,11 +813,16 @@ def get_predicted_calculated_reflections(
         f"Using {len(model_reflections)} observed reflections to calculate bounding boxes"
     )
 
-    # Get the closest observed reflection for each calculated reflection
-    # Use the observed bounding box as a basis for the calculated reflection
+    use_foreground_bbox = params.calculated.bbox_from_foreground
 
-    tof_padding = params.bbox_tof_padding
-    xy_padding = params.bbox_xy_padding
+    if use_foreground_bbox:
+        # This initial box is only used to extract the shoebox; it is redefined
+        # from the foreground mask extent (padded by bbox_*_padding) afterwards.
+        tof_padding = params.init_bbox_tof_padding
+        xy_padding = params.init_bbox_xy_padding
+    else:
+        tof_padding = params.bbox_tof_padding
+        xy_padding = params.bbox_xy_padding
     n_sigma_xy = params.partiality_n_sigma_xy
     n_sigma_z = params.partiality_n_sigma_z
     image_size = experiments[0].detector[0].get_image_size()
@@ -793,7 +854,7 @@ def get_predicted_calculated_reflections(
             expt_m_reflections = model_reflections.select(m_sel)
 
             for i in range(len(expt_p_reflections)):
-                if len(expt_m_reflections) == 0:
+                if use_foreground_bbox or len(expt_m_reflections) == 0:
                     c = expt_p_reflections["xyzcal.px"][i]
                     bbox = (
                         c[0] - avg_bbox_size[0],
@@ -956,6 +1017,17 @@ def run_integrate(
             params=params, experiments=experiments, reflections=reflections
         )
 
+    if params.wavelength_range is not None:
+        min_wavelength = float(params.wavelength_range[0])
+        max_wavelength = float(params.wavelength_range[1])
+        wavelength_sel = (predicted_reflections["wavelength_cal"] >= min_wavelength) & (
+            predicted_reflections["wavelength_cal"] <= max_wavelength
+        )
+        logger.info(
+            f"Removing {wavelength_sel.count(False)} reflections outside of range ({min_wavelength}, {max_wavelength}) (A)"
+        )
+        predicted_reflections = predicted_reflections.select(wavelength_sel)
+
     corrections_data = get_corrections_data(experiments=experiments, params=params)
 
     experiment_cls = experiments[0].imageset.get_format_class()
@@ -979,6 +1051,36 @@ def run_integrate(
         )
 
         expt_reflections = calculate_shoebox_masks(expt, expt_reflections, params)
+
+        if (
+            params.integration_type == "calculated"
+            and params.calculated.bbox_from_foreground
+        ):
+            logger.info("    Redefining bounding boxes from the foreground mask extent")
+            tof_calculate_bboxes_from_foreground_mask(
+                expt_reflections,
+                int(params.bbox_xy_padding),
+                int(params.bbox_tof_padding),
+                params.mp.nproc,
+            )
+
+            # Recompute partiality for the refined bounding boxes
+            image_size = expt.detector[0].get_image_size()
+            tof_size = len(expt.scan.get_property("time_of_flight"))
+            bounds = (0, image_size[0], 0, image_size[1], 0, tof_size)
+            centroids = expt_reflections["xyzcal.px"]
+            refined_bboxes = expt_reflections["bbox"]
+            partiality = flex.double(len(expt_reflections))
+            for i in range(len(expt_reflections)):
+                partiality[i] = compute_partiality(
+                    refined_bboxes[i],
+                    bounds,
+                    centroids[i],
+                    n_sigma_xy=params.partiality_n_sigma_xy,
+                    n_sigma_z=params.partiality_n_sigma_z,
+                )
+            expt_reflections["partiality"] = partiality
+
         expt_reflections.is_overloaded(experiments)
         expt_reflections.contains_invalid_pixels()
 
@@ -1024,6 +1126,14 @@ def run_integrate(
             params,
             **corrections_data,
         )
+
+        p = expt_reflections["partiality"]
+
+        expt_reflections["intensity.sum.value"] /= p
+        expt_reflections["intensity.sum.variance"] /= p * p
+        if "intensity.prf.value" in expt_reflections:
+            expt_reflections["intensity.prf.value"] /= p
+            expt_reflections["intensity.prf.variance"] /= p * p
 
         predicted_reflections.set_selected(sel_expt, expt_reflections)
 

@@ -202,7 +202,7 @@ namespace dials { namespace algorithms {
 
               // Variances
               double var_S = std::abs(raw_S);
-              double var_B = std::abs(var_B);
+              double var_B = std::abs(raw_B);
               if (n_background > 0) {
                 var_B *= (1.0 + double(n_signal) / double(n_background));
               }
@@ -518,7 +518,7 @@ namespace dials { namespace algorithms {
 
               // Variances
               double var_S = std::abs(raw_S);
-              double var_B = std::abs(var_B);
+              double var_B = std::abs(raw_B);
               if (n_background > 0) {
                 var_B *= (1.0 + double(n_signal) / double(n_background));
               }
